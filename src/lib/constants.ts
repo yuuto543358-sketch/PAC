@@ -131,12 +131,15 @@ export const EMPLOYEE_STATUS_LABEL: Record<string, string> = {
   offline: "休止中",
 };
 
-/** 選べるAIモデル（料金は src/lib/pricing.ts） */
+/** 選べるAIモデル（料金は src/lib/pricing.ts。ここに無いモデルは使えません） */
 export const MODEL_OPTIONS = [
-  { id: "claude-haiku-5-5", label: "Claude Haiku 5.5（軽量・低価格）" },
-  { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5（中位）" },
-  { id: "claude-opus-5-5", label: "Claude Opus 5.5（高性能・高価格）" },
+  { id: "gpt-5-nano", label: "GPT-5 nano（最安・簡単な作業向け）" },
+  { id: "gpt-5-mini", label: "GPT-5 mini（低価格・通常業務向け）" },
+  { id: "gpt-5", label: "GPT-5（高性能・高価格）" },
 ] as const;
+
+export const DEFAULT_MODEL_STANDARD = "gpt-5-mini";
+export const DEFAULT_MODEL_ADVANCED = "gpt-5";
 
 export const AUTORUN_OPTIONS = [
   { id: "off", label: "停止（初期設定）" },

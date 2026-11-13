@@ -27,7 +27,7 @@ export default async function HomePage() {
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
 
   const notices: { tone: "info" | "warn" | "error"; text: string; href?: string }[] = [];
-  if (!isAiConfigured()) notices.push({ tone: "error", text: "AIのAPIキーが未設定です。社員との会話はまだできません（READMEの手順4）。" });
+  if (!isAiConfigured()) notices.push({ tone: "error", text: "OpenAI の APIキー（OPENAI_API_KEY）が未設定です。社員との会話はまだできません（README の「環境変数」参照）。" });
   if (settings.emergency_stop) notices.push({ tone: "error", text: "緊急停止中：AIの呼び出しをすべて止めています。", href: "/settings" });
   if (spend.monthJpy >= hardLimit) notices.push({ tone: "error", text: "今月のAPI利用額が緊急停止ラインに達しました。", href: "/finance" });
   else if (spend.monthJpy >= budget.monthly_target_jpy)

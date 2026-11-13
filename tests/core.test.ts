@@ -68,14 +68,17 @@ describe("budget guard", () => {
   });
 
   it("estimates worst-case cost and records actual cost", async () => {
-    const est = estimateCostJpy("claude-haiku-5-5", 3000, 2500, 160)!;
+    const est = estimateCostJpy("gpt-5-mini", 3000, 2500, 160)!;
     expect(est).toBeGreaterThan(0);
-    expect(est).toBeLessThan(1); // 1円未満
-    expect(actualCostUsd("claude-haiku-5-5", { input_tokens: 1_000_000, output_tokens: 0 })).toBeCloseTo(0.1);
+    expect(est).toBeLessThan(2); // 最悪の場合でも2円未満
+    expect(actualCostUsd("gpt-5-mini", { input_tokens: 1_000_000, output_tokens: 0 })).toBeCloseTo(0.25);
+    // キャッシュ読み込み分は割引料金
+    expect(actualCostUsd("gpt-5-mini", { input_tokens: 1_000_000, cached_input_tokens: 1_000_000, output_tokens: 0 })).toBeCloseTo(0.025);
+    expect(actualCostUsd("gpt-5-mini", { input_tokens: 0, output_tokens: 1_000_000 })).toBeCloseTo(2);
 
     const sql = await getDb();
     const res = await reserveApiCall(sql, {
-      model: "claude-haiku-5-5",
+      model: "gpt-5-mini",
       purpose: "test",
       estInputTokens: 3000,
       maxOutputTokens: 2500,
@@ -84,7 +87,7 @@ describe("budget guard", () => {
     expect(fin.known).toBe(true);
     const [row] = await sql`select status, cost_jpy from api_usage where id = ${res.usageId}`;
     expect(row.status).toBe("completed");
-    expect(row.cost_jpy).toBeCloseTo(((2000 * 0.1 + 300 * 0.5) / 1e6) * 160, 6);
+    expect(row.cost_jpy).toBeCloseTo(((2000 * 0.25 + 300 * 2) / 1e6) * 160, 6);
     // 確定済みの記録は変更できない
     await expect(sql`update api_usage set cost_jpy = 0 where id = ${res.usageId}`).rejects.toThrow();
     await expect(sql`delete from api_usage where id = ${res.usageId}`).rejects.toThrow();
@@ -92,13 +95,13 @@ describe("budget guard", () => {
 
   it("records estimated cost when usage is unknown (safe side)", async () => {
     const sql = await getDb();
-    const res = await reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 100, maxOutputTokens: 100 });
+    const res = await reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 100, maxOutputTokens: 100 });
     await finalizeApiCall(sql, res, null);
     const [row] = await sql`select status, cost_jpy, estimated_cost_jpy from api_usage where id = ${res.usageId}`;
     expect(row.status).toBe("unknown");
     expect(row.cost_jpy).toBe(row.estimated_cost_jpy);
 
-    const res2 = await reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 100, maxOutputTokens: 100 });
+    const res2 = await reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 100, maxOutputTokens: 100 });
     await failApiCall(sql, res2, "timeout", true);
     const [row2] = await sql`select status, cost_jpy from api_usage where id = ${res2.usageId}`;
     expect(row2.status).toBe("unknown");
@@ -111,11 +114,11 @@ describe("budget guard", () => {
       reserveApiCall(sql, { model: "gpt-x", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
     ).rejects.toMatchObject({ code: "unknown_pricing" });
     await expect(
-      reserveApiCall(sql, { model: "claude-opus-5-5", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
+      reserveApiCall(sql, { model: "gpt-5", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
     ).rejects.toMatchObject({ code: "advanced_model_not_allowed" });
     await sql`update company_settings set emergency_stop = true`;
     await expect(
-      reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
+      reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
     ).rejects.toBeInstanceOf(BudgetBlockedError);
   });
 
@@ -123,11 +126,11 @@ describe("budget guard", () => {
     const sql = await getDb();
     await sql`update budgets set daily_limit_jpy = 0.001`;
     await expect(
-      reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 1000, maxOutputTokens: 1000 }),
+      reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 1000, maxOutputTokens: 1000 }),
     ).rejects.toMatchObject({ code: "daily_limit" });
     await sql`update budgets set daily_limit_jpy = 1000, emergency_stop_jpy = 0.001`;
     await expect(
-      reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 1000, maxOutputTokens: 1000 }),
+      reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 1000, maxOutputTokens: 1000 }),
     ).rejects.toMatchObject({ code: "monthly_limit" });
   });
 
@@ -137,30 +140,30 @@ describe("budget guard", () => {
     if (!r.created) throw new Error("not created");
     await sql`update budgets set max_calls_per_task = 2`;
     for (let i = 0; i < 2; i++) {
-      const res = await reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 10, maxOutputTokens: 10, taskId: r.task.id });
+      const res = await reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 10, maxOutputTokens: 10, taskId: r.task.id });
       await finalizeApiCall(sql, res, { input_tokens: 10, output_tokens: 10 });
     }
     await expect(
-      reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 10, maxOutputTokens: 10, taskId: r.task.id }),
+      reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 10, maxOutputTokens: 10, taskId: r.task.id }),
     ).rejects.toMatchObject({ code: "task_calls" });
 
     const [{ n }] = await sql`select count(*)::int as n from api_usage where created_at > now() - interval '1 minute'`;
     await sql`update budgets set max_calls_per_minute = ${Math.max(1, n)}`;
     await expect(
-      reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
+      reserveApiCall(sql, { model: "gpt-5-mini", purpose: "t", estInputTokens: 10, maxOutputTokens: 10 }),
     ).rejects.toMatchObject({ code: "rate_limit" });
   });
 
   it("does not exceed limit under concurrent reservations", async () => {
     const sql = await getDb();
-    const est = estimateCostJpy("claude-haiku-5-5", 1000, 1000, 160)!;
+    const est = estimateCostJpy("gpt-5-mini", 1000, 1000, 160)!;
     await sql`update budgets set max_calls_per_minute = 60, max_calls_per_day = 2000, daily_limit_jpy = 100000`;
     const [{ spent }] = await sql`select coalesce(sum(coalesce(cost_jpy, estimated_cost_jpy)),0)::float8 as spent from api_usage`;
     // ちょうど3回分だけ余裕がある上限
     await sql`update budgets set emergency_stop_jpy = ${spent + est * 3.5}, monthly_limit_jpy = 100000`;
     const results = await Promise.allSettled(
       Array.from({ length: 8 }, () =>
-        reserveApiCall(sql, { model: "claude-haiku-5-5", purpose: "c", estInputTokens: 1000, maxOutputTokens: 1000 }),
+        reserveApiCall(sql, { model: "gpt-5-mini", purpose: "c", estInputTokens: 1000, maxOutputTokens: 1000 }),
       ),
     );
     expect(results.filter((r) => r.status === "fulfilled").length).toBe(3);
@@ -298,6 +301,27 @@ describe("chat (mock AI)", () => {
     const r = await sendChatMessage(sql, "secretary", null, "こんにちは", false);
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/緊急停止/);
+  });
+});
+
+describe("OpenAI structured output schema", () => {
+  it("builds a strict JSON schema accepted by OpenAI (all fields required, no extra fields)", async () => {
+    const { zodTextFormat } = await import("openai/helpers/zod");
+    const { ChatOutputSchema } = await import("@/lib/ai/chat");
+    const fmt = zodTextFormat(ChatOutputSchema, "employee_chat_reply");
+    expect(fmt.type).toBe("json_schema");
+    expect(fmt.strict).toBe(true);
+    const check = (node: Record<string, unknown>) => {
+      if (node.type === "object") {
+        expect(node.additionalProperties).toBe(false);
+        const props = Object.keys(node.properties as object);
+        expect([...(node.required as string[])].sort()).toEqual([...props].sort());
+        for (const v of Object.values(node.properties as Record<string, Record<string, unknown>>)) check(v);
+      }
+      if (node.type === "array") check(node.items as Record<string, unknown>);
+      if (Array.isArray(node.anyOf)) for (const v of node.anyOf) check(v);
+    };
+    check(fmt.schema as Record<string, unknown>);
   });
 });
 

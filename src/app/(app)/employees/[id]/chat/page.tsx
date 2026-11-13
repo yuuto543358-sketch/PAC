@@ -10,6 +10,9 @@ import { Avatar } from "@/components/Avatar";
 import { PageHeader } from "@/components/ui";
 import { ChatComposer, ScrollToBottom } from "./ChatComposer";
 
+// AIの返事を待つ時間（秒）。AI呼び出し自体は90秒で打ち切ります。
+export const maxDuration = 120;
+
 export default async function ChatPage({
   params,
   searchParams,
@@ -122,7 +125,7 @@ export default async function ChatPage({
       <ChatComposer
         employeeId={e.id}
         conversationId={conv?.id ?? null}
-        disabledReason={!aiReady ? "AIのAPIキーが未設定のため、まだ会話できません（READMEの手順4）。" : settings.emergency_stop ? "緊急停止中のため会話できません（設定画面で解除できます）。" : null}
+        disabledReason={!aiReady ? "OpenAI の APIキー（OPENAI_API_KEY）が未設定のため、まだ会話できません。Vercel の環境変数に追加してください（README 参照）。" : settings.emergency_stop ? "緊急停止中のため会話できません（設定画面で解除できます）。" : null}
         advancedAllowed={settings.advanced_model_allowed}
       />
     </div>

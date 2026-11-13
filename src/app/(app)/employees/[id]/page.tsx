@@ -9,6 +9,9 @@ import { Avatar } from "@/components/Avatar";
 import { ChevronRight, Empty, Page, PageHeader, PhaseNotice, Section, TaskStatusBadge } from "@/components/ui";
 import { DirectInstructionForm, RatingForm } from "./forms";
 
+// AIの返事を待つ時間（秒）。AI呼び出し自体は90秒で打ち切ります。
+export const maxDuration = 120;
+
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sql = await getDb();

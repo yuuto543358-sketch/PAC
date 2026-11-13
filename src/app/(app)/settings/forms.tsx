@@ -115,7 +115,7 @@ export function ModelForm({ initial }: { initial: { model_standard: string; mode
       </label>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="advanced_model_allowed" defaultChecked={initial.advanced_model_allowed} className="h-5 w-5" />
-        高性能モデルの利用を許可する（費用が20〜40倍になります）
+        高性能モデルの利用を許可する（費用が約5倍になります）
       </label>
       <label className="block">
         <span className="label">為替レート（1ドルあたりの円）</span>

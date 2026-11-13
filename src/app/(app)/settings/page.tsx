@@ -60,7 +60,7 @@ export default async function SettingsPage() {
         <Section title="AIモデル">
           <div className="card p-4">
             <p className="mb-3 text-sm">
-              APIキー：
+              OpenAI APIキー：
               {isMockMode() ? <span className="font-semibold text-danger">テスト用モック</span> : isAiConfigured() ? <span className="font-semibold text-success">設定済み</span> : <span className="font-semibold text-danger">未設定</span>}
               <span className="ml-1 text-xs text-muted">（キーはサーバーにだけ保存され、この画面には表示されません）</span>
             </p>

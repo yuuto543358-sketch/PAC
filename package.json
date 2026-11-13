@@ -12,8 +12,8 @@
     "e2e": "node tests/e2e/flow.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0",
     "next": "16.4.6",
+    "openai": "^7.56.0",
     "postgres": "^4.1.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -32,6 +32,6 @@
     "vitest": "^5.1.0"
   },
   "engines": {
-    "node": ">=20.19"
+    "node": "22.x"
   }
 }

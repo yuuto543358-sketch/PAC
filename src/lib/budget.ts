@@ -188,8 +188,8 @@ export async function finalizeApiCall(
   await db`
     update api_usage set status = 'completed',
       input_tokens = ${usage.input_tokens ?? 0}, output_tokens = ${usage.output_tokens ?? 0},
-      cache_read_tokens = ${usage.cache_read_input_tokens ?? 0},
-      cache_write_tokens = ${usage.cache_creation_input_tokens ?? 0},
+      cache_read_tokens = ${usage.cached_input_tokens ?? 0},
+      cache_write_tokens = ${usage.cache_write_tokens ?? 0},
       cost_usd = ${usd}, cost_jpy = ${jpy}, completed_at = now(), request_id = ${requestId ?? null}
     where id = ${reservation.usageId} and status = 'reserved'`;
   return { costJpy: jpy, known: true };

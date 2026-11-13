@@ -381,4 +381,15 @@ begin
 end $$;
 `,
   },
+  {
+    version: 2,
+    name: "switch_ai_provider_to_openai",
+    sql: /* sql */ `
+-- AIの提供元を OpenAI に変更。以前の設定（Claude のモデル名）が残っていれば置き換える。
+alter table company_settings alter column model_standard set default 'gpt-5-mini';
+alter table company_settings alter column model_advanced set default 'gpt-5';
+update company_settings set model_standard = 'gpt-5-mini', updated_at = now() where model_standard like 'claude-%';
+update company_settings set model_advanced = 'gpt-5', updated_at = now() where model_advanced like 'claude-%';
+`,
+  },
 ];

@@ -1,10 +1,9 @@
 import "server-only";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { APPROVAL_ACTION_TYPES, APPROVAL_ACTION_LABEL } from "@/lib/constants";
 import { BudgetBlockedError } from "@/lib/budget";
-import { AiUnavailableError, callStructured } from "@/lib/ai/client";
+import { AiUnavailableError, callStructured, type ChatTurn } from "@/lib/ai/client";
 import { buildChatSystemPrompt } from "@/lib/ai/prompts";
 import { getSettings } from "@/lib/repo/settings";
 import { listEmployees } from "@/lib/repo/employees";
@@ -132,7 +131,7 @@ export async function sendChatMessage(
   const openTasks = await listTasks(sql, { view: "active" }, 15);
   const system = buildChatSystemPrompt({ settings, employee, roster, openTasks, todayJst: todayJst() });
 
-  const messages: Anthropic.MessageParam[] = [];
+  const messages: ChatTurn[] = [];
   for (const m of history) {
     if (m.role === "notice") continue;
     const content = m.content.slice(0, MAX_MESSAGE_CHARS_IN_HISTORY);
@@ -152,6 +151,7 @@ export async function sendChatMessage(
       system,
       messages,
       schema: ChatOutputSchema,
+      schemaName: "employee_chat_reply",
       purpose: `chat:${employeeId}`,
       employeeId,
       conversationId: convId,
