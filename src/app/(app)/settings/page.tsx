@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const [settings, budget, employees] = await Promise.all([getSettings(sql), getBudget(sql), listEmployees(sql)]);
   return (
     <>
-      <PageHeader title="設定" back="/more" />
+      <PageHeader title="設定" back="/more" backLabel="メニュー" />
       <Page>
         <Section title="緊急停止">
           <div className="card p-4">
@@ -34,7 +34,7 @@ export default async function SettingsPage() {
         </Section>
 
         <Section title="社員情報">
-          <ul className="card divide-y divide-line">
+          <ul className="card divide-y divide-separator">
             {employees.map((e) => (
               <li key={e.id}>
                 <Link href={`/settings/employees/${e.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-2">

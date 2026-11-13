@@ -47,3 +47,26 @@ export function relativeTime(d: Date | string | null | undefined): string {
 export function todayJst(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
 }
+
+/** 日本時間の時刻に合わせたあいさつ */
+export function greeting(d: Date = new Date()): string {
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", hour: "numeric", hour12: false }).format(d)) % 24;
+  if (h >= 4 && h < 11) return "おはようございます";
+  if (h >= 11 && h < 18) return "こんにちは";
+  return "こんばんは";
+}
+
+/** 日付の区切り表示用（今日・昨日・M月D日） */
+export function dayLabel(d: Date | string): string {
+  const fmt = (x: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(x);
+  const target = fmt(new Date(d));
+  const today = fmt(new Date());
+  const yesterday = fmt(new Date(Date.now() - 86400000));
+  if (target === today) return "今日";
+  if (target === yesterday) return "昨日";
+  return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" }).format(new Date(d));
+}
+
+export function timeOnly(d: Date | string): string {
+  return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(new Date(d));
+}

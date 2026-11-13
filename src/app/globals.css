@@ -2,46 +2,62 @@
 
 /* ===== 色の設定（ライト / ダーク） ===== */
 :root {
-  --bg: #f3f4f7;
+  --bg: #f2f3f7;
   --surface: #ffffff;
-  --surface-2: #f7f8fa;
-  --border: #e3e6ec;
-  --text: #141824;
-  --muted: #5d6475;
-  --brand: #1d3a8a;
-  --brand-2: #2f55c6;
+  --surface-2: #f5f6f9;
+  --surface-3: #eceef3;
+  --border: #e4e7ee;
+  --separator: rgba(60, 60, 67, 0.12);
+  --text: #11141c;
+  --muted: #646b7b;
+  --faint: #9aa0ad;
+  --brand: #2348b8;
+  --brand-2: #3d66e0;
+  --brand-deep: #14286a;
   --brand-fg: #ffffff;
-  --brand-soft: #e7edfb;
-  --accent: #b45309;
-  --accent-soft: #fdf1e2;
+  --brand-soft: #e8eefc;
+  --accent: #c2410c;
+  --accent-soft: #fff1e6;
   --success: #15803d;
-  --success-soft: #e5f5ea;
-  --danger: #b91c1c;
-  --danger-soft: #fbe9e9;
-  --info-soft: #eaf1fd;
-  --tabbar: rgba(255, 255, 255, 0.92);
+  --success-soft: #e6f6ec;
+  --danger: #d12d2d;
+  --danger-soft: #fdecec;
+  --info-soft: #ebf1fd;
+  --tabbar: rgba(250, 250, 252, 0.86);
+  --bar: rgba(242, 243, 247, 0.82);
+  --shadow-sm: 0 1px 2px rgba(17, 20, 28, 0.04), 0 1px 1px rgba(17, 20, 28, 0.03);
+  --shadow-md: 0 4px 18px rgba(17, 20, 28, 0.07), 0 1px 3px rgba(17, 20, 28, 0.05);
+  --shadow-lg: 0 12px 40px rgba(17, 20, 28, 0.16);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e1118;
-    --surface: #171b25;
-    --surface-2: #1d2230;
-    --border: #2a3142;
-    --text: #e9ecf3;
-    --muted: #9aa3b5;
-    --brand: #7aa2ff;
-    --brand-2: #9db9ff;
-    --brand-fg: #0e1118;
-    --brand-soft: #1d2847;
-    --accent: #f5a524;
-    --accent-soft: #3a2a12;
+    --bg: #0b0d13;
+    --surface: #161a24;
+    --surface-2: #1c212d;
+    --surface-3: #252b39;
+    --border: #262c3a;
+    --separator: rgba(235, 235, 245, 0.1);
+    --text: #eef0f6;
+    --muted: #9ba3b4;
+    --faint: #6b7385;
+    --brand: #7fa3ff;
+    --brand-2: #a2bdff;
+    --brand-deep: #0f1d4d;
+    --brand-fg: #0b0d13;
+    --brand-soft: #1b2748;
+    --accent: #ffa94d;
+    --accent-soft: #3a2712;
     --success: #4ade80;
-    --success-soft: #133222;
-    --danger: #f87171;
-    --danger-soft: #3b1a1a;
-    --info-soft: #1a2540;
-    --tabbar: rgba(23, 27, 37, 0.92);
+    --success-soft: #12301f;
+    --danger: #ff7b7b;
+    --danger-soft: #3b1818;
+    --info-soft: #18233f;
+    --tabbar: rgba(18, 21, 29, 0.86);
+    --bar: rgba(11, 13, 19, 0.82);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 18px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -49,11 +65,15 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-line: var(--border);
+  --color-separator: var(--separator);
   --color-ink: var(--text);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-brand: var(--brand);
   --color-brand-2: var(--brand-2);
+  --color-brand-deep: var(--brand-deep);
   --color-brand-fg: var(--brand-fg);
   --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
@@ -63,7 +83,10 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-info-soft: var(--info-soft);
-  --font-sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+  --shadow-card: var(--shadow-sm);
+  --shadow-float: var(--shadow-md);
+  --shadow-pop: var(--shadow-lg);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
     "Yu Gothic UI", Meiryo, sans-serif;
 }
 
@@ -78,6 +101,27 @@ body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  font-feature-settings: "palt" 1;
+}
+
+/* タップの反応を速くする（ダブルタップ拡大の待ち時間をなくす） */
+a,
+button,
+input,
+select,
+textarea,
+label,
+summary {
+  touch-action: manipulation;
+}
+
+/* ボタンやメニューは長押しで文字選択・メニューが出ないようにする */
+nav,
+button,
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* iPhone で入力欄をタップしたときに拡大されないよう、16px 以上にする */
@@ -87,6 +131,15 @@ textarea {
   font-size: 16px;
 }
 
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -94,39 +147,126 @@ textarea {
   padding-top: env(safe-area-inset-top);
 }
 
-/* よく使う部品 */
-@utility card {
-    @apply rounded-2xl border border-line bg-surface;
+/* ===== 動き（控えめ・動きを減らす設定の人には止める） ===== */
+@keyframes pac-shimmer {
+  0% {
+    background-position: -200px 0;
   }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+@keyframes pac-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes pac-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes pac-typing {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-3) 0, var(--surface-2) 50%, var(--surface-3) 100%);
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  background-color: var(--surface-3);
+  animation: pac-shimmer 1.3s ease-in-out infinite;
+  border-radius: 10px;
+}
+.toast-in {
+  animation: pac-toast-in 0.22s ease-out;
+}
+.fade-up {
+  animation: pac-fade-up 0.25s ease-out both;
+}
+.typing-dot {
+  animation: pac-typing 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .toast-in,
+  .fade-up,
+  .typing-dot {
+    animation: none;
+  }
+}
+
+/* ===== よく使う部品 ===== */
+@utility card {
+  @apply rounded-[18px] bg-surface shadow-card ring-1 ring-line/60;
+}
+
+@utility press {
+  @apply transition-[transform,opacity,background-color] duration-150 active:scale-[0.98] active:opacity-80;
+}
 
 @utility field {
-    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-ink outline-none placeholder:text-muted focus:border-brand;
-  }
+  @apply w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-ink outline-none transition-colors placeholder:text-faint focus:border-brand focus:ring-4 focus:ring-brand/10;
+}
 
 @utility label {
-    @apply mb-1 block text-sm font-medium text-muted;
-  }
+  @apply mb-1.5 block text-[13px] font-semibold text-muted;
+}
 
 @utility btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-4 text-[15px] font-semibold transition-opacity active:opacity-70 disabled:opacity-50;
-  }
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] px-5 text-[16px] font-semibold transition-[transform,opacity] duration-150 active:scale-[0.98] active:opacity-80 disabled:opacity-45;
+}
 
 @utility btn-primary {
-    @apply btn bg-brand text-brand-fg;
-  }
+  @apply btn bg-brand text-brand-fg shadow-card;
+}
 
 @utility btn-secondary {
-    @apply btn border border-line bg-surface text-ink;
-  }
+  @apply btn bg-surface text-ink ring-1 ring-line;
+}
+
+@utility btn-tinted {
+  @apply btn bg-brand-soft text-brand;
+}
 
 @utility btn-danger {
-    @apply btn bg-danger text-white;
-  }
+  @apply btn bg-danger text-white;
+}
 
 @utility btn-accent {
-    @apply btn bg-accent text-white;
-  }
+  @apply btn bg-accent text-white;
+}
 
 @utility section-title {
-    @apply mb-2 px-1 text-[13px] font-semibold tracking-wide text-muted;
-  }
+  @apply mb-2 px-1 text-[13px] font-semibold tracking-wide text-muted;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}

@@ -4,7 +4,9 @@ import { getDb } from "@/lib/db";
 import { getApproval, getApprovalEvents } from "@/lib/repo/approvals";
 import { APPROVAL_ACTION_LABEL } from "@/lib/constants";
 import { dateTime, yen } from "@/lib/format";
-import { Alert, ApprovalStatusBadge, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import { Alert, ApprovalStatusBadge, IconTile, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { APPROVAL_ACTION_STYLE } from "@/lib/approval-style";
 import { DecisionForm, ResubmitForm } from "./forms";
 
 const EVENT_LABEL: Record<string, string> = {
@@ -40,17 +42,35 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
 
   return (
     <>
-      <PageHeader title="承認依頼" back="/approvals" />
+      <PageHeader title="承認依頼" back="/approvals" backLabel="承認" large={false} />
       <Page>
-        <div className={`card p-4 ${a.status === "pending" ? "border-accent" : ""}`}>
-          <div className="flex items-center gap-2">
-            <ApprovalStatusBadge status={a.status} />
-            <span className="text-xs text-muted">{dateTime(a.created_at)} 提出</span>
+        <div className="card p-5">
+          <div className="flex items-start gap-3.5">
+            <IconTile name={APPROVAL_ACTION_STYLE[a.action_type].icon} color={APPROVAL_ACTION_STYLE[a.action_type].color} size={48} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <ApprovalStatusBadge status={a.status} />
+                <span className="text-[12px] text-muted">{dateTime(a.created_at)} 提出</span>
+              </div>
+              <h2 className="mt-1.5 text-[20px] leading-snug font-bold tracking-tight">{a.title}</h2>
+              <p className="mt-0.5 text-[13px] text-muted">{APPROVAL_ACTION_LABEL[a.action_type]}</p>
+            </div>
           </div>
-          <h2 className="mt-2 text-lg font-bold">{a.title}</h2>
+          <div className="mt-4 grid grid-cols-2 gap-2 rounded-[14px] bg-surface-2 p-3 text-center">
+            <div>
+              <div className="text-[11px] font-semibold text-muted">発生する費用</div>
+              <div className="tabular mt-0.5 text-[20px] font-bold">{yen(a.estimated_cost_jpy)}</div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-muted">担当社員</div>
+              <div className="mt-1 truncate text-[15px] font-semibold">{a.requester_name ?? "—"}</div>
+            </div>
+          </div>
           {a.task_id && (
-            <Link href={`/tasks/${a.task_id}`} className="mt-1 inline-block text-sm text-brand">
-              関連業務：{a.task_title} ›
+            <Link href={`/tasks/${a.task_id}`} className="press mt-3 flex items-center gap-2 rounded-[12px] bg-brand-soft px-3 py-2.5 text-[14px] font-medium text-brand">
+              <Icon name="tasks" size={18} stroke={2} />
+              <span className="min-w-0 flex-1 truncate">関連業務：{a.task_title}</span>
+              <Icon name="chevronRight" size={16} stroke={2.4} />
             </Link>
           )}
         </div>
@@ -67,15 +87,15 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
         )}
 
         <Section title="実行しようとしている内容">
-          <div className="card p-4 text-[15px] whitespace-pre-wrap">{a.content}</div>
+          <div className="card p-4 text-[16px] leading-relaxed whitespace-pre-wrap">{a.content}</div>
         </Section>
 
         <Section title="詳細">
-          <dl className="card divide-y divide-line text-sm">
+          <dl className="card divide-y divide-separator text-[15px]">
             {rows.map(([k, v]) => (
-              <div key={k} className="px-4 py-3">
-                <dt className="text-xs font-semibold text-muted">{k}</dt>
-                <dd className="mt-1 whitespace-pre-wrap">{v}</dd>
+              <div key={k} className="px-4 py-3.5">
+                <dt className="text-[12px] font-semibold text-muted">{k}</dt>
+                <dd className="mt-1 leading-relaxed whitespace-pre-wrap">{v}</dd>
               </div>
             ))}
           </dl>
@@ -86,9 +106,13 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
             <div className="card p-4">
               <DecisionForm approvalId={a.id} hash={a.content_hash} isOnHold={a.status === "on_hold"} />
             </div>
-            <details className="card mt-2.5">
-              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">内容を修正して再提出 ›</summary>
-              <div className="border-t border-line p-4">
+            <details className="card mt-3 overflow-hidden">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3.5 text-[15px] font-semibold">
+                <Icon name="edit" size={18} stroke={2} className="text-muted" />
+                内容を修正して再提出
+                <Icon name="chevronRight" size={16} stroke={2.4} className="ml-auto text-faint" />
+              </summary>
+              <div className="border-t border-separator p-4">
                 <ResubmitForm
                   approvalId={a.id}
                   hash={a.content_hash}
@@ -120,7 +144,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
         )}
 
         <Section title="承認履歴（変更・削除できない記録）">
-          <ol className="card divide-y divide-line text-sm">
+          <ol className="card divide-y divide-separator text-sm">
             {events.map((ev) => (
               <li key={ev.id} className="px-4 py-2.5">
                 <div className="text-xs text-muted">{dateTime(ev.created_at)}</div>
@@ -133,6 +157,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
           </ol>
           <p className="mt-2 px-1 text-[11px] break-all text-muted">内容の指紋（改ざん検出用）: {a.content_hash}</p>
         </Section>
+        {open && <div className="h-16" aria-hidden />}
       </Page>
     </>
   );

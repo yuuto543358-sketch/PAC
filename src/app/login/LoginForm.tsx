@@ -2,12 +2,12 @@
 
 import { useActionState } from "react";
 import { login, type LoginState } from "@/app/actions/auth";
-import { SubmitButton } from "@/components/forms";
+import { FormError, SubmitButton } from "@/components/forms";
 
 export function LoginForm() {
   const [state, action] = useActionState<LoginState, FormData>(login, {});
   return (
-    <form action={action} className="card space-y-4 p-5">
+    <form action={action} className="card space-y-4 p-5 shadow-pop">
       <div>
         <label htmlFor="password" className="label">
           パスワード
@@ -22,11 +22,7 @@ export function LoginForm() {
           placeholder="設定したパスワード"
         />
       </div>
-      {state.error && (
-        <p role="alert" className="rounded-xl bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
-          {state.error}
-        </p>
-      )}
+      <FormError message={state.error} />
       <SubmitButton pendingText="確認中…">ログイン</SubmitButton>
     </form>
   );

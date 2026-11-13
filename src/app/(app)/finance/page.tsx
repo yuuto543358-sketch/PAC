@@ -29,7 +29,7 @@ export default async function FinancePage() {
 
   return (
     <>
-      <PageHeader title="財務管理" subtitle="今月（日本時間）の集計" back="/more" />
+      <PageHeader title="財務管理" subtitle="今月（日本時間）の集計" back="/more" backLabel="メニュー" />
       <Page>
         <Section title="AI API 利用料">
           <div className="card p-4">
@@ -108,7 +108,7 @@ export default async function FinancePage() {
           {byTask.length === 0 ? (
             <p className="card px-4 py-4 text-sm text-muted">今月はまだ利用がありません。</p>
           ) : (
-            <ul className="card divide-y divide-line text-sm">
+            <ul className="card divide-y divide-separator text-sm">
               {byTask.map((t) => (
                 <li key={t.task_id ?? "none"} className="flex justify-between gap-3 px-4 py-2.5">
                   {t.task_id ? (
@@ -165,7 +165,7 @@ export default async function FinancePage() {
           {history.length === 0 ? (
             <p className="card px-4 py-4 text-sm text-muted">まだ利用履歴はありません。</p>
           ) : (
-            <ul className="card divide-y divide-line text-sm">
+            <ul className="card divide-y divide-separator text-sm">
               {history.map((u) => (
                 <li key={u.id} className="px-4 py-2.5">
                   <div className="flex justify-between gap-2">

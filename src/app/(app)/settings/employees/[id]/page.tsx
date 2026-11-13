@@ -11,7 +11,7 @@ export default async function EmployeeEditPage({ params }: { params: Promise<{ i
   if (!e) notFound();
   return (
     <>
-      <PageHeader title="社員情報の編集" subtitle={e.name} back="/settings" />
+      <PageHeader title="社員情報の編集" subtitle={e.name} back="/settings" backLabel="設定" />
       <Page>
         <EmployeeEditForm
           e={{

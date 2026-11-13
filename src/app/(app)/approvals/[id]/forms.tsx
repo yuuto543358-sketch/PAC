@@ -8,21 +8,31 @@ export function DecisionForm({ approvalId, hash, isOnHold }: { approvalId: strin
     <ActionForm action={decideApprovalAction}>
       <input type="hidden" name="approvalId" value={approvalId} />
       <input type="hidden" name="hash" value={hash} />
-      <textarea name="note" rows={2} maxLength={2000} className="field" placeholder="判断メモ（任意）：却下の理由など" />
-      <div className="grid grid-cols-2 gap-2">
-        <SubmitButton name="decision" value="approve" className="btn-primary col-span-2" confirmText="この内容で承認しますか？">
-          承認する
-        </SubmitButton>
-        <SubmitButton name="decision" value="reject" className="btn-danger" confirmText="却下しますか？">
-          却下する
-        </SubmitButton>
-        {!isOnHold ? (
-          <SubmitButton name="decision" value="hold" className="btn-secondary">
-            保留する
+      <label className="block">
+        <span className="label">判断メモ（任意）</span>
+        <textarea name="note" rows={2} maxLength={2000} className="field" placeholder="却下の理由・注意点など" />
+      </label>
+      <p className="text-[12px] text-muted">下のボタンで判断します。承認は、この画面に表示されている内容・実行先・費用に対してだけ有効です。</p>
+      {/* 画面の下に固定される判断ボタン（iPhone アプリのアクションバー風） */}
+      <div
+        className="fixed inset-x-0 z-20 bg-[var(--tabbar)] shadow-[0_-0.5px_0_var(--separator)] backdrop-blur-xl backdrop-saturate-150"
+        style={{ bottom: "calc(54px + env(safe-area-inset-bottom))" }}
+      >
+        <div className="mx-auto grid max-w-2xl grid-cols-[1fr_1fr_1.6fr] gap-2 px-3 py-2.5">
+          <SubmitButton name="decision" value="reject" className="btn-secondary min-h-11 px-2 text-[15px] text-danger" confirmText="却下しますか？" pendingText="…">
+            却下する
           </SubmitButton>
-        ) : (
-          <span className="btn-secondary pointer-events-none opacity-60">保留中</span>
-        )}
+          {!isOnHold ? (
+            <SubmitButton name="decision" value="hold" className="btn-secondary min-h-11 px-2 text-[15px]" pendingText="…">
+              保留する
+            </SubmitButton>
+          ) : (
+            <span className="btn-secondary pointer-events-none min-h-11 px-2 text-[15px] opacity-60">保留中</span>
+          )}
+          <SubmitButton name="decision" value="approve" className="btn-primary min-h-11 px-2 text-[15px]" confirmText="この内容で承認しますか？" pendingText="処理中…">
+            承認する
+          </SubmitButton>
+        </div>
       </div>
     </ActionForm>
   );

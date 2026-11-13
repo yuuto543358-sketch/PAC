@@ -26,45 +26,45 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <PageHeader title="業務の詳細" back="/tasks" />
+      <PageHeader title="業務の詳細" back="/tasks" backLabel="業務" large={false} />
       <Page>
-        <div className="card p-4">
+        <div className="card p-5">
           <div className="flex flex-wrap items-center gap-1.5">
             <TaskStatusBadge status={task.status} />
             <PriorityBadge priority={task.priority} />
-            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted">{TASK_SOURCE_LABEL[task.source]}</span>
+            <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] text-muted">{TASK_SOURCE_LABEL[task.source]}</span>
           </div>
-          <h2 className="mt-2 text-lg font-bold">{task.title}</h2>
-          {task.description && <p className="mt-2 text-sm whitespace-pre-wrap text-ink/85">{task.description}</p>}
-          <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
+          <h2 className="mt-2.5 text-[22px] leading-snug font-bold tracking-tight">{task.title}</h2>
+          {task.description && <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-wrap text-ink/85">{task.description}</p>}
+          <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 rounded-[14px] bg-surface-2 p-3.5 text-[14px]">
             <div>
-              <dt className="text-xs text-muted">担当</dt>
+              <dt className="text-[11px] font-semibold text-muted">担当</dt>
               <dd className="font-medium">
                 {task.assignee_id ? <Link href={`/employees/${task.assignee_id}`} className="text-brand">{task.assignee_name}</Link> : "未定"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">部署</dt>
+              <dt className="text-[11px] font-semibold text-muted">部署</dt>
               <dd className="font-medium">{task.department_name ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">登録者</dt>
+              <dt className="text-[11px] font-semibold text-muted">登録者</dt>
               <dd className="font-medium">{task.creator_name ?? "経営者"}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">期限</dt>
+              <dt className="text-[11px] font-semibold text-muted">期限</dt>
               <dd className="font-medium">{task.due_date ?? "なし"}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">発生日</dt>
+              <dt className="text-[11px] font-semibold text-muted">発生日</dt>
               <dd className="font-medium">{dateTime(task.created_at)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">完了日</dt>
+              <dt className="text-[11px] font-semibold text-muted">完了日</dt>
               <dd className="font-medium">{dateTime(task.completed_at)}</dd>
             </div>
             <div className="col-span-2">
-              <dt className="text-xs text-muted">API費用（使用額／業務予算）・AI呼び出し回数</dt>
+              <dt className="text-[11px] font-semibold text-muted">API費用（使用額／業務予算）・AI呼び出し回数</dt>
               <dd className="font-medium">
                 {yen(task.spent_jpy)} ／ {yen(task.budget_limit_jpy)} ・ {task.ai_call_count}回
               </dd>
@@ -87,7 +87,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
         {approvals.length > 0 && (
           <Section title="関連する承認依頼">
-            <ul className="card divide-y divide-line">
+            <ul className="card divide-y divide-separator">
               {approvals.map((a) => (
                 <li key={a.id}>
                   <Link href={`/approvals/${a.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
@@ -124,7 +124,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           {usage.length === 0 ? (
             <p className="card px-4 py-4 text-sm text-muted">この業務ではまだAIを使っていません。</p>
           ) : (
-            <ul className="card divide-y divide-line text-sm">
+            <ul className="card divide-y divide-separator text-sm">
               {usage.map((u) => (
                 <li key={u.id} className="flex justify-between px-4 py-2.5">
                   <span>
@@ -140,9 +140,9 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <Section title="進行履歴（変更・削除できない記録）">
           <ol className="card space-y-0 p-4">
             {logs.map((l, i) => (
-              <li key={l.id} className="relative pb-4 pl-5 last:pb-0">
-                {i < logs.length - 1 && <span className="absolute top-2 left-[5px] h-full w-px bg-line" />}
-                <span className="absolute top-1.5 left-0 h-[11px] w-[11px] rounded-full border-2 border-brand bg-surface" />
+              <li key={l.id} className="relative pb-4 pl-6 last:pb-0">
+                {i < logs.length - 1 && <span className="absolute top-3 left-[5.5px] h-full w-px bg-separator" />}
+                <span className="absolute top-1.5 left-0 h-3 w-3 rounded-full border-[3px] border-brand bg-surface" />
                 <div className="text-xs text-muted">
                   {dateTime(l.created_at)} ・ {l.actor_type === "user" ? "経営者" : l.actor_type === "employee" ? (l.actor_name ?? "社員") : "システム"}
                 </div>

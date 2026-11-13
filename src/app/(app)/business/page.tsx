@@ -21,7 +21,7 @@ const FIELDS = [
 export default function BusinessPage() {
   return (
     <>
-      <PageHeader title="事業開発" back="/more" />
+      <PageHeader title="事業開発" back="/more" backLabel="メニュー" />
       <Page>
         <PhaseNotice phase="Phase 3〜4">
           AI社員（事業開発担当・調査担当・財務担当）が事業候補を発掘・評価し、この画面で進捗を管理できるようになります。現在はまだ使えません。

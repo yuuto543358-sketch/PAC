@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { countPendingApprovals } from "@/lib/repo/approvals";
 import { isMockMode } from "@/lib/ai/client";
 import { TabBar } from "@/components/TabBar";
+import { Toaster } from "@/components/Toaster";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh">
       {isMockMode() && (
-        <div className="pt-safe bg-danger px-4 py-1.5 text-center text-xs font-bold text-white">
+        <div className="pt-safe bg-danger px-4 py-1 text-center text-[11px] font-bold text-white">
           テスト用モック応答モード（AI_MOCK=1）：AIの返答は本物ではありません
         </div>
       )}
       {children}
       <TabBar pendingApprovals={pending} />
+      <Toaster />
     </div>
   );
 }

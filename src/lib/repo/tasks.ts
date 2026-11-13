@@ -266,3 +266,28 @@ export async function countTasks(db: Db) {
     from tasks`;
   return row;
 }
+
+export type Activity = {
+  id: number;
+  task_id: string;
+  task_title: string;
+  actor_type: "user" | "employee" | "system";
+  actor_employee_id: string | null;
+  actor_name: string | null;
+  avatar_color: string | null;
+  avatar_style: string | null;
+  action: string;
+  message: string;
+  created_at: Date;
+};
+
+/** 会社の最近の動き（業務履歴の新しいもの） */
+export async function listRecentActivity(db: Db, limit = 6): Promise<Activity[]> {
+  return db<Activity[]>`
+    select l.id, l.task_id, t.title as task_title, l.actor_type, l.actor_employee_id, e.name as actor_name,
+      e.avatar_color, e.avatar_style, l.action, l.message, l.created_at
+    from task_logs l
+    join tasks t on t.id = l.task_id
+    left join employees e on e.id = l.actor_employee_id
+    order by l.id desc limit ${limit}`;
+}

@@ -50,7 +50,8 @@ await page.getByText("天城 翔").click();
 await page.getByText("直接指示を出す").waitFor();
 await shot("03-employee-detail");
 
-// 評価
+// 評価（「評価」タブ）
+await page.getByRole("tab", { name: "評価" }).click();
 await page.getByRole("radio", { name: "4点" }).click();
 await page.fill("textarea[name=comment]", "丁寧な対応でした");
 await page.getByRole("button", { name: "評価を記録する" }).click();
@@ -76,8 +77,12 @@ await page.click("button[aria-label=送信]");
 await page.getByText("すでにあるため、新しく登録しませんでした").waitFor({ timeout: 20000 });
 check("重複した業務は登録されない", true);
 
+// チャット画面は全画面（下のメニューを隠す）
+check("チャット画面では下のメニューを隠す", (await page.locator("nav[aria-label=メインメニュー]").count()) === 0);
+
 // --- 承認 ---
-const badge = await page.locator("nav a[href='/approvals'] span").last().textContent();
+await page.goto(`${BASE}/`);
+const badge = await page.locator("nav[aria-label=メインメニュー] a[href='/approvals'] span").last().textContent();
 check("承認タブに未確認件数バッジ", badge?.trim() === "1", `badge=${badge}`);
 await page.click("nav >> text=承認");
 await page.getByText("未確認 1件").waitFor();

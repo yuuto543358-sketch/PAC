@@ -11,7 +11,7 @@ export default async function NewTaskPage() {
   const [employees, budget] = await Promise.all([listEmployees(sql), getBudget(sql)]);
   return (
     <>
-      <PageHeader title="業務を登録" back="/tasks" />
+      <PageHeader title="業務を登録" back="/tasks" backLabel="業務" />
       <Page>
         <NewTaskForm employees={employees.map((e) => ({ id: e.id, name: e.name, role: e.role_title }))} defaultBudget={budget.per_task_limit_jpy} />
         <p className="px-1 text-xs text-muted">

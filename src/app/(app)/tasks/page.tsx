@@ -4,7 +4,9 @@ import { listTasks, type TaskFilter } from "@/lib/repo/tasks";
 import { listDepartments, listEmployees } from "@/lib/repo/employees";
 import { PRIORITIES, PRIORITY_LABEL, TASK_STATUSES, TASK_STATUS_LABEL } from "@/lib/constants";
 import { dateTime, yen } from "@/lib/format";
-import { ChevronRight, Empty, Page, PageHeader, PriorityBadge, TaskStatusBadge } from "@/components/ui";
+import { ChevronRight, Empty, Fab, Page, PageHeader, PriorityBadge, SegmentedLinks, TaskStatusBadge } from "@/components/ui";
+import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "業務管理" };
 
@@ -28,38 +30,30 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const [tasks, employees, departments] = await Promise.all([listTasks(sql, filter), listEmployees(sql), listDepartments(sql)]);
   const filtered = Boolean(filter.assignee || filter.department || filter.status || filter.priority || sp.cfrom || sp.cto || sp.dfrom || sp.dto);
 
-  const tab = (v: string, label: string) => (
-    <Link
-      href={`/tasks?view=${v}`}
-      className={`flex-1 rounded-lg py-2 text-center text-sm font-semibold ${view === v ? "bg-surface text-ink shadow-sm" : "text-muted"}`}
-    >
-      {label}
-    </Link>
-  );
-
   return (
     <>
       <PageHeader
         title="業務管理"
         subtitle={`${tasks.length}件を表示中`}
-        action={
-          <Link href="/tasks/new" className="btn-primary min-h-9 px-3 text-sm">
-            ＋ 登録
-          </Link>
-        }
       />
       <Page>
-        <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
-          {tab("active", "進行中")}
-          {tab("closed", "終了")}
-          {tab("all", "すべて")}
-        </div>
+        <SegmentedLinks
+          active={view}
+          items={[
+            { key: "active", label: "進行中", href: "/tasks?view=active" },
+            { key: "closed", label: "終了", href: "/tasks?view=closed" },
+            { key: "all", label: "すべて", href: "/tasks?view=all" },
+          ]}
+        />
 
-        <details className="card" open={filtered}>
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">
-            絞り込み{filtered && <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand">適用中</span>}
+        <details className="card overflow-hidden" open={filtered}>
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[15px] font-semibold">
+            <Icon name="filter" size={18} stroke={2} className="text-muted" />
+            絞り込み
+            {filtered && <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] text-brand">適用中</span>}
+            <Icon name="chevronRight" size={16} stroke={2.4} className="ml-auto text-faint" />
           </summary>
-          <form className="grid grid-cols-2 gap-2.5 border-t border-line p-4" method="get">
+          <form className="grid grid-cols-2 gap-3 border-t border-separator p-4" method="get">
             <input type="hidden" name="view" value={view} />
             <label className="col-span-1">
               <span className="label">担当社員</span>
@@ -131,35 +125,46 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </details>
 
         {tasks.length === 0 ? (
-          <Empty>
+          <Empty icon="tasks">
             該当する業務はありません。
             <Link href="/tasks/new" className="mt-2 block font-semibold text-brand">
               業務を登録する
             </Link>
           </Empty>
         ) : (
-          <ul className="space-y-2">
-            {tasks.map((t) => (
-              <li key={t.id}>
-                <Link href={`/tasks/${t.id}`} className="card flex items-center gap-3 p-3.5 active:opacity-70">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <TaskStatusBadge status={t.status} />
-                      <PriorityBadge priority={t.priority} />
+          <ul className="space-y-2.5">
+            {tasks.map((t) => {
+              const emp = employees.find((e) => e.id === t.assignee_id);
+              return (
+                <li key={t.id}>
+                  <Link href={`/tasks/${t.id}`} className="card press flex items-center gap-3 p-4">
+                    {emp ? (
+                      <Avatar color={emp.avatar_color} styleId={emp.avatar_style} size={40} label={emp.name} />
+                    ) : (
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-faint">
+                        <Icon name="users" size={20} />
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[16px] font-semibold">{t.title}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <TaskStatusBadge status={t.status} />
+                        <PriorityBadge priority={t.priority} />
+                      </div>
+                      <div className="mt-1.5 truncate text-[12px] text-muted">
+                        {t.assignee_name ?? "担当未定"} ・ {dateTime(t.created_at)} ・ API {yen(t.spent_jpy)}
+                        {t.due_date && ` ・ 期限 ${t.due_date}`}
+                      </div>
                     </div>
-                    <div className="mt-1.5 truncate text-[15px] font-semibold">{t.title}</div>
-                    <div className="mt-0.5 text-xs text-muted">
-                      担当: {t.assignee_name ?? "未定"} ／ {dateTime(t.created_at)} ／ API {yen(t.spent_jpy)}
-                      {t.due_date && ` ／ 期限 ${t.due_date}`}
-                    </div>
-                  </div>
-                  <ChevronRight />
-                </Link>
-              </li>
-            ))}
+                    <ChevronRight />
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Page>
+      <Fab href="/tasks/new" label="業務を新しく登録" />
     </>
   );
 }

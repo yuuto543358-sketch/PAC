@@ -3,7 +3,8 @@ import { getDb } from "@/lib/db";
 import { listApprovals } from "@/lib/repo/approvals";
 import { APPROVAL_ACTION_LABEL } from "@/lib/constants";
 import { dateTime, yen } from "@/lib/format";
-import { ApprovalStatusBadge, ChevronRight, Empty, Page, PageHeader } from "@/components/ui";
+import { ApprovalStatusBadge, ChevronRight, Empty, IconTile, Page, PageHeader, SegmentedLinks } from "@/components/ui";
+import { APPROVAL_ACTION_STYLE } from "@/lib/approval-style";
 
 export const metadata = { title: "承認センター" };
 
@@ -18,35 +19,33 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="承認センター" subtitle={view === "open" ? `未確認 ${pending}件` : "処理済みの承認"} />
       <Page>
-        <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
-          <Link href="/approvals" className={`flex-1 rounded-lg py-2 text-center text-sm font-semibold ${view === "open" ? "bg-surface shadow-sm" : "text-muted"}`}>
-            判断が必要
-          </Link>
-          <Link href="/approvals?view=closed" className={`flex-1 rounded-lg py-2 text-center text-sm font-semibold ${view === "closed" ? "bg-surface shadow-sm" : "text-muted"}`}>
-            処理済み
-          </Link>
-        </div>
-        <p className="px-1 text-xs text-muted">
+        <SegmentedLinks
+          active={view}
+          items={[
+            { key: "open", label: "判断が必要", href: "/approvals" },
+            { key: "closed", label: "処理済み", href: "/approvals?view=closed" },
+          ]}
+        />
+        <p className="px-1 text-[13px] leading-relaxed text-muted">
           メール送信・投稿・購入など、外部に影響する操作は、ここで承認されるまで実行されません。承認は「内容・実行先・費用」に結びついた1件ごとの承認です。
         </p>
         {items.length === 0 ? (
-          <Empty>{view === "open" ? "判断が必要な案件はありません。" : "処理済みの案件はまだありません。"}</Empty>
+          <Empty icon="approve">{view === "open" ? "判断が必要な案件はありません。" : "処理済みの案件はまだありません。"}</Empty>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {items.map((a) => (
               <li key={a.id}>
-                <Link
-                  href={`/approvals/${a.id}`}
-                  className={`card flex items-center gap-3 p-3.5 active:opacity-70 ${a.status === "pending" ? "border-l-4 border-l-accent" : ""}`}
-                >
+                <Link href={`/approvals/${a.id}`} className="card press relative flex items-center gap-3 overflow-hidden p-4">
+                  {a.status === "pending" && <span className="absolute inset-y-0 left-0 w-1 bg-accent" aria-hidden />}
+                  <IconTile name={APPROVAL_ACTION_STYLE[a.action_type].icon} color={APPROVAL_ACTION_STYLE[a.action_type].color} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <ApprovalStatusBadge status={a.status} />
-                      <span className="truncate text-xs text-muted">{APPROVAL_ACTION_LABEL[a.action_type]}</span>
+                      <span className="truncate text-[12px] text-muted">{APPROVAL_ACTION_LABEL[a.action_type]}</span>
                     </div>
-                    <div className="mt-1.5 truncate text-[15px] font-semibold">{a.title}</div>
-                    <div className="mt-0.5 text-xs text-muted">
-                      {a.requester_name ?? "—"} ／ 費用 {yen(a.estimated_cost_jpy)} ／ {dateTime(a.created_at)}
+                    <div className="mt-1 truncate text-[16px] font-semibold">{a.title}</div>
+                    <div className="mt-0.5 truncate text-[12px] text-muted">
+                      {a.requester_name ?? "—"} ・ 費用 {yen(a.estimated_cost_jpy)} ・ {dateTime(a.created_at)}
                     </div>
                   </div>
                   <ChevronRight />
