@@ -17,6 +17,7 @@ export default function LoginPage() {
       </div>
       <LoginForm />
       <p className="mt-6 text-center text-xs text-muted">経営者専用の管理画面です。</p>
+      <p className="mt-1 text-center text-[11px] text-muted">バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
     </main>
   );
 }

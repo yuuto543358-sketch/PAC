@@ -15,7 +15,10 @@ export async function GET() {
   const t0 = Date.now();
   const missing = checkRequiredEnv().map((i) => i.key);
   if (missing.length) {
-    return Response.json({ ok: false, message: "必要な環境変数が足りません", missing: [...new Set(missing)] }, { status: 500 });
+    return Response.json(
+      { ok: false, message: "必要な環境変数が足りません", missing: [...new Set(missing)], version: process.env.NEXT_PUBLIC_BUILD_COMMIT },
+      { status: 500 },
+    );
   }
   try {
     await withTimeout(
@@ -32,10 +35,14 @@ export async function GET() {
       message: "データベースに接続できました",
       ms: Date.now() - t0,
       openaiKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
+      version: process.env.NEXT_PUBLIC_BUILD_COMMIT,
     });
   } catch (err) {
     log.fail("health", err);
     if (err instanceof TimeoutError) await resetDb();
-    return Response.json({ ok: false, message: describeDbError(err), ms: Date.now() - t0 }, { status: 503 });
+    return Response.json(
+      { ok: false, message: describeDbError(err), ms: Date.now() - t0, version: process.env.NEXT_PUBLIC_BUILD_COMMIT },
+      { status: 503 },
+    );
   }
 }
