@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type postgres from "postgres";
 type JSONValue = postgres.JSONValue;
-import type { Db, Sql, Tx } from "@/lib/db";
+import { begin, type Db, type Sql, type Tx } from "@/lib/db";
 import { APPROVAL_ACTION_TYPES, type ApprovalActionType, type ApprovalStatus } from "@/lib/constants";
 import { addTaskLog } from "./tasks";
 
@@ -191,7 +191,7 @@ export async function createApprovalTx(tx: Tx, input: CreateApprovalInput, actor
 }
 
 export async function createApproval(sql: Sql, input: CreateApprovalInput, actorType = "employee") {
-  return sql.begin((tx) => createApprovalTx(tx, input, actorType));
+  return begin(sql, (tx) => createApprovalTx(tx, input, actorType));
 }
 
 /** 経営者の判断（承認・却下・保留）を記録します。 */
@@ -202,7 +202,7 @@ export async function decideApproval(
   note: string,
   expectedHash: string,
 ) {
-  await sql.begin(async (tx) => {
+  await begin(sql, async (tx) => {
     const [a] = await tx<{ status: ApprovalStatus; task_id: string | null; content_hash: string; title: string }[]>`
       select status, task_id, content_hash, title from approvals where id = ${approvalId} for update`;
     if (!a) throw new Error("承認依頼が見つかりません");
@@ -246,7 +246,7 @@ export async function resubmitApproval(
   edits: { title: string; content: string; destination: string; estimatedCostJpy: number; reason: string; risks: string; afterEffect: string },
   expectedHash: string,
 ): Promise<string> {
-  return sql.begin(async (tx) => {
+  return begin(sql, async (tx) => {
     const [a] = await tx<Approval[]>`select * from approvals where id = ${approvalId} for update`;
     if (!a) throw new Error("承認依頼が見つかりません");
     if (a.content_hash !== expectedHash) throw new Error("承認依頼の内容が変わっています。再読み込みしてください。");
@@ -301,7 +301,7 @@ export async function executeApprovedAction(
   approvalId: string,
   executors: Partial<Record<ApprovalActionType, ActionExecutor>> = ACTION_EXECUTORS,
 ): Promise<ExecuteResult> {
-  const prepared = await sql.begin(async (tx) => {
+  const prepared = await begin(sql, async (tx) => {
     const [a] = await tx<Approval[]>`select * from approvals where id = ${approvalId} for update`;
     if (!a) return { ok: false as const, reason: "not_found" as const, message: "承認依頼が見つかりません" };
     if (a.status !== "approved") {
@@ -338,14 +338,14 @@ export async function executeApprovedAction(
 
   try {
     const result = await prepared.executor(Object.freeze({ ...prepared.approval }));
-    await sql.begin(async (tx) => {
+    await begin(sql, async (tx) => {
       await tx`update approvals set status = 'executed', executed_at = now() where id = ${approvalId}`;
       await insertEvent(tx, approvalId, "executed", "executing", "executed", result.summary.slice(0, 2000), "system");
     });
     return { ok: true, summary: result.summary };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await sql.begin(async (tx) => {
+    await begin(sql, async (tx) => {
       await tx`update approvals set status = 'execution_failed' where id = ${approvalId}`;
       await insertEvent(tx, approvalId, "execution_failed", "executing", "execution_failed", msg.slice(0, 2000), "system");
     });

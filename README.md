@@ -157,6 +157,7 @@ APIキーは「AIを使うための合い言葉」です。**他の人に見せ�
 - `OPENAI_API_KEY` が無い場合、アプリは開けますが、社員との会話はできません（ホーム画面に赤いお知らせが出ます）。
 - これらの値は**サーバー（Vercel）の中だけ**で使われ、iPhone の画面には送られません。OpenAI への呼び出しも、すべてサーバーから行います。
 - 以前のバージョンで使っていた `ANTHROPIC_API_KEY` は**不要**になりました。Vercel に残っていたら削除してかまいません。
+- Vercel では、公開用（Production）以外のアドレス（Preview）にも同じ値が必要です。環境変数の「Environments」は **Production・Preview・Development すべてにチェック**しておくと安心です。
 - **環境変数を追加・変更したあとは、必ず「Redeploy（再デプロイ）」してください。** そうしないと新しい値が使われません。
   - やり方：Vercel のプロジェクト →「Deployments」→ 一番上の行の「…」→「Redeploy」→「Redeploy」
 
@@ -240,6 +241,7 @@ APIキーは「AIを使うための合い言葉」です。**他の人に見せ�
 | こまったこと | どうすればいいか |
 |---|---|
 | 「初期設定が必要です」と出る | Vercel の環境変数を確認して、Redeploy してください（手順4）。 |
+| ログインボタンを押すと「確認中」のまま動かない／エラーが出る | まず、ブラウザで **`https://（アプリのアドレス）/api/health`** を開きます。`"ok":true` なら、データベースへの接続は正常です。`"ok":false` のときは、`message` に原因と直し方が書いてあります。くわしく調べるときは、Vercel のプロジェクト →「Logs」で **`[pac]`** を検索すると、ログイン処理のどこで止まったかが分かります（下の「ログの見方」参照）。 |
 | 「表示中にエラーが発生しました」と出る | データベースが一時停止している可能性があります。Supabase を開いて、プロジェクトの「Restore（再開）」を押してください。1〜2分で戻ります。 |
 | 「OpenAI の APIキーが正しくありません」と出る | `OPENAI_API_KEY` が間違っているか、削除されています。OpenAI で作り直して Vercel に入れ直し、Redeploy してください。 |
 | 「OpenAI の利用制限に達しました」と出る | OpenAI のクレジット残高が0になっている可能性があります。OpenAI の「Billing」で残高を確認し、必要ならクレジットを購入してください。 |
@@ -248,6 +250,36 @@ APIキーは「AIを使うための合い言葉」です。**他の人に見せ�
 | 「緊急停止中」と出る | 設定画面で「緊急停止を解除する」を押してください。 |
 | パスワードを忘れた | Vercel の環境変数 `APP_PASSWORD` を新しいものに変えて、Redeploy してください。 |
 | 誰かにパスワードを知られたかも | 上と同じ方法でパスワードを変え、設定画面の「すべての端末からログアウト」を押してください。 |
+
+### ログの見方（Vercel の Logs）
+
+ログイン時には、次のような行が順番に出ます。最後に出ている行の「次の処理」で止まっています。
+
+| ログに出る文字 | 意味 |
+|---|---|
+| `[pac][login] start` | ログイン処理が始まった |
+| `[pac][login] env ok` | 環境変数はそろっている |
+| `[pac][db] create client {"host":…,"kind":…}` | データベースへの接続を準備した（`kind` が `supabase-transaction-pooler` なら正しい接続方式） |
+| `[pac][login] db ping ok` | データベースにつながった |
+| `[pac][login] schema up to date` | 表はすでにできている |
+| `[pac][login] db ready` | データベースの準備完了 |
+| `[pac][login] attempt recorded {"ok":true}` | パスワードが正しかった |
+| `[pac][login] cookie set` → `redirect to home` | ログイン完了 |
+| `FAILED …` | ここでエラーになった（`code` と `message` に理由） |
+
+パスワードや接続文字列などの秘密情報は、ログには出しません。
+
+### データベースに「固まった処理」が残っている場合（めったにありません）
+
+アプリは、30秒以上放置された処理を自動で片付けるようになっています。それでも直らないときは、Supabase の「SQL Editor」で次の文を実行すると、放置された処理を終了できます。
+
+```sql
+select pg_terminate_backend(pid)
+from pg_stat_activity
+where datname = current_database()
+  and state like 'idle in transaction%'
+  and pid <> pg_backend_pid();
+```
 
 ---
 

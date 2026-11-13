@@ -1,4 +1,5 @@
 import "server-only";
+import { parseDatabaseUrl } from "@/lib/db/url";
 
 export type EnvIssue = { key: string; message: string };
 
@@ -7,6 +8,10 @@ export function checkRequiredEnv(): EnvIssue[] {
   const issues: EnvIssue[] = [];
   if (!process.env.DATABASE_URL) {
     issues.push({ key: "DATABASE_URL", message: "データベース（Supabase）の接続先が設定されていません。" });
+  } else {
+    // よくある貼り付けミス（[YOUR-PASSWORD] の置き換え忘れ・形の間違いなど）を検出
+    const parsed = parseDatabaseUrl(process.env.DATABASE_URL);
+    if (!parsed.ok) for (const p of parsed.problems) issues.push({ key: "DATABASE_URL", message: p });
   }
   const pw = process.env.APP_PASSWORD;
   if (!pw) {

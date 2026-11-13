@@ -1,5 +1,5 @@
 import "server-only";
-import type { Db, Sql } from "@/lib/db";
+import { begin, type Db, type Sql } from "@/lib/db";
 import {
   ACTIVE_TASK_STATUSES,
   MANUAL_STATUS_TRANSITIONS,
@@ -157,7 +157,7 @@ export type CreateTaskResult =
 export async function createTask(sql: Sql, input: CreateTaskInput): Promise<CreateTaskResult> {
   const title = input.title.trim().slice(0, 200);
   if (!title) throw new Error("業務名を入力してください");
-  return sql.begin(async (tx) => {
+  return begin(sql, async (tx) => {
     // 同時に同じ業務が登録されないようロック
     await tx`select pg_advisory_xact_lock(hashtext('pac_task_create'))`;
     const open = await tx<{ id: string; title: string; status: TaskStatus }[]>`
@@ -187,7 +187,7 @@ export async function createTask(sql: Sql, input: CreateTaskInput): Promise<Crea
 
 /** 手動でのステータス変更。決められた順序以外の変更は拒否します。 */
 export async function changeTaskStatus(sql: Sql, taskId: string, to: TaskStatus, actor: Actor, note = "") {
-  await sql.begin(async (tx) => {
+  await begin(sql, async (tx) => {
     const [t] = await tx<{ status: TaskStatus }[]>`select status from tasks where id = ${taskId} for update`;
     if (!t) throw new Error("業務が見つかりません");
     if (!MANUAL_STATUS_TRANSITIONS[t.status].includes(to)) {
@@ -218,7 +218,7 @@ export type UpdateTaskInput = {
 };
 
 export async function updateTask(sql: Sql, taskId: string, input: UpdateTaskInput, actor: Actor) {
-  await sql.begin(async (tx) => {
+  await begin(sql, async (tx) => {
     const [t] = await tx<{ priority: string; assignee_id: string | null; due_date: string | null; deliverable: string; budget_limit_jpy: number }[]>`
       select priority, assignee_id, to_char(due_date, 'YYYY-MM-DD') as due_date, deliverable, budget_limit_jpy
       from tasks where id = ${taskId} for update`;

@@ -1,5 +1,5 @@
 import "server-only";
-import type { Db, Sql } from "@/lib/db";
+import { begin, type Db, type Sql } from "@/lib/db";
 import { actualCostUsd, estimateCostJpy, getPricing, type UsageLike } from "@/lib/pricing";
 import { getBudget, getSettings } from "@/lib/repo/settings";
 
@@ -73,7 +73,7 @@ export type Reservation = {
  * 同時に複数の呼び出しが来ても上限を超えないよう、ロックをかけて順番に処理します。
  */
 export async function reserveApiCall(sql: Sql, input: ReserveInput): Promise<Reservation> {
-  return sql.begin(async (tx) => {
+  return begin(sql, async (tx) => {
     await tx`select pg_advisory_xact_lock(hashtext('pac_api_budget'))`;
     const settings = await getSettings(tx);
     const budget = await getBudget(tx);
