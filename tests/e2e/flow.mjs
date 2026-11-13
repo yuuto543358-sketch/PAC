@@ -80,14 +80,45 @@ check("重複した業務は登録されない", true);
 // チャット画面は全画面（下のメニューを隠す）
 check("チャット画面では下のメニューを隠す", (await page.locator("nav[aria-label=メインメニュー]").count()) === 0);
 
+// --- チーム（Phase 2）：社長が登録した業務をチームが自動で進める ---
+await page.getByText("チームを編成して自動で進めます").first().click();
+await page.waitForURL(/\/room/);
+check("社長のチャットからチームのグループチャットへ移動できる", true);
+await page.getByText("成果物の確認をお願いします").waitFor({ timeout: 90000 });
+check("チームが自動で 計画→議論→作成→監査→報告 まで進む", true);
+for (const kind of ["計画", "提案", "意見", "監査", "報告"]) {
+  check(`グループチャットに「${kind}」の発言`, (await page.locator("main span", { hasText: new RegExp(`^${kind}$`) }).count()) > 0);
+}
+check("グループチャット画面では下のメニューを隠す", (await page.locator("nav[aria-label=メインメニュー]").count()) === 0);
+await shot("15-room");
+
+// 経営者の指示 → チームが修正版を作り、もう一度確認待ちになる
+await page.fill("textarea[name=message]", "結論を最初に書いてください");
+await page.click("button[aria-label=指示を送る]");
+await page.getByText("指示を送り、チームの作業を再開しました").waitFor({ timeout: 20000 });
+check("グループチャットで指示を送ると作業を再開する", true);
+await page.waitForFunction(() => document.body.innerText.includes("第2版"), null, { timeout: 90000 });
+await page.getByText("成果物の確認をお願いします").waitFor({ timeout: 90000 });
+check("指示を反映した修正版（第2版）が作られる", true);
+
+// 成果物の画面（出力：コピー・ファイル保存）
+await page.locator("a[href*='/deliverables/2']").first().click();
+await page.getByRole("heading", { name: "本文" }).waitFor().catch(() => {});
+await page.getByText("出力形式：").waitFor();
+const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "ファイルで保存" }).click()]);
+check("成果物をファイルで保存できる", Boolean(download), download.suggestedFilename());
+check("成果物の版の履歴が表示される", (await page.getByText("版の履歴").count()) > 0);
+await shot("16-deliverable");
+
 // --- 承認 ---
 await page.goto(`${BASE}/`);
+check("ホームにチームの進行状況", (await page.getByText("成果物の承認待ち").count()) > 0);
 const badge = await page.locator("nav[aria-label=メインメニュー] a[href='/approvals'] span").last().textContent();
-check("承認タブに未確認件数バッジ", badge?.trim() === "1", `badge=${badge}`);
+check("承認タブに未確認件数バッジ", Number(badge?.trim()) >= 2, `badge=${badge}`);
 await page.click("nav >> text=承認");
-await page.getByText("未確認 1件").waitFor();
+await page.getByText(/未確認 \d+件/).waitFor();
 await shot("05-approvals");
-await page.locator("main ul li a").first().click();
+await page.locator("main ul li a", { hasText: "送信の承認依頼" }).first().click();
 await page.getByText("実行しようとしている内容").waitFor();
 for (const label of ["実行先", "担当社員", "発生する費用", "実行する理由", "想定されるリスク", "承認後に何が起こるか"]) {
   check(`承認画面に「${label}」`, (await page.getByText(label, { exact: true }).count()) > 0);
@@ -103,26 +134,36 @@ check("修正して再提出すると新しい承認依頼になる", true);
 
 // 承認
 await page.getByRole("button", { name: "承認する" }).click();
-await page.getByText("承認しました").waitFor();
+await page.getByRole("status").filter({ hasText: /^承認しました$/ }).waitFor();
 await page.getByText("Phase 4で実装予定").waitFor();
 check("承認後も外部実行はされない（未実装と表示）", true);
 await shot("07-approved");
+
+// 成果物の最終確認（承認 → 業務完了）
+await page.goto(`${BASE}/approvals`);
+await page.locator("main ul li a", { hasText: "成果物の確認" }).first().click();
+await page.getByText("確認する成果物").waitFor();
+await shot("17-accept-deliverable");
+await page.getByRole("button", { name: "承認する" }).click();
+await page.getByText("承認しました。業務完了です").waitFor();
+check("成果物を承認すると業務が完了する", true);
 
 // --- 業務 ---
 await page.click("nav >> text=業務");
 await page.getByRole("heading", { name: "業務管理" }).waitFor();
 await shot("08-tasks");
+await page.goto(`${BASE}/tasks?view=closed`);
 await page.locator("main ul li a").first().click();
 await page.getByText("進行履歴").waitFor();
-const statusSel = page.locator("select[name=to]");
-const opts = await statusSel.locator("option").allTextContents();
-check("ステータス変更の選択肢がある", opts.length > 0, opts.join(","));
+check("完了した業務にチームと成果物が表示される", (await page.getByText("グループチャットを開く").count()) > 0 && (await page.getByText("第2版：").count()) > 0);
 await shot("09-task-detail");
+const statusSel = page.locator("select[name=to]");
 
 // 新規登録
 await page.goto(`${BASE}/tasks/new`);
 await page.fill("input[name=title]", "週次の振り返りメモを作る");
 await page.selectOption("select[name=assignee]", "secretary");
+await page.uncheck("input[name=team]");
 await page.getByRole("button", { name: "業務を登録する" }).click();
 await page.waitForURL(/\/tasks\/[0-9a-f-]{36}/);
 check("業務を手動登録", true);
@@ -187,7 +228,7 @@ check("社員の名前を変更できる", true);
 await page.goto(`${BASE}/business`);
 check("事業開発は準備中と明示", (await page.getByText("Phase 3〜4で実装予定").count()) > 0);
 await page.goto(`${BASE}/reports`);
-check("報告書は準備中と明示", (await page.getByText("Phase 2で実装予定").count()) > 0);
+check("報告書に社長の完了報告が保存される", (await page.getByText("業務完了報告：").count()) > 0);
 
 // PWA
 const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();

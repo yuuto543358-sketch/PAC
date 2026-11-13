@@ -5,6 +5,7 @@ import { Page, PageHeader } from "@/components/ui";
 import { NewTaskForm } from "./NewTaskForm";
 
 export const metadata = { title: "業務を登録" };
+export const maxDuration = 300;
 
 export default async function NewTaskPage() {
   const sql = await getDb();
@@ -15,7 +16,7 @@ export default async function NewTaskPage() {
       <Page>
         <NewTaskForm employees={employees.map((e) => ({ id: e.id, name: e.name, role: e.role_title }))} defaultBudget={budget.per_task_limit_jpy} />
         <p className="px-1 text-xs text-muted">
-          社長とのチャットで依頼すると、社長が担当者を選んで業務を登録することもできます。登録だけではAIは呼び出されません（費用はかかりません）。
+          社長とのチャットで依頼しても、社長が業務を登録してチームで進めます。「チームで自動的に進める」をオフにすると、登録だけ行います（費用はかかりません）。
         </p>
       </Page>
     </>

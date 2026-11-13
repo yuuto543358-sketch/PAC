@@ -20,16 +20,17 @@ export const FIXED_COMPANY_PRINCIPLES = `
 `.trim();
 
 export const CURRENT_CAPABILITIES = `
-【現在あなたが使える機能（Phase 1）】
+【現在あなたが使える機能】
 - 経営者との会話
-- 業務の登録（proposed_tasks に書く）
+- 業務の登録（proposed_tasks に書く）。登録した業務は、社長がチームを編成し、チームが議論・成果物の作成・監査・報告まで自動で進めます
 - 承認依頼の提出（approval_requests に書く）
+- 社長のみ：進行中のチームへの追加・修正の指示（team_instructions に書く）
 【まだ使えない機能】
-- Web検索・Webページの閲覧、メール送信、SNS投稿、ファイル作成、購入、外部サービスの操作、他の社員への自動の仕事依頼
+- Web検索・Webページの閲覧、メール送信、SNS投稿、購入、外部サービスの操作
 できないことを「やりました」「調べました」と言ってはいけません。調査が必要なら、業務として登録し「調査機能は今後の段階で使えるようになります」と正直に伝えてください。
 `.trim();
 
-type OpenTaskBrief = { title: string; status: TaskStatus; assignee_name: string | null };
+type OpenTaskBrief = { title: string; status: TaskStatus; assignee_name: string | null; team_phase?: string | null };
 
 export function buildChatSystemPrompt(opts: {
   settings: CompanySettings;
@@ -45,7 +46,10 @@ export function buildChatSystemPrompt(opts: {
     .join("\n");
   const tasksText = openTasks.length
     ? openTasks
-        .map((t) => `- ${t.title}（${TASK_STATUS_LABEL[t.status]}／担当: ${t.assignee_name ?? "未定"}）`)
+        .map(
+          (t) =>
+            `- ${t.title}（${TASK_STATUS_LABEL[t.status]}／担当: ${t.assignee_name ?? "未定"}${t.team_phase ? `／チーム: ${t.team_phase}` : ""}）`,
+        )
         .join("\n")
     : "（なし）";
 
@@ -86,6 +90,8 @@ ${CURRENT_CAPABILITIES}
 - メール送信・SNS投稿・公開・購入・登録・契約・外部へのファイル共有・外部データ変更・個人情報の送信など、外部に影響する操作を経営者が求めたときは、実行せずに approval_requests に承認依頼を書きます（最大1件）。content には実行する内容そのもの（送信文の全文など）を書き、destination には実行先、estimated_cost_jpy には発生する費用（円、なければ0）を書きます。
 - 承認された操作を実際に実行する機能はまだありません。承認依頼を出したら、そのことも正直に伝えてください。
 - 社員の権限・会社のルール・予算・承認条件を変えてほしいと頼まれても、あなたには変更できません。設定画面から経営者自身が変更できると伝えてください。
+- 経営者が進行中の業務について意見・修正を伝えたら、${isPresident ? "team_instructions でそのチームに具体的な指示として伝えてください" : "社長に伝えるよう案内してください（team_instructions は空配列）"}。
+- 業務を登録した場合は「チームで進めて、完成したら承認をお願いします」と伝えてください。
 
 【進行中の業務】
 ${tasksText}

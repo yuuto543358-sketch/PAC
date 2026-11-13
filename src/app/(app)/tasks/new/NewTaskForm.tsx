@@ -46,6 +46,13 @@ export function NewTaskForm({ employees, defaultBudget }: { employees: { id: str
           <input type="number" name="budget" min={0} max={10000} step="1" defaultValue={defaultBudget} className="field" />
         </label>
       </div>
+      <label className="flex items-start gap-3 rounded-[14px] bg-brand-soft p-3.5">
+        <input type="checkbox" name="team" defaultChecked className="mt-0.5 h-5 w-5 accent-[var(--brand)]" />
+        <span>
+          <span className="block text-[15px] font-semibold text-brand">チームで自動的に進める</span>
+          <span className="mt-0.5 block text-[12px] text-ink/70">社長がチームを編成し、議論・成果物の作成・監査・報告まで進めます。あなたは最後に承認するだけです（AI利用料がかかります。1業務あたり通常数円〜十数円）。</span>
+        </span>
+      </label>
       <SubmitButton pendingText="登録中…">業務を登録する</SubmitButton>
     </ActionForm>
   );

@@ -6,6 +6,8 @@ import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { PRIORITIES, TASK_STATUSES, type Priority, type TaskStatus } from "@/lib/constants";
 import { addTaskLog, changeTaskStatus, createTask, updateTask } from "@/lib/repo/tasks";
+import { initWorkflow } from "@/lib/workflow/repo";
+import { scheduleTeamRun } from "@/lib/workflow/trigger";
 import type { ActionState } from "@/components/forms";
 
 function fail(e: unknown): ActionState {
@@ -49,7 +51,14 @@ export async function createTaskAction(_p: ActionState, fd: FormData): Promise<A
         ts: Date.now(),
       };
     }
-    target = `/tasks/${r.task.id}`;
+    // 「チームで自動的に進める」がオンなら、社長がチームを編成して進める
+    if (fd.get("team") === "on") {
+      await initWorkflow(sql, r.task.id, true);
+      scheduleTeamRun([r.task.id]);
+      target = `/tasks/${r.task.id}/room`;
+    } else {
+      target = `/tasks/${r.task.id}`;
+    }
   } catch (e) {
     return fail(e);
   }

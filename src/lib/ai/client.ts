@@ -18,6 +18,9 @@ export class AiUnavailableError extends Error {
 
 const NO_KEY_MESSAGE = "AIのAPIキー（OPENAI_API_KEY）が設定されていません。READMEの手順で設定してください。";
 
+/** テスト用：モックモードで失敗を再現する回数 */
+export const mockHooks = { failNext: 0 };
+
 export function isMockMode() {
   return process.env.AI_MOCK === "1";
 }
@@ -107,6 +110,12 @@ export async function callStructured<T extends z.ZodType>(
   });
 
   if (isMockMode()) {
+    // テスト用：失敗を再現する
+    if (mockHooks.failNext > 0) {
+      mockHooks.failNext--;
+      await failApiCall(sql, reservation, "テスト用に再現した失敗", false);
+      throw new AiUnavailableError("テスト用に再現した失敗です");
+    }
     const data = input.mock();
     const fakeUsage: UsageLike = {
       input_tokens: Math.round(estInputTokens / 1.5),

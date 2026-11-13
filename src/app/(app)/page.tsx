@@ -6,6 +6,8 @@ import { countTasks, listRecentActivity, listTasks } from "@/lib/repo/tasks";
 import { countPendingApprovals } from "@/lib/repo/approvals";
 import { latestPresidentMessage } from "@/lib/repo/conversations";
 import { listEmployees } from "@/lib/repo/employees";
+import { listActiveTeams } from "@/lib/workflow/repo";
+import { ACTIVE_WORKFLOW_PHASES, WORKFLOW_PHASE_LABEL } from "@/lib/constants";
 import { isAiConfigured } from "@/lib/ai/client";
 import { greeting, longDate, relativeTime, yen } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
@@ -14,7 +16,7 @@ import { Alert, ChevronRight, List, ListRow, Page, PhaseNotice, Ring, Section, S
 
 export default async function HomePage() {
   const sql = await getDb();
-  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity] = await Promise.all([
+  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -24,6 +26,7 @@ export default async function HomePage() {
     listEmployees(sql),
     listTasks(sql, { view: "active" }, 5),
     listRecentActivity(sql, 6),
+    listActiveTeams(sql, 5),
   ]);
   const president = employees.find((e) => e.id === "president");
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
@@ -122,6 +125,53 @@ export default async function HomePage() {
             <Stat label="今月完了した業務" value={`${counts.completed_month}件`} sub={`累計 ${counts.completed_total}件`} href="/tasks?view=closed" icon="check" />
             <Stat label="今月の収益" value="0円" sub="記録は Phase 4 で実装予定" icon="trend" />
           </div>
+        </Section>
+
+        <Section title="チームの進行状況" action={<Link href="/tasks" className="font-medium text-brand">業務一覧</Link>}>
+          {teams.length === 0 ? (
+            <div className="card px-4 py-5 text-center text-[14px] text-muted">
+              進行中のチームはありません。社長に仕事を頼むと、チームを編成して自動で進めます。
+            </div>
+          ) : (
+            <ul className="space-y-2.5">
+              {teams.map((t) => {
+                const running = t.autopilot && ACTIVE_WORKFLOW_PHASES.includes(t.phase);
+                const waiting = t.phase === "waiting_human";
+                return (
+                  <li key={t.task_id}>
+                    <Link href={`/tasks/${t.task_id}/room`} className="card press flex items-center gap-3 p-3.5">
+                      <div className="flex shrink-0 -space-x-2">
+                        {t.members.slice(0, 3).map((m) => (
+                          <span key={m.employee_id} className="rounded-full ring-2 ring-[var(--surface)]">
+                            <Avatar color={m.avatar_color} styleId={m.avatar_style} size={30} label={m.name} />
+                          </span>
+                        ))}
+                        {t.members.length === 0 && (
+                          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-surface-2 text-faint">
+                            <Icon name="users" size={16} />
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[15px] font-semibold">{t.title}</div>
+                        <div className={`mt-0.5 flex items-center gap-1.5 text-[12px] font-medium ${waiting ? "text-accent" : running ? "text-success" : "text-muted"}`}>
+                          {running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />}
+                          {waiting
+                            ? t.waiting_reason === "acceptance"
+                              ? "成果物の承認待ち"
+                              : t.waiting_reason === "question"
+                                ? "チームから質問があります"
+                                : "一時停止中（指示待ち）"
+                            : `${WORKFLOW_PHASE_LABEL[t.phase]}${!t.autopilot ? "（一時停止）" : ""}`}
+                        </div>
+                      </div>
+                      <ChevronRight />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Section>
 
         <Section title="社長からの報告">

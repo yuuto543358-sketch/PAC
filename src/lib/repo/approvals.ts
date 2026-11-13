@@ -205,8 +205,9 @@ export async function decideApproval(
   expectedHash: string,
 ) {
   await begin(sql, async (tx) => {
-    const [a] = await tx<{ status: ApprovalStatus; task_id: string | null; content_hash: string; title: string }[]>`
-      select status, task_id, content_hash, title from approvals where id = ${approvalId} for update`;
+    const [a] = await tx<
+      { status: ApprovalStatus; task_id: string | null; content_hash: string; title: string; action_type: string; payload: Record<string, unknown> }[]
+    >`select status, task_id, content_hash, title, action_type, payload from approvals where id = ${approvalId} for update`;
     if (!a) throw new Error("承認依頼が見つかりません");
     // 画面を開いた後に中身が変わっていないか確認（見た内容と違うものを承認しないため）
     if (a.content_hash !== expectedHash) {
@@ -222,6 +223,10 @@ export async function decideApproval(
         decided_at = ${to === "on_hold" ? null : tx`now()`}
       where id = ${approvalId}`;
     await insertEvent(tx, approvalId, decision, a.status, to, note.slice(0, 2000));
+    if (a.task_id && a.action_type === "accept_deliverable") {
+      await onDeliverableDecision(tx, a.task_id, decision, note, Number(a.payload?.deliverableVersion) || null);
+      return;
+    }
     if (a.task_id) {
       const [t] = await tx<{ status: string }[]>`select status from tasks where id = ${a.task_id} for update`;
       const taskTo = decision === "approve" ? "approved" : decision === "reject" ? "on_hold" : null;
@@ -239,6 +244,43 @@ export async function decideApproval(
       }
     }
   });
+}
+
+/**
+ * 成果物の最終確認（チームの成果物の受け取り）の判断。
+ * 承認 → 業務を完了にする。差し戻し → コメントを修正指示としてチームに伝え、修正版を作らせる。
+ */
+async function onDeliverableDecision(
+  tx: Tx,
+  taskId: string,
+  decision: "approve" | "reject" | "hold",
+  note: string,
+  version: number | null,
+) {
+  if (decision === "hold") return;
+  const [t] = await tx<{ status: string }[]>`select status from tasks where id = ${taskId} for update`;
+  if (!t) return;
+  if (decision === "approve") {
+    if (version) await tx`update deliverables set status = 'accepted' where task_id = ${taskId} and version = ${version}`;
+    if (t.status !== "completed") {
+      await tx`update tasks set status = 'completed', completed_at = now(), updated_at = now() where id = ${taskId}`;
+      await addTaskLog(tx, taskId, { type: "user" }, "approval_approved", "経営者が成果物を承認しました（業務完了）", t.status, "completed");
+    }
+    await tx`update task_workflows set phase = 'done', waiting_reason = '', updated_at = now() where task_id = ${taskId}`;
+    await tx`insert into task_messages (task_id, author_type, kind, content, meta)
+      values (${taskId}, 'system', 'system', '経営者が成果物を承認しました。業務完了です。お疲れさまでした。', ${tx.json({ tone: "info" })})`;
+    await tx`update employees set experience_points = experience_points + 3
+      where id in (select employee_id from task_members where task_id = ${taskId})`;
+    return;
+  }
+  // 差し戻し
+  if (version) await tx`update deliverables set status = 'rejected', review_note = ${note.slice(0, 4000)} where task_id = ${taskId} and version = ${version}`;
+  const instruction = note.trim() || "成果物を見直して、もう一度提出してください。";
+  await tx`insert into task_messages (task_id, author_type, kind, content) values (${taskId}, 'owner', 'instruction', ${`【差し戻し】${instruction}`})`;
+  await tx`update tasks set status = 'producing', updated_at = now() where id = ${taskId}`;
+  await addTaskLog(tx, taskId, { type: "user" }, "approval_rejected", `成果物を差し戻しました：${instruction.slice(0, 200)}`, t.status, "producing");
+  await tx`update task_workflows set phase = 'rework', waiting_reason = '', rework_count = 0, failures = 0, autopilot = true, updated_at = now()
+    where task_id = ${taskId}`;
 }
 
 /** 内容を修正して再提出：新しい承認依頼を作り、元の依頼は「置き換え」にします（再承認が必要）。 */

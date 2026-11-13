@@ -87,9 +87,15 @@ export const APPROVAL_ACTION_TYPES = [
   "share_file",
   "modify_external",
   "send_personal_info",
+  "accept_deliverable",
   "other",
 ] as const;
 export type ApprovalActionType = (typeof APPROVAL_ACTION_TYPES)[number];
+/** AI社員が承認を求められる「外部への操作」（成果物の最終確認は除く） */
+export const EXTERNAL_ACTION_TYPES = APPROVAL_ACTION_TYPES.filter((t) => t !== "accept_deliverable") as [
+  Exclude<ApprovalActionType, "accept_deliverable">,
+  ...Exclude<ApprovalActionType, "accept_deliverable">[],
+];
 export const APPROVAL_ACTION_LABEL: Record<ApprovalActionType, string> = {
   send_message: "メール・メッセージの送信",
   sns_post: "SNSへの投稿",
@@ -100,6 +106,7 @@ export const APPROVAL_ACTION_LABEL: Record<ApprovalActionType, string> = {
   share_file: "外部へのファイル共有",
   modify_external: "外部データの変更・削除",
   send_personal_info: "個人情報の送信",
+  accept_deliverable: "成果物の最終確認（完了の承認）",
   other: "その他の取り消しが難しい操作",
 };
 
@@ -146,3 +153,87 @@ export const AUTORUN_OPTIONS = [
   { id: "weekly", label: "週1回" },
   { id: "daily", label: "1日1回" },
 ] as const;
+
+// ===== Phase 2: チームでの自動進行 =====
+
+export const WORKFLOW_PHASES = [
+  "kickoff",
+  "discussion",
+  "drafting",
+  "review",
+  "rework",
+  "final_report",
+  "waiting_human",
+  "done",
+  "stopped",
+] as const;
+export type WorkflowPhase = (typeof WORKFLOW_PHASES)[number];
+
+export const WORKFLOW_PHASE_LABEL: Record<WorkflowPhase, string> = {
+  kickoff: "チーム編成・計画",
+  discussion: "チームで議論",
+  drafting: "成果物を作成",
+  review: "監査・品質確認",
+  rework: "修正対応",
+  final_report: "社長が報告書を作成",
+  waiting_human: "経営者の確認待ち",
+  done: "完了",
+  stopped: "停止中",
+};
+
+/** 自動で進める段階（AIが動く段階） */
+export const ACTIVE_WORKFLOW_PHASES: WorkflowPhase[] = ["kickoff", "discussion", "drafting", "review", "rework", "final_report"];
+
+/** 進行状況の表示に使う段階の並び */
+export const WORKFLOW_STEPS: { key: WorkflowPhase; label: string }[] = [
+  { key: "kickoff", label: "計画" },
+  { key: "discussion", label: "議論" },
+  { key: "drafting", label: "作成" },
+  { key: "review", label: "監査" },
+  { key: "final_report", label: "報告" },
+  { key: "waiting_human", label: "承認" },
+];
+
+export const MEMBER_ROLE_LABEL: Record<string, string> = {
+  lead: "リーダー",
+  member: "メンバー",
+  reviewer: "監査",
+  ceo: "社長",
+};
+
+export const DELIVERABLE_FORMATS = [
+  { id: "markdown_report", label: "レポート（文書）", ext: "md", mime: "text/markdown" },
+  { id: "plain_text", label: "テキスト", ext: "txt", mime: "text/plain" },
+  { id: "email_draft", label: "メール文面（下書き）", ext: "txt", mime: "text/plain" },
+  { id: "sns_post", label: "SNS投稿案", ext: "txt", mime: "text/plain" },
+  { id: "csv_table", label: "表（CSV）", ext: "csv", mime: "text/csv" },
+  { id: "checklist", label: "チェックリスト", ext: "md", mime: "text/markdown" },
+  { id: "slide_outline", label: "スライド構成案", ext: "md", mime: "text/markdown" },
+] as const;
+export type DeliverableFormat = (typeof DELIVERABLE_FORMATS)[number]["id"];
+export const DELIVERABLE_FORMAT_IDS = DELIVERABLE_FORMATS.map((f) => f.id) as [DeliverableFormat, ...DeliverableFormat[]];
+
+export const DELIVERABLE_STATUS_LABEL: Record<string, string> = {
+  draft: "下書き",
+  in_review: "監査中",
+  revise: "修正依頼",
+  passed: "監査合格",
+  accepted: "経営者が承認",
+  rejected: "差し戻し",
+};
+
+export const ROOM_MESSAGE_KIND_LABEL: Record<string, string> = {
+  plan: "計画",
+  opinion: "意見",
+  proposal: "提案",
+  question: "質問",
+  question_to_owner: "経営者への質問",
+  findings: "調査メモ",
+  deliverable: "成果物",
+  review: "監査",
+  decision: "決定",
+  report: "報告",
+  instruction: "指示",
+  message: "発言",
+  system: "お知らせ",
+};

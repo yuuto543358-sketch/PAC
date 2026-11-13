@@ -8,6 +8,10 @@ import { Alert, ApprovalStatusBadge, IconTile, Page, PageHeader, PhaseNotice, Se
 import { Icon } from "@/components/Icon";
 import { APPROVAL_ACTION_STYLE } from "@/lib/approval-style";
 import { DecisionForm, ResubmitForm } from "./forms";
+import { DocumentView } from "@/components/DocumentView";
+
+// 差し戻し後のチームの作業（バックグラウンド）を待つ時間（秒）
+export const maxDuration = 300;
 
 const EVENT_LABEL: Record<string, string> = {
   created: "承認依頼が提出されました",
@@ -29,6 +33,8 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
   const events = await getApprovalEvents(sql, id);
   const [newer] = await sql<{ id: string }[]>`select id from approvals where supersedes_id = ${id} limit 1`;
   const open = a.status === "pending" || a.status === "on_hold";
+  const isDeliverable = a.action_type === "accept_deliverable";
+  const deliverableVersion = Number(a.payload?.deliverableVersion) || null;
 
   const rows: [string, string][] = [
     ["操作の種類", APPROVAL_ACTION_LABEL[a.action_type]],
@@ -86,9 +92,26 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
           </Link>
         )}
 
-        <Section title="実行しようとしている内容">
-          <div className="card p-4 text-[16px] leading-relaxed whitespace-pre-wrap">{a.content}</div>
-        </Section>
+        {isDeliverable ? (
+          <Section
+            title="確認する成果物"
+            action={
+              a.task_id && deliverableVersion ? (
+                <Link href={`/tasks/${a.task_id}/deliverables/${deliverableVersion}`} className="font-medium text-brand">
+                  全画面で見る
+                </Link>
+              ) : undefined
+            }
+          >
+            <article className="card max-h-[60vh] overflow-y-auto p-5">
+              <DocumentView content={a.content} format={String(a.payload?.format ?? "markdown_report")} />
+            </article>
+          </Section>
+        ) : (
+          <Section title="実行しようとしている内容">
+            <div className="card p-4 text-[16px] leading-relaxed whitespace-pre-wrap">{a.content}</div>
+          </Section>
+        )}
 
         <Section title="詳細">
           <dl className="card divide-y divide-separator text-[15px]">
@@ -104,8 +127,9 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
         {open && (
           <Section title="判断">
             <div className="card p-4">
-              <DecisionForm approvalId={a.id} hash={a.content_hash} isOnHold={a.status === "on_hold"} />
+              <DecisionForm approvalId={a.id} hash={a.content_hash} isOnHold={a.status === "on_hold"} isDeliverable={isDeliverable} />
             </div>
+            {!isDeliverable && (
             <details className="card mt-3 overflow-hidden">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3.5 text-[15px] font-semibold">
                 <Icon name="edit" size={18} stroke={2} className="text-muted" />
@@ -128,10 +152,11 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
                 />
               </div>
             </details>
+            )}
           </Section>
         )}
 
-        {a.status === "approved" && (
+        {a.status === "approved" && !isDeliverable && (
           <PhaseNotice phase="Phase 4">
             承認は記録されました。実際に外部へ実行する機能はまだありません。実装後も、サーバーが「承認済み」かつ「承認時と内容が同じ」ことを確認した場合だけ実行されます。
           </PhaseNotice>

@@ -6,6 +6,7 @@ import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { decideApproval, resubmitApproval } from "@/lib/repo/approvals";
 import { audit } from "@/lib/repo/audit";
+import { scheduleTeamRun } from "@/lib/workflow/trigger";
 import type { ActionState } from "@/components/forms";
 
 export async function decideApprovalAction(_p: ActionState, fd: FormData): Promise<ActionState> {
@@ -17,8 +18,21 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
     const sql = await getDb();
     await decideApproval(sql, id, decision, String(fd.get("note") ?? ""), String(fd.get("hash") ?? ""));
     await audit(sql, "user", `approval_${decision}`, "approval", id);
+    const [a] = await sql<{ task_id: string | null; action_type: string }[]>`select task_id, action_type from approvals where id = ${id}`;
+    const isDeliverable = a?.action_type === "accept_deliverable";
+    // 成果物を差し戻したら、チームがすぐ修正に取りかかる
+    if (decision === "reject" && isDeliverable && a?.task_id) scheduleTeamRun([a.task_id]);
     refresh();
-    const msg = decision === "approve" ? "承認しました" : decision === "reject" ? "却下しました" : "保留にしました";
+    const msg =
+      decision === "approve"
+        ? isDeliverable
+          ? "承認しました。業務完了です"
+          : "承認しました"
+        : decision === "reject"
+          ? isDeliverable
+            ? "差し戻しました。チームが修正します"
+            : "却下しました"
+          : "保留にしました";
     return { ok: true, message: msg, ts: Date.now() };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "処理に失敗しました", ts: Date.now() };

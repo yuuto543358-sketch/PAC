@@ -3,9 +3,26 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getTask, getTaskLogs } from "@/lib/repo/tasks";
 import { listEmployees } from "@/lib/repo/employees";
-import { MANUAL_STATUS_TRANSITIONS, TASK_SOURCE_LABEL, type ApprovalStatus } from "@/lib/constants";
+import {
+  ACTIVE_WORKFLOW_PHASES,
+  DELIVERABLE_FORMATS,
+  DELIVERABLE_STATUS_LABEL,
+  MANUAL_STATUS_TRANSITIONS,
+  MEMBER_ROLE_LABEL,
+  TASK_SOURCE_LABEL,
+  WORKFLOW_PHASE_LABEL,
+  type ApprovalStatus,
+} from "@/lib/constants";
+import { getWorkflow, listDeliverables, listMembers } from "@/lib/workflow/repo";
+import { Avatar } from "@/components/Avatar";
+import { Icon } from "@/components/Icon";
+import { WorkflowStepper } from "@/components/WorkflowStepper";
+import { PauseResumeButton, StartTeamButton } from "./team-forms";
 import { dateTime, yen, yenPrecise } from "@/lib/format";
-import { ApprovalStatusBadge, ChevronRight, Page, PageHeader, PhaseNotice, PriorityBadge, Section, TaskStatusBadge } from "@/components/ui";
+import { ApprovalStatusBadge, ChevronRight, Page, PageHeader, PriorityBadge, Section, TaskStatusBadge } from "@/components/ui";
+
+// チームの作業（バックグラウンド）を待つ時間（秒）
+export const maxDuration = 300;
 import { CommentForm, DeliverableForm, EditTaskForm, StatusForm } from "./forms";
 
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,6 +30,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const sql = await getDb();
   const task = await getTask(sql, id);
   if (!task) notFound();
+  const [wf, members, deliverables] = await Promise.all([getWorkflow(sql, id), listMembers(sql, id), listDeliverables(sql, id)]);
   const [logs, employees, approvals, usage] = await Promise.all([
     getTaskLogs(sql, id),
     listEmployees(sql),
@@ -72,6 +90,111 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           </dl>
         </div>
 
+        <Section title="チーム">
+          {!wf ? (
+            <div className="card p-4">
+              <p className="text-[14px] leading-relaxed text-muted">
+                社長がチームを編成し、グループチャットで議論しながら、成果物の作成・監査・報告まで自動で進めます。あなたは最後に承認するだけです。
+              </p>
+              <div className="mt-3">
+                <StartTeamButton taskId={task.id} />
+              </div>
+            </div>
+          ) : (
+            <div className="card p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[15px] font-semibold">
+                  {WORKFLOW_PHASE_LABEL[wf.phase]}
+                  {!wf.autopilot && wf.phase !== "done" && <span className="ml-1.5 text-[12px] font-medium text-accent">（一時停止中）</span>}
+                </span>
+                {wf.autopilot && ACTIVE_WORKFLOW_PHASES.includes(wf.phase) && (
+                  <span className="inline-flex items-center gap-1 text-[12px] font-medium text-success">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+                    自動で進行中
+                  </span>
+                )}
+              </div>
+              <div className="mt-3">
+                <WorkflowStepper phase={wf.phase} resumePhase={wf.resume_phase} />
+              </div>
+              {members.length > 0 && (
+                <ul className="mt-4 flex flex-wrap gap-2">
+                  {members.map((m) => (
+                    <li key={m.employee_id}>
+                      <Link
+                        href={`/employees/${m.employee_id}`}
+                        className="press inline-flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 text-[13px]"
+                      >
+                        <Avatar color={m.avatar_color} styleId={m.avatar_style} size={26} label={m.name} />
+                        <span className="font-medium">{m.name}</span>
+                        <span className="text-[11px] text-muted">{MEMBER_ROLE_LABEL[m.role]}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {wf.plan?.goal && (
+                <div className="mt-4 rounded-[14px] bg-surface-2 p-3.5 text-[13px] leading-relaxed">
+                  <div className="font-semibold">ゴール</div>
+                  <p className="text-ink/80">{wf.plan.goal}</p>
+                  {wf.plan.steps && wf.plan.steps.length > 0 && (
+                    <>
+                      <div className="mt-2 font-semibold">進め方</div>
+                      <p className="text-ink/80">{wf.plan.steps.join(" → ")}</p>
+                    </>
+                  )}
+                </div>
+              )}
+              {wf.phase === "waiting_human" && (
+                <p className="mt-3 flex items-start gap-2 rounded-[12px] bg-accent-soft px-3 py-2.5 text-[13px] font-medium text-accent">
+                  <Icon name="bell" size={16} stroke={2} className="mt-px shrink-0" />
+                  {wf.waiting_reason === "acceptance"
+                    ? "成果物が完成しました。承認センターで確認してください。"
+                    : wf.waiting_reason === "question"
+                      ? "チームから質問があります。グループチャットで答えてください。"
+                      : "チームが一時停止しています。グループチャットで指示を送ると再開します。"}
+                </p>
+              )}
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Link href={`/tasks/${task.id}/room`} className="btn-primary w-full">
+                  <Icon name="chat" size={20} stroke={2} />
+                  グループチャットを開く
+                </Link>
+                {wf.phase !== "done" && <PauseResumeButton taskId={task.id} paused={!wf.autopilot || wf.phase === "stopped"} />}
+              </div>
+              <p className="mt-2 text-[11px] text-muted">
+                作業回数 {wf.steps}回 ・ 監査による修正 {wf.rework_count}回
+              </p>
+            </div>
+          )}
+        </Section>
+
+        {deliverables.length > 0 && (
+          <Section title="成果物メモ（手動で記録）">
+            <ul className="card divide-y divide-separator">
+              {deliverables.map((d) => (
+                <li key={d.version}>
+                  <Link href={`/tasks/${task.id}/deliverables/${d.version}`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-success-soft text-success">
+                      <Icon name="document" size={20} stroke={2} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-medium">
+                        第{d.version}版：{d.title}
+                      </span>
+                      <span className="block text-[12px] text-muted">
+                        {DELIVERABLE_FORMATS.find((f) => f.id === d.format)?.label ?? d.format} ・ {d.author_name ?? "—"} ・{" "}
+                        {DELIVERABLE_STATUS_LABEL[d.status] ?? d.status}
+                      </span>
+                    </span>
+                    <ChevronRight />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
         <Section title="進捗（ステータス変更）">
           <div className="card p-4">
             {transitions.length > 0 ? (
@@ -104,9 +227,6 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <Section title="成果物">
           <div className="card p-4">
             <DeliverableForm taskId={task.id} initial={task.deliverable} />
-          </div>
-          <div className="mt-2">
-            <PhaseNotice phase="Phase 2〜3">担当社員がAIで調査・企画を進め、成果物を自動で作成する機能</PhaseNotice>
           </div>
         </Section>
 

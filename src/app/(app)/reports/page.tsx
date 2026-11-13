@@ -1,23 +1,64 @@
-import { Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import Link from "next/link";
+import { getDb } from "@/lib/db";
+import { dateTime } from "@/lib/format";
+import { Empty, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "報告書" };
 
-export default function ReportsPage() {
+type ReportRow = { id: string; report_type: string; title: string; content: string; task_id: string | null; created_at: Date };
+
+const TYPE_LABEL: Record<string, string> = {
+  task: "業務完了報告",
+  daily: "日次報告",
+  weekly: "週次報告",
+  monthly: "月次報告",
+  bizdev: "事業開発レポート",
+  employee: "社員別活動報告",
+};
+
+export default async function ReportsPage() {
+  const sql = await getDb();
+  const reports = await sql<ReportRow[]>`
+    select id, report_type, title, content, task_id, created_at from reports order by created_at desc limit 50`;
   return (
     <>
-      <PageHeader title="報告書" back="/more" backLabel="メニュー" />
+      <PageHeader title="報告書" subtitle={`${reports.length}件`} back="/more" backLabel="メニュー" />
       <Page>
-        <PhaseNotice phase="Phase 2">
-          社長が業務履歴とAPI費用をもとに報告書を作成し、ここに保存します。週次報告の自動作成は Phase 3（定期実行）で行います。現在はまだ使えません。
-        </PhaseNotice>
-        <Section title="作成予定の報告書">
-          <ul className="card divide-y divide-separator text-sm">
-            {["日次報告", "週次報告", "月次報告", "事業開発レポート", "社員別活動報告"].map((r) => (
-              <li key={r} className="px-4 py-3 text-muted">
-                {r}
+        {reports.length === 0 ? (
+          <Empty icon="report">まだ報告書はありません。チームが業務を完了すると、社長の完了報告がここに保存されます。</Empty>
+        ) : (
+          <ul className="space-y-3">
+            {reports.map((r) => (
+              <li key={r.id}>
+                <details className="card group overflow-hidden">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-soft text-brand">
+                      <Icon name="report" size={20} stroke={2} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12px] font-semibold text-brand">{TYPE_LABEL[r.report_type] ?? r.report_type}</span>
+                      <span className="block truncate text-[15px] font-semibold">{r.title}</span>
+                      <span className="block text-[12px] text-muted">{dateTime(r.created_at)}</span>
+                    </span>
+                    <Icon name="chevronRight" size={16} stroke={2.4} className="text-faint transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="border-t border-separator px-4 py-3.5">
+                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{r.content}</p>
+                    {r.task_id && (
+                      <Link href={`/tasks/${r.task_id}`} className="mt-3 inline-flex items-center gap-1 text-[14px] font-semibold text-brand">
+                        業務と成果物を見る
+                        <Icon name="chevronRight" size={14} stroke={2.4} />
+                      </Link>
+                    )}
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
+        )}
+        <Section title="今後追加する報告書">
+          <PhaseNotice phase="Phase 3">日次・週次・月次報告、事業開発レポート、社員別活動報告の自動作成（定期実行）</PhaseNotice>
         </Section>
       </Page>
     </>

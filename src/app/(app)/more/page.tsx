@@ -27,7 +27,7 @@ export default async function MorePage() {
           <List>
             <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="API予算・使用額・利用履歴・運用費" />
             <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="事業候補の管理" trailing={soon} />
-            <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="日次・週次・月次・社員別" trailing={soon} />
+            <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="社長の業務完了報告（定期報告は準備中）" />
           </List>
         </Section>
 

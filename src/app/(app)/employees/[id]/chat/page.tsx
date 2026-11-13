@@ -11,7 +11,7 @@ import { Icon, type IconName } from "@/components/Icon";
 import { ChatComposer, ScrollToBottom } from "./ChatComposer";
 
 // AIの返事を待つ時間（秒）。AI呼び出し自体は90秒で打ち切ります。
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const SUGGESTIONS: Record<string, string[]> = {
   president: [

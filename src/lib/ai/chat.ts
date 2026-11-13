@@ -1,13 +1,16 @@
 import "server-only";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
-import { APPROVAL_ACTION_TYPES, APPROVAL_ACTION_LABEL } from "@/lib/constants";
+import { EXTERNAL_ACTION_TYPES, APPROVAL_ACTION_LABEL } from "@/lib/constants";
 import { BudgetBlockedError } from "@/lib/budget";
 import { AiUnavailableError, callStructured, type ChatTurn } from "@/lib/ai/client";
 import { buildChatSystemPrompt } from "@/lib/ai/prompts";
 import { getSettings } from "@/lib/repo/settings";
 import { listEmployees } from "@/lib/repo/employees";
 import { listTasks, createTask } from "@/lib/repo/tasks";
+import { findDuplicate, similarity } from "@/lib/dedupe";
+import { initWorkflow } from "@/lib/workflow/repo";
+import { postInstruction } from "@/lib/workflow/human";
 import { createApproval } from "@/lib/repo/approvals";
 import { addMessage, createConversation, getConversation, listMessages } from "@/lib/repo/conversations";
 import { audit } from "@/lib/repo/audit";
@@ -29,7 +32,7 @@ export const ChatOutputSchema = z.object({
   approval_requests: z
     .array(
       z.object({
-        action_type: z.enum(APPROVAL_ACTION_TYPES),
+        action_type: z.enum(EXTERNAL_ACTION_TYPES),
         title: z.string().describe("承認依頼の件名"),
         content: z.string().describe("実行する内容そのもの"),
         destination: z.string().describe("実行先（宛先・サービス名・URLなど）"),
@@ -41,6 +44,14 @@ export const ChatOutputSchema = z.object({
       }),
     )
     .describe("承認依頼（なければ空配列）"),
+  team_instructions: z
+    .array(
+      z.object({
+        task_title: z.string().describe("指示を伝える進行中の業務の題名（進行中の業務の一覧から正確に）"),
+        instruction: z.string().describe("チームへの指示（経営者の意向を具体的に）"),
+      }),
+    )
+    .describe("社長だけが使う：進行中のチームへの追加・修正の指示（最大2件。なければ空配列）"),
 });
 export type ChatOutput = z.infer<typeof ChatOutputSchema>;
 
@@ -52,6 +63,8 @@ export type SendChatResult = {
   conversationId: string;
   ok: boolean;
   error?: string;
+  /** チームでの自動進行を始めた（または再開した）業務 */
+  teamTaskIds?: string[];
 };
 
 function todayJst() {
@@ -94,6 +107,7 @@ function mockReply(employeeName: string, employeeId: string, text: string): Chat
           },
         ]
       : [],
+    team_instructions: [],
   };
 }
 
@@ -129,7 +143,16 @@ export async function sendChatMessage(
 
   const settings = await getSettings(sql);
   const openTasks = await listTasks(sql, { view: "active" }, 15);
-  const system = buildChatSystemPrompt({ settings, employee, roster, openTasks, todayJst: todayJst() });
+  const phases = await sql<{ task_id: string; phase: string }[]>`
+    select task_id, phase from task_workflows where task_id in ${sql(openTasks.length ? openTasks.map((t) => t.id) : ["00000000-0000-0000-0000-000000000000"])}`;
+  const phaseOf = new Map(phases.map((p) => [p.task_id, p.phase]));
+  const system = buildChatSystemPrompt({
+    settings,
+    employee,
+    roster,
+    openTasks: openTasks.map((t) => ({ ...t, team_phase: phaseOf.get(t.id) ?? null })),
+    todayJst: todayJst(),
+  });
 
   const messages: ChatTurn[] = [];
   for (const m of history) {
@@ -180,6 +203,7 @@ export async function sendChatMessage(
   // 業務の登録（最大3件）。社長以外は自分にしか割り当てられない。
   const validIds = new Set(roster.map((e) => e.id));
   const createdTasks = new Map<string, string>();
+  const teamTaskIds: string[] = [];
   for (const t of out.proposed_tasks.slice(0, 3)) {
     const assignee =
       employee.role_key === "president" ? (validIds.has(t.assignee_id) ? t.assignee_id : null) : employee.id;
@@ -196,9 +220,12 @@ export async function sendChatMessage(
       if (r.created) {
         createdTasks.set(t.title.trim(), r.task.id);
         const who = roster.find((e) => e.id === assignee)?.name ?? "未定";
-        await addMessage(sql, convId, "notice", `業務を登録しました：「${r.task.title}」（担当: ${who}）`, {
+        // 登録した業務は、チームを編成して自動で進める
+        await initWorkflow(sql, r.task.id, true);
+        teamTaskIds.push(r.task.id);
+        await addMessage(sql, convId, "notice", `業務を登録しました：「${r.task.title}」（担当: ${who}）。チームを編成して自動で進めます。`, {
           kind: "task_created",
-          href: `/tasks/${r.task.id}`,
+          href: `/tasks/${r.task.id}/room`,
           tone: "info",
         });
       } else {
@@ -244,11 +271,38 @@ export async function sendChatMessage(
     }
   }
 
+  // 社長から進行中のチームへの指示（経営者の意向を伝える）
+  if (employee.role_key === "president") {
+    const teamTasks = openTasks.filter((t) => phaseOf.has(t.id));
+    for (const ti of out.team_instructions.slice(0, 2)) {
+      const exact = teamTasks.find((t) => t.title === ti.task_title.trim());
+      const match =
+        exact ??
+        findDuplicate(ti.task_title, teamTasks) ??
+        teamTasks
+          .map((t) => ({ t, s: similarity(ti.task_title, t.title) }))
+          .filter((x) => x.s >= 0.5)
+          .sort((a, b) => b.s - a.s)[0]?.t;
+      if (!match || !ti.instruction.trim()) continue;
+      try {
+        await postInstruction(sql, match.id, { type: "ceo" }, ti.instruction);
+        teamTaskIds.push(match.id);
+        await addMessage(sql, convId, "notice", `チーム「${match.title}」に指示を伝えました。`, {
+          kind: "team_instruction",
+          href: `/tasks/${match.id}/room`,
+          tone: "info",
+        });
+      } catch (err) {
+        console.error("team instruction failed", err);
+      }
+    }
+  }
+
   await audit(sql, `employee:${employeeId}`, "chat_reply", "conversation", convId, {
     model,
     costJpy: result.costJpy,
     tasks: out.proposed_tasks.length,
     approvals: out.approval_requests.length,
   });
-  return { conversationId: convId, ok: true };
+  return { conversationId: convId, ok: true, teamTaskIds };
 }

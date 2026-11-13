@@ -392,4 +392,121 @@ update company_settings set model_standard = 'gpt-5-mini', updated_at = now() wh
 update company_settings set model_advanced = 'gpt-5', updated_at = now() where model_advanced like 'claude-%';
 `,
   },
+  {
+    version: 3,
+    name: "phase2_teams_workflow",
+    sql: /* sql */ `
+-- ===== Phase 2: チーム・グループチャット・成果物・自動進行 =====
+
+-- 業務ごとのチーム（リーダー・メンバー・監査役・社長）
+create table if not exists task_members (
+  task_id uuid not null references tasks(id),
+  employee_id text not null references employees(id),
+  role text not null check (role in ('lead','member','reviewer','ceo')),
+  joined_at timestamptz not null default now(),
+  primary key (task_id, employee_id)
+);
+
+-- 業務ごとの自動進行の状態
+create table if not exists task_workflows (
+  task_id uuid primary key references tasks(id),
+  phase text not null default 'kickoff' check (phase in (
+    'kickoff','discussion','drafting','review','rework','final_report','waiting_human','done','stopped')),
+  resume_phase text,
+  waiting_reason text not null default '',
+  autopilot boolean not null default true,
+  plan jsonb not null default '{}'::jsonb,
+  lead_id text references employees(id),
+  reviewer_id text references employees(id),
+  discussion_index int not null default 0,
+  rework_count int not null default 0,
+  steps int not null default 0,
+  failures int not null default 0,
+  lease_until timestamptz,
+  lease_owner text,
+  last_step_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists task_workflows_active_idx on task_workflows(phase, autopilot);
+
+-- グループチャット（追記のみ。変更・削除不可）
+create table if not exists task_messages (
+  id bigserial primary key,
+  task_id uuid not null references tasks(id),
+  author_type text not null check (author_type in ('employee','owner','system')),
+  employee_id text references employees(id),
+  kind text not null default 'message',
+  content text not null,
+  meta jsonb not null default '{}'::jsonb,
+  api_usage_id uuid,
+  created_at timestamptz not null default now()
+);
+create index if not exists task_messages_task_idx on task_messages(task_id, id);
+drop trigger if exists task_messages_immutable on task_messages;
+create trigger task_messages_immutable before update or delete on task_messages
+  for each row execute function pac_forbid_change();
+drop trigger if exists task_messages_no_truncate on task_messages;
+create trigger task_messages_no_truncate before truncate on task_messages
+  for each statement execute function pac_forbid_change();
+
+-- 成果物（版ごとに保存。本文は変更不可、状態と監査コメントだけ更新可。削除不可）
+create table if not exists deliverables (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks(id),
+  version int not null,
+  title text not null,
+  format text not null default 'markdown_report',
+  content text not null,
+  author_employee_id text references employees(id),
+  status text not null default 'draft' check (status in ('draft','in_review','revise','passed','accepted','rejected')),
+  review_note text not null default '',
+  created_at timestamptz not null default now(),
+  unique (task_id, version)
+);
+create or replace function pac_deliverables_guard() returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'PAC: 成果物は削除できません';
+  end if;
+  if new.id <> old.id or new.task_id <> old.task_id or new.version <> old.version or new.title <> old.title
+     or new.format <> old.format or new.content <> old.content or new.created_at <> old.created_at
+     or new.author_employee_id is distinct from old.author_employee_id then
+    raise exception 'PAC: 成果物の本文は変更できません（新しい版として保存してください）';
+  end if;
+  return new;
+end $$;
+drop trigger if exists deliverables_guard on deliverables;
+create trigger deliverables_guard before update or delete on deliverables
+  for each row execute function pac_deliverables_guard();
+
+-- 報告書に「業務の完了報告」を追加
+alter table reports add column if not exists task_id uuid references tasks(id);
+alter table reports drop constraint if exists reports_report_type_check;
+alter table reports add constraint reports_report_type_check
+  check (report_type in ('daily','weekly','monthly','bizdev','employee','task'));
+
+-- チームで進めると1業務あたりのAI呼び出しが増えるため、初期値のままなら上限を引き上げる（8回→20回）
+update budgets set max_calls_per_task = 20, updated_at = now() where max_calls_per_task = 8;
+alter table budgets alter column max_calls_per_task set default 20;
+-- チームの社員が順番に発言するため、1分あたりの上限も初期値のままなら引き上げる（6回→12回）
+update budgets set max_calls_per_minute = 12, updated_at = now() where max_calls_per_minute = 6;
+alter table budgets alter column max_calls_per_minute set default 12;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['task_members','task_workflows','task_messages','deliverables'] loop
+    execute format('alter table %I enable row level security', t);
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on table %I from anon', t);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+      execute format('revoke all on table %I from authenticated', t);
+    end if;
+  end loop;
+end $$;
+`,
+  },
 ];

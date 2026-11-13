@@ -3,24 +3,50 @@
 import { decideApprovalAction, resubmitApprovalAction } from "@/app/actions/approvals";
 import { ActionForm, SubmitButton } from "@/components/forms";
 
-export function DecisionForm({ approvalId, hash, isOnHold }: { approvalId: string; hash: string; isOnHold: boolean }) {
+export function DecisionForm({
+  approvalId,
+  hash,
+  isOnHold,
+  isDeliverable = false,
+}: {
+  approvalId: string;
+  hash: string;
+  isOnHold: boolean;
+  isDeliverable?: boolean;
+}) {
   return (
     <ActionForm action={decideApprovalAction}>
       <input type="hidden" name="approvalId" value={approvalId} />
       <input type="hidden" name="hash" value={hash} />
       <label className="block">
-        <span className="label">判断メモ（任意）</span>
-        <textarea name="note" rows={2} maxLength={2000} className="field" placeholder="却下の理由・注意点など" />
+        <span className="label">{isDeliverable ? "修正してほしい点（差し戻すときに書く）" : "判断メモ（任意）"}</span>
+        <textarea
+          name="note"
+          rows={isDeliverable ? 3 : 2}
+          maxLength={2000}
+          className="field"
+          placeholder={isDeliverable ? "例：対象を30代の会社員に絞って、価格の比較表を追加してください" : "却下の理由・注意点など"}
+        />
       </label>
-      <p className="text-[12px] text-muted">下のボタンで判断します。承認は、この画面に表示されている内容・実行先・費用に対してだけ有効です。</p>
+      <p className="text-[12px] text-muted">
+        {isDeliverable
+          ? "承認すると業務が完了します。差し戻すと、書いた内容が修正指示としてチームに伝わり、修正版が作られます。"
+          : "下のボタンで判断します。承認は、この画面に表示されている内容・実行先・費用に対してだけ有効です。"}
+      </p>
       {/* 画面の下に固定される判断ボタン（iPhone アプリのアクションバー風） */}
       <div
         className="fixed inset-x-0 z-20 bg-[var(--tabbar)] shadow-[0_-0.5px_0_var(--separator)] backdrop-blur-xl backdrop-saturate-150"
         style={{ bottom: "calc(54px + env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto grid max-w-2xl grid-cols-[1fr_1fr_1.6fr] gap-2 px-3 py-2.5">
-          <SubmitButton name="decision" value="reject" className="btn-secondary min-h-11 px-2 text-[15px] text-danger" confirmText="却下しますか？" pendingText="…">
-            却下する
+          <SubmitButton
+            name="decision"
+            value="reject"
+            className="btn-secondary min-h-11 px-2 text-[15px] text-danger"
+            confirmText={isDeliverable ? "差し戻して修正を依頼しますか？" : "却下しますか？"}
+            pendingText="…"
+          >
+            {isDeliverable ? "差し戻す" : "却下する"}
           </SubmitButton>
           {!isOnHold ? (
             <SubmitButton name="decision" value="hold" className="btn-secondary min-h-11 px-2 text-[15px]" pendingText="…">
@@ -29,7 +55,13 @@ export function DecisionForm({ approvalId, hash, isOnHold }: { approvalId: strin
           ) : (
             <span className="btn-secondary pointer-events-none min-h-11 px-2 text-[15px] opacity-60">保留中</span>
           )}
-          <SubmitButton name="decision" value="approve" className="btn-primary min-h-11 px-2 text-[15px]" confirmText="この内容で承認しますか？" pendingText="処理中…">
+          <SubmitButton
+            name="decision"
+            value="approve"
+            className="btn-primary min-h-11 px-2 text-[15px]"
+            confirmText={isDeliverable ? "この成果物を承認して、業務を完了しますか？" : "この内容で承認しますか？"}
+            pendingText="処理中…"
+          >
             承認する
           </SubmitButton>
         </div>

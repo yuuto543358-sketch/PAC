@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { showToast } from "./Toaster";
 import { Icon } from "./Icon";
@@ -68,6 +68,7 @@ export function FormError({ message }: { message?: string }) {
 /**
  * サーバーアクションを呼び出すフォーム。
  * 成功したら画面上部にお知らせ（トースト）を出し、失敗したらフォームの中にエラーを表示します。
+ * （承認のように、成功するとフォーム自体が画面から消える場合でも、お知らせは必ず出ます）
  */
 export function ActionForm({
   action,
@@ -80,19 +81,19 @@ export function ActionForm({
   className?: string;
   resetOnSuccess?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, setState] = useState<ActionState>({});
   const ref = useRef<HTMLFormElement>(null);
-  const lastTs = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    if (!state.ts || state.ts === lastTs.current) return;
-    lastTs.current = state.ts;
-    if (state.ok) {
-      if (state.message) showToast(state.message, "success");
-      if (resetOnSuccess) ref.current?.reset();
-    }
-  }, [state, resetOnSuccess]);
   return (
-    <form ref={ref} action={formAction} className={className}>
+    <form
+      ref={ref}
+      action={async (formData) => {
+        const r = await action(state, formData);
+        if (r.ok && r.message) showToast(r.message, "success");
+        if (r.ok && resetOnSuccess) ref.current?.reset();
+        setState(r);
+      }}
+      className={className}
+    >
       {children}
       <FormError message={state.ok ? undefined : state.error} />
     </form>

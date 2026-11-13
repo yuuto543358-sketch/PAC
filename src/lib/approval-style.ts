@@ -12,5 +12,6 @@ export const APPROVAL_ACTION_STYLE: Record<ApprovalActionType, { icon: IconName;
   share_file: { icon: "document", color: "#0f766e" },
   modify_external: { icon: "settings", color: "#475569" },
   send_personal_info: { icon: "lock", color: "#dc2626" },
+  accept_deliverable: { icon: "document", color: "#15803d" },
   other: { icon: "alert", color: "#64748b" },
 };

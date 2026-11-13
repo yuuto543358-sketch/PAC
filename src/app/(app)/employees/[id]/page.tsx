@@ -7,11 +7,11 @@ import { EMPLOYEE_STATUS_LABEL } from "@/lib/constants";
 import { dateTime, relativeTime } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/Icon";
-import { Empty, List, ListRow, Page, PageHeader, PhaseNotice, Section, SegmentedLinks, TaskStatusBadge } from "@/components/ui";
+import { Empty, List, ListRow, Page, PageHeader, Section, SegmentedLinks, TaskStatusBadge } from "@/components/ui";
 import { DirectInstructionForm, RatingForm } from "./forms";
 
 // AIの返事を待つ時間（秒）。AI呼び出し自体は90秒で打ち切ります。
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 type Tab = "profile" | "tasks" | "ratings";
 
@@ -28,7 +28,12 @@ export default async function EmployeeDetailPage({
   const sql = await getDb();
   const e = await getEmployee(sql, id);
   if (!e) notFound();
-  const [tasks, ratings] = await Promise.all([listTasks(sql, { assignee: id, view: "all" }, 30), listRatings(sql, id)]);
+  const [tasks, ratings, memories] = await Promise.all([
+    listTasks(sql, { assignee: id, view: "all" }, 30),
+    listRatings(sql, id),
+    sql<{ id: string; title: string; content: string; created_at: Date; source_task_id: string | null }[]>`
+      select id, title, content, created_at, source_task_id from knowledge where employee_id = ${id} order by created_at desc limit 10`,
+  ]);
   const firstName = e.name.split(" ")[1] ?? e.name;
   const base = `/employees/${e.id}`;
 
@@ -135,7 +140,30 @@ export default async function EmployeeDetailPage({
                 </div>
               </dl>
             </Section>
-            <PhaseNotice phase="Phase 2">業務経験・評価・修正指示を記憶として蓄積し、次の仕事に活かす機能</PhaseNotice>
+            <Section title="仕事から学んだこと（記憶）" footer="チームの仕事が終わるたびに、社長が各社員の学びを記録します。次の仕事のとき、社員はこの記憶を参考にします。">
+              {memories.length === 0 ? (
+                <Empty icon="sparkles">まだ記憶はありません。チームで仕事を終えると、ここに学びが増えていきます。</Empty>
+              ) : (
+                <ul className="card divide-y divide-separator">
+                  {memories.map((k) => (
+                    <li key={k.id} className="px-4 py-3">
+                      <div className="text-[12px] text-muted">
+                        {dateTime(k.created_at)}
+                        {k.source_task_id && (
+                          <>
+                            {" ・ "}
+                            <Link href={`/tasks/${k.source_task_id}`} className="text-brand">
+                              {k.title}
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[15px] leading-relaxed">{k.content}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
           </>
         )}
 

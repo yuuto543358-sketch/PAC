@@ -16,7 +16,7 @@ const MORE_PATHS = ["/more", "/business", "/reports", "/finance", "/settings"];
 
 /** チャット画面では、メッセージアプリのように下のメニューを隠して全画面にする */
 function isFullScreen(pathname: string) {
-  return /^\/employees\/[^/]+\/chat/.test(pathname);
+  return /^\/employees\/[^/]+\/chat/.test(pathname) || /^\/tasks\/[^/]+\/room/.test(pathname);
 }
 
 export function TabBar({ pendingApprovals }: { pendingApprovals: number }) {
