@@ -94,6 +94,8 @@ export async function listApprovals(db: Db, view: "open" | "closed" | "all" = "o
   return db.unsafe<Approval[]>(
     `${APPROVAL_SELECT} ${where}
      order by case a.status when 'pending' then 0 when 'on_hold' then 1 else 2 end, a.created_at desc limit 200`,
+    [],
+    { simple: false },
   );
 }
 

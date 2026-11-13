@@ -36,7 +36,7 @@ export async function usageByEmployeeThisMonth(db: Db) {
       sum(coalesce(u.cost_jpy, u.estimated_cost_jpy))::float8 as jpy, count(*)::int as calls
     from api_usage u left join employees e on e.id = u.employee_id
     where u.created_at >= ${MONTH_START}
-    group by u.employee_id, e.name, e.avatar_color order by jpy desc`);
+    group by u.employee_id, e.name, e.avatar_color order by jpy desc`, [], { simple: false });
 }
 
 export async function usageByTaskThisMonth(db: Db) {
@@ -44,7 +44,7 @@ export async function usageByTaskThisMonth(db: Db) {
     select u.task_id, t.title, sum(coalesce(u.cost_jpy, u.estimated_cost_jpy))::float8 as jpy, count(*)::int as calls
     from api_usage u left join tasks t on t.id = u.task_id
     where u.created_at >= ${MONTH_START}
-    group by u.task_id, t.title order by jpy desc limit 20`);
+    group by u.task_id, t.title order by jpy desc limit 20`, [], { simple: false });
 }
 
 export async function dailyUsageThisMonth(db: Db) {
@@ -52,5 +52,5 @@ export async function dailyUsageThisMonth(db: Db) {
     select to_char(created_at at time zone 'Asia/Tokyo', 'MM/DD') as day,
       sum(coalesce(cost_jpy, estimated_cost_jpy))::float8 as jpy
     from api_usage where created_at >= ${MONTH_START}
-    group by 1 order by 1`);
+    group by 1 order by 1`, [], { simple: false });
 }

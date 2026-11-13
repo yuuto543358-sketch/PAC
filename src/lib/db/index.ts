@@ -2,7 +2,7 @@ import "server-only";
 import postgres from "postgres";
 import { MIGRATIONS } from "./schema";
 import { SEED_DEPARTMENTS, SEED_EMPLOYEES } from "./seed";
-import { parseDatabaseUrl } from "./url";
+import { parseDatabaseUrl, type DatabaseUrlInfo } from "./url";
 import { createStepLogger, TimeoutError, withTimeout, type StepLogger } from "@/lib/log";
 
 export type Sql = postgres.Sql<Record<string, never>>;
@@ -19,6 +19,13 @@ const HEALTH_CHECK_AFTER_MS = 15_000;
 const PING_TIMEOUT_MS = 12_000;
 /** 表の作成・確認の最大待ち時間 */
 const SCHEMA_TIMEOUT_MS = 45_000;
+/**
+ * 1つの問い合わせ（クエリ）の最大待ち時間（秒）。接続待ちと実行の合計。
+ * プール（Supabase の pooler）が答えを返さなくなっても、ここで必ずエラーになり、接続は作り直される。
+ */
+const QUERY_TIMEOUT_SEC = Number(process.env.PAC_DB_QUERY_TIMEOUT_SEC) || 20;
+/** 空いている接続を待つ最大時間（秒） */
+const QUEUE_TIMEOUT_SEC = 15;
 /** トランザクション内のロック待ち・処理・放置の上限（サーバー側で強制） */
 const TX_LOCK_TIMEOUT = "10s";
 const TX_STATEMENT_TIMEOUT = "30s";
@@ -36,25 +43,23 @@ const g = globalThis as GlobalWithDb;
 
 const bootLog = createStepLogger("db");
 
-function createClient(): Sql {
-  const parsed = parseDatabaseUrl(process.env.DATABASE_URL);
-  if (!parsed.ok) {
-    throw new Error(`DATABASE_URL の設定に問題があります: ${parsed.problems.join(" / ")}`);
-  }
-  const { info } = parsed;
-  // パスワードは出さず、接続先の種類だけをログに出す
-  bootLog.step("create client", { host: info.host, port: info.port, user: info.user, database: info.database, kind: info.kind });
-  for (const w of parsed.warnings) console.warn(`[pac][db] 注意: ${w}`);
-
-  return postgres(parsed.url, {
+/** 接続の設定（サーバーレス・Supabase Transaction pooler 向け）。テストでも同じ設定を使う。 */
+export function clientOptions(kind: DatabaseUrlInfo["kind"]) {
+  return {
     // Supabase の「Transaction pooler」では prepared statement が使えないため無効化
     prepare: false,
     // サーバーレス（Vercel）向け：1つのサーバーが持つ接続は少なく、使わない接続はすぐ閉じる
     max: 3,
+    // 1つの接続に同時に送る問い合わせは1つだけにする。
+    // Supabase の Transaction pooler（Supavisor 2.10 より前）は、まとめて送った問い合わせ（パイプライン）の
+    // 答えが返ってこない不具合があるため（postgres.js の公式説明より）。
+    max_pipeline: 1,
+    query_timeout: QUERY_TIMEOUT_SEC,
+    queue_timeout: QUEUE_TIMEOUT_SEC,
     idle_timeout: 10,
     max_lifetime: 60 * 5,
     connect_timeout: CONNECT_TIMEOUT_SEC,
-    ssl: info.kind === "local" ? false : "require",
+    ssl: kind === "local" ? (false as const) : ("require" as const),
     onnotice: () => {},
     types: {
       // numeric 型を JavaScript の数値として受け取る（金額は小数点以下4桁程度なので精度は十分）
@@ -65,7 +70,19 @@ function createClient(): Sql {
         parse: (x: string) => Number(x),
       },
     },
-  }) as unknown as Sql;
+  };
+}
+
+function createClient(): Sql {
+  const parsed = parseDatabaseUrl(process.env.DATABASE_URL);
+  if (!parsed.ok) {
+    throw new Error(`DATABASE_URL の設定に問題があります: ${parsed.problems.join(" / ")}`);
+  }
+  const { info } = parsed;
+  // パスワードは出さず、接続先の種類だけをログに出す
+  bootLog.step("create client", { host: info.host, port: info.port, user: info.user, database: info.database, kind: info.kind });
+  for (const w of parsed.warnings) console.warn(`[pac][db] 注意: ${w}`);
+  return postgres(parsed.url, clientOptions(info.kind)) as unknown as Sql;
 }
 
 function getClient(): Sql {
@@ -109,8 +126,11 @@ async function isSchemaUpToDate(sql: Sql): Promise<boolean> {
   if (!st.has_table) return false;
   const [v] = await sql<{ v: number }[]>`select coalesce(max(version), 0)::int as v from schema_migrations`;
   if (v.v < LATEST_VERSION) return false;
-  const [s] = await sql<{ ok: boolean }[]>`select exists(select 1 from company_settings where id = 1) as ok`;
-  return s.ok;
+  const [s] = await sql<{ ok: boolean }[]>`
+    select exists(select 1 from company_settings where id = 1)
+       and exists(select 1 from budgets where id = 1)
+       and exists(select 1 from employees) as ok`;
+  return Boolean(s?.ok);
 }
 
 /**

@@ -17,6 +17,9 @@ export function describeDbError(err: unknown): string {
   if (code === "55P03") {
     return "データベースの準備処理が混み合っています。1分ほど待ってからもう一度お試しください。";
   }
+  if (code === "QUERY_TIMEOUT" || code === "QUEUE_TIMEOUT" || code === "CANCEL_UNANSWERED") {
+    return "データベースの応答が時間内に返ってきませんでした。少し待ってからもう一度お試しください（接続は自動で作り直されます）。";
+  }
   if (code === "57014") {
     return "データベースの処理が時間内に終わりませんでした。もう一度お試しください。";
   }

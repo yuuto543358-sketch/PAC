@@ -30,8 +30,12 @@ export type SpendSummary = {
   callsLastMinute: number;
 };
 
+/**
+ * 今月・今日の使用額と呼び出し回数。集計（sum/count）なので、利用記録が0件でも必ず1行（0円）返る。
+ * 1行も返らないのは通信の異常なので、0円として扱わずエラーにする（予算の上限チェックを素通りさせないため）。
+ */
 export async function getSpendSummary(db: Db): Promise<SpendSummary> {
-  const [row] = await db.unsafe<
+  const rows = await db.unsafe<
     { month_jpy: number; today_jpy: number; calls_today: number; calls_last_minute: number }[]
   >(`
     select
@@ -41,7 +45,11 @@ export async function getSpendSummary(db: Db): Promise<SpendSummary> {
       count(*) filter (where created_at >= now() - interval '1 minute')::int as calls_last_minute
     from api_usage
     where created_at >= least(${MONTH_START}, now() - interval '1 minute')
-  `);
+  `, [], { simple: false });
+  const row = rows[0];
+  if (!row) {
+    throw new Error("API利用額の集計結果を取得できませんでした（データベースの応答が不正）");
+  }
   return {
     monthJpy: row.month_jpy,
     todayJpy: row.today_jpy,
@@ -111,7 +119,16 @@ export async function reserveApiCall(sql: Sql, input: ReserveInput): Promise<Res
       throw new BudgetBlockedError("費用を見積もれないため、安全のため呼び出しを止めました。", "estimate_failed");
     }
 
-    const spend = await getSpendSummary(tx);
+    let spend: SpendSummary;
+    try {
+      spend = await getSpendSummary(tx);
+    } catch (err) {
+      console.error("[pac][budget] FAILED spend summary", err);
+      throw new BudgetBlockedError(
+        "API利用額を確認できなかったため、安全のためAIの呼び出しを止めました。少し待ってからもう一度お試しください。",
+        "spend_unknown",
+      );
+    }
     const hardMonthly = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
     if (spend.monthJpy + estimate > hardMonthly) {
       throw new BudgetBlockedError(
