@@ -1,6 +1,7 @@
 import "server-only";
 import type { Db } from "@/lib/db";
-import type { JSONValue } from "postgres";
+import type postgres from "postgres";
+type JSONValue = postgres.JSONValue;
 
 /** 操作履歴を記録（追記のみ・変更削除不可） */
 export async function audit(

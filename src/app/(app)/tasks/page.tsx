@@ -1,0 +1,165 @@
+import Link from "next/link";
+import { getDb } from "@/lib/db";
+import { listTasks, type TaskFilter } from "@/lib/repo/tasks";
+import { listDepartments, listEmployees } from "@/lib/repo/employees";
+import { PRIORITIES, PRIORITY_LABEL, TASK_STATUSES, TASK_STATUS_LABEL } from "@/lib/constants";
+import { dateTime, yen } from "@/lib/format";
+import { ChevronRight, Empty, Page, PageHeader, PriorityBadge, TaskStatusBadge } from "@/components/ui";
+
+export const metadata = { title: "業務管理" };
+
+type SP = Record<string, string | undefined>;
+
+export default async function TasksPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams;
+  const view = sp.view === "closed" || sp.view === "all" ? sp.view : "active";
+  const filter: TaskFilter = {
+    view,
+    assignee: sp.assignee || undefined,
+    department: sp.department || undefined,
+    status: sp.status && (TASK_STATUSES as readonly string[]).includes(sp.status) ? sp.status : undefined,
+    priority: sp.priority && (PRIORITIES as readonly string[]).includes(sp.priority) ? sp.priority : undefined,
+    createdFrom: sp.cfrom || undefined,
+    createdTo: sp.cto || undefined,
+    completedFrom: sp.dfrom || undefined,
+    completedTo: sp.dto || undefined,
+  };
+  const sql = await getDb();
+  const [tasks, employees, departments] = await Promise.all([listTasks(sql, filter), listEmployees(sql), listDepartments(sql)]);
+  const filtered = Boolean(filter.assignee || filter.department || filter.status || filter.priority || sp.cfrom || sp.cto || sp.dfrom || sp.dto);
+
+  const tab = (v: string, label: string) => (
+    <Link
+      href={`/tasks?view=${v}`}
+      className={`flex-1 rounded-lg py-2 text-center text-sm font-semibold ${view === v ? "bg-surface text-ink shadow-sm" : "text-muted"}`}
+    >
+      {label}
+    </Link>
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="業務管理"
+        subtitle={`${tasks.length}件を表示中`}
+        action={
+          <Link href="/tasks/new" className="btn-primary min-h-9 px-3 text-sm">
+            ＋ 登録
+          </Link>
+        }
+      />
+      <Page>
+        <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
+          {tab("active", "進行中")}
+          {tab("closed", "終了")}
+          {tab("all", "すべて")}
+        </div>
+
+        <details className="card" open={filtered}>
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">
+            絞り込み{filtered && <span className="ml-2 rounded-full bg-brand-soft px-2 py-0.5 text-xs text-brand">適用中</span>}
+          </summary>
+          <form className="grid grid-cols-2 gap-2.5 border-t border-line p-4" method="get">
+            <input type="hidden" name="view" value={view} />
+            <label className="col-span-1">
+              <span className="label">担当社員</span>
+              <select name="assignee" defaultValue={filter.assignee ?? ""} className="field">
+                <option value="">すべて</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="col-span-1">
+              <span className="label">部署</span>
+              <select name="department" defaultValue={filter.department ?? ""} className="field">
+                <option value="">すべて</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="label">ステータス</span>
+              <select name="status" defaultValue={filter.status ?? ""} className="field">
+                <option value="">すべて</option>
+                {TASK_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {TASK_STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="label">優先順位</span>
+              <select name="priority" defaultValue={filter.priority ?? ""} className="field">
+                <option value="">すべて</option>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {PRIORITY_LABEL[p]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="label">発生日（から）</span>
+              <input type="date" name="cfrom" defaultValue={sp.cfrom} className="field" />
+            </label>
+            <label>
+              <span className="label">発生日（まで）</span>
+              <input type="date" name="cto" defaultValue={sp.cto} className="field" />
+            </label>
+            <label>
+              <span className="label">完了日（から）</span>
+              <input type="date" name="dfrom" defaultValue={sp.dfrom} className="field" />
+            </label>
+            <label>
+              <span className="label">完了日（まで）</span>
+              <input type="date" name="dto" defaultValue={sp.dto} className="field" />
+            </label>
+            <button type="submit" className="btn-primary col-span-1">
+              絞り込む
+            </button>
+            <Link href={`/tasks?view=${view}`} className="btn-secondary col-span-1">
+              解除
+            </Link>
+          </form>
+        </details>
+
+        {tasks.length === 0 ? (
+          <Empty>
+            該当する業務はありません。
+            <Link href="/tasks/new" className="mt-2 block font-semibold text-brand">
+              業務を登録する
+            </Link>
+          </Empty>
+        ) : (
+          <ul className="space-y-2">
+            {tasks.map((t) => (
+              <li key={t.id}>
+                <Link href={`/tasks/${t.id}`} className="card flex items-center gap-3 p-3.5 active:opacity-70">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <TaskStatusBadge status={t.status} />
+                      <PriorityBadge priority={t.priority} />
+                    </div>
+                    <div className="mt-1.5 truncate text-[15px] font-semibold">{t.title}</div>
+                    <div className="mt-0.5 text-xs text-muted">
+                      担当: {t.assignee_name ?? "未定"} ／ {dateTime(t.created_at)} ／ API {yen(t.spent_jpy)}
+                      {t.due_date && ` ／ 期限 ${t.due_date}`}
+                    </div>
+                  </div>
+                  <ChevronRight />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Page>
+    </>
+  );
+}

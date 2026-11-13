@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import type { JSONValue } from "postgres";
+import type postgres from "postgres";
+type JSONValue = postgres.JSONValue;
 import type { Db, Sql, Tx } from "@/lib/db";
 import { APPROVAL_ACTION_TYPES, type ApprovalActionType, type ApprovalStatus } from "@/lib/constants";
 import { addTaskLog } from "./tasks";

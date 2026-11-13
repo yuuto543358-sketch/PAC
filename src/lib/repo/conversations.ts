@@ -1,5 +1,6 @@
 import "server-only";
-import type { JSONValue } from "postgres";
+import type postgres from "postgres";
+type JSONValue = postgres.JSONValue;
 import type { Db } from "@/lib/db";
 
 export type Conversation = {

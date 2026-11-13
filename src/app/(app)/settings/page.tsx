@@ -1,0 +1,110 @@
+import Link from "next/link";
+import { getDb } from "@/lib/db";
+import { getBudget, getSettings } from "@/lib/repo/settings";
+import { listEmployees } from "@/lib/repo/employees";
+import { FIXED_COMPANY_PRINCIPLES } from "@/lib/ai/prompts";
+import { isAiConfigured, isMockMode } from "@/lib/ai/client";
+import { Avatar } from "@/components/Avatar";
+import { ChevronRight, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import { AutorunForm, BudgetForm, CompanyForm, EmergencyForm, LogoutAllForm, ModelForm, OpsCostForm } from "./forms";
+
+export const metadata = { title: "設定" };
+
+export default async function SettingsPage() {
+  const sql = await getDb();
+  const [settings, budget, employees] = await Promise.all([getSettings(sql), getBudget(sql), listEmployees(sql)]);
+  return (
+    <>
+      <PageHeader title="設定" back="/more" />
+      <Page>
+        <Section title="緊急停止">
+          <div className="card p-4">
+            <EmergencyForm on={settings.emergency_stop} />
+          </div>
+        </Section>
+
+        <Section title="会社情報">
+          <div className="card p-4">
+            <CompanyForm initial={{ company_name: settings.company_name, philosophy: settings.philosophy, custom_rules: settings.custom_rules }} />
+          </div>
+          <details className="card mt-2.5">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold">会社の基本原則（変更不可）を見る ›</summary>
+            <pre className="border-t border-line px-4 py-3 font-sans text-xs whitespace-pre-wrap text-muted">{FIXED_COMPANY_PRINCIPLES}</pre>
+          </details>
+        </Section>
+
+        <Section title="社員情報">
+          <ul className="card divide-y divide-line">
+            {employees.map((e) => (
+              <li key={e.id}>
+                <Link href={`/settings/employees/${e.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
+                  <Avatar color={e.avatar_color} styleId={e.avatar_style} size={36} label={e.name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-medium">{e.name}</div>
+                    <div className="text-xs text-muted">{e.role_title}</div>
+                  </div>
+                  <ChevronRight />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 px-1 text-xs text-muted">社員の権限や役割（社長・調査担当など）はAI社員自身では変更できません。</p>
+        </Section>
+
+        <Section title="API予算">
+          <div id="budget" className="card scroll-mt-20 p-4">
+            <BudgetForm initial={budget} />
+          </div>
+        </Section>
+
+        <Section title="AIモデル">
+          <div className="card p-4">
+            <p className="mb-3 text-sm">
+              APIキー：
+              {isMockMode() ? <span className="font-semibold text-danger">テスト用モック</span> : isAiConfigured() ? <span className="font-semibold text-success">設定済み</span> : <span className="font-semibold text-danger">未設定</span>}
+              <span className="ml-1 text-xs text-muted">（キーはサーバーにだけ保存され、この画面には表示されません）</span>
+            </p>
+            <ModelForm
+              initial={{
+                model_standard: settings.model_standard,
+                model_advanced: settings.model_advanced,
+                advanced_model_allowed: settings.advanced_model_allowed,
+                usd_jpy_rate: settings.usd_jpy_rate,
+              }}
+            />
+          </div>
+        </Section>
+
+        <Section title="自動実行の頻度">
+          <div className="card p-4">
+            <AutorunForm initial={settings.autorun_frequency} />
+          </div>
+          <div className="mt-2">
+            <PhaseNotice phase="Phase 3">定期的な事業機会の調査・未完了業務の確認・週次報告などの自動実行（保存した頻度で動きます）</PhaseNotice>
+          </div>
+        </Section>
+
+        <Section title="運用料金">
+          <div id="ops" className="card scroll-mt-20 p-4">
+            <OpsCostForm initial={settings.hosting_cost_jpy_monthly} />
+          </div>
+        </Section>
+
+        <Section title="通知設定">
+          <PhaseNotice phase="Phase 3">承認依頼・予算超過のプッシュ通知（iPhoneのホーム画面アプリへの通知）。現在は、ホーム画面の「重要なお知らせ」と承認タブの数字でお知らせします。</PhaseNotice>
+        </Section>
+
+        <Section title="セキュリティ">
+          <div className="card space-y-3 p-4 text-sm">
+            <ul className="list-disc space-y-1 pl-5 text-xs text-muted">
+              <li>ログインはパスワード方式です。パスワードはVercelの環境変数 APP_PASSWORD で変更できます。</li>
+              <li>ログイン失敗が続くと15分間ロックされます。</li>
+              <li>業務履歴・承認履歴・API利用記録・操作履歴は、データベースの仕組みで変更・削除できないよう保護されています。</li>
+            </ul>
+            <LogoutAllForm />
+          </div>
+        </Section>
+      </Page>
+    </>
+  );
+}

@@ -1,26 +1,132 @@
 @import "tailwindcss";
 
+/* ===== 色の設定（ライト / ダーク） ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --border: #e3e6ec;
+  --text: #141824;
+  --muted: #5d6475;
+  --brand: #1d3a8a;
+  --brand-2: #2f55c6;
+  --brand-fg: #ffffff;
+  --brand-soft: #e7edfb;
+  --accent: #b45309;
+  --accent-soft: #fdf1e2;
+  --success: #15803d;
+  --success-soft: #e5f5ea;
+  --danger: #b91c1c;
+  --danger-soft: #fbe9e9;
+  --info-soft: #eaf1fd;
+  --tabbar: rgba(255, 255, 255, 0.92);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0e1118;
+    --surface: #171b25;
+    --surface-2: #1d2230;
+    --border: #2a3142;
+    --text: #e9ecf3;
+    --muted: #9aa3b5;
+    --brand: #7aa2ff;
+    --brand-2: #9db9ff;
+    --brand-fg: #0e1118;
+    --brand-soft: #1d2847;
+    --accent: #f5a524;
+    --accent-soft: #3a2a12;
+    --success: #4ade80;
+    --success-soft: #133222;
+    --danger: #f87171;
+    --danger-soft: #3b1a1a;
+    --info-soft: #1a2540;
+    --tabbar: rgba(23, 27, 37, 0.92);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info-soft: var(--info-soft);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+    "Yu Gothic UI", Meiryo, sans-serif;
 }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* iPhone で入力欄をタップしたときに拡大されないよう、16px 以上にする */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* よく使う部品 */
+@utility card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+
+@utility field {
+    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-ink outline-none placeholder:text-muted focus:border-brand;
+  }
+
+@utility label {
+    @apply mb-1 block text-sm font-medium text-muted;
+  }
+
+@utility btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-4 text-[15px] font-semibold transition-opacity active:opacity-70 disabled:opacity-50;
+  }
+
+@utility btn-primary {
+    @apply btn bg-brand text-brand-fg;
+  }
+
+@utility btn-secondary {
+    @apply btn border border-line bg-surface text-ink;
+  }
+
+@utility btn-danger {
+    @apply btn bg-danger text-white;
+  }
+
+@utility btn-accent {
+    @apply btn bg-accent text-white;
+  }
+
+@utility section-title {
+    @apply mb-2 px-1 text-[13px] font-semibold tracking-wide text-muted;
+  }

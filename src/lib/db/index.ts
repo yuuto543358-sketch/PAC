@@ -73,8 +73,8 @@ async function seed(tx: Tx) {
       insert into employees (id, role_key, name, name_kana, role_title, department_id, personality,
         speaking_style, expertise, strengths, weaknesses, judgment_criteria, avatar_color, avatar_style, sort_order)
       values (${e.id}, ${e.role_key}, ${e.name}, ${e.name_kana}, ${e.role_title}, ${e.department_id},
-        ${e.personality}, ${e.speaking_style}, ${tx.array(e.expertise)}, ${tx.array(e.strengths)},
-        ${tx.array(e.weaknesses)}, ${e.judgment_criteria}, ${e.avatar_color}, ${e.avatar_style}, ${e.sort_order})
+        ${e.personality}, ${e.speaking_style}, ${e.expertise}::text[], ${e.strengths}::text[],
+        ${e.weaknesses}::text[], ${e.judgment_criteria}, ${e.avatar_color}, ${e.avatar_style}, ${e.sort_order})
       on conflict (id) do nothing`;
   }
 }
