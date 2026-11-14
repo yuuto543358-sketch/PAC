@@ -28,8 +28,10 @@ export type CompanySettings = {
   sns_plan_frequency: string;
   /** 1回に作る投稿案の数 */
   sns_posts_per_plan: number;
-  /** 1か月に投稿してよい上限 */
+  /** （使っていません。以前の自動投稿の上限） */
   sns_monthly_post_limit: number;
+  /** 投稿案を作るSNS（x / bluesky） */
+  sns_platforms: string[];
   last_sns_plan_on: Date | null;
   updated_at: Date;
 };

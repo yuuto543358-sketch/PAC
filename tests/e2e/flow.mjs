@@ -317,7 +317,7 @@ await page.getByRole("status").filter({ hasText: "通知の設定を保存しま
 check("通知のオン・オフを保存", true);
 await shot("23-notify");
 
-// SNS運用：SNS担当が投稿案を作り、承認すると投稿（設定がなければコピーして自分で投稿）
+// SNS運用：SNS担当が投稿案を作り、承認したら経営者が自分で投稿する
 await page.goto(`${BASE}/sns`);
 // テストは短時間にAIを何度も使うため、「1分あたりの上限」（安全装置）で止まったら1分待ってやり直す
 for (let attempt = 0; attempt < 3; attempt++) {
@@ -338,8 +338,10 @@ await page.locator("main a[href^='/approvals/']").first().click();
 await page.getByText(/投稿する文章（X（旧Twitter））/).waitFor();
 check("SNSの承認依頼に投稿先が出る", true);
 await page.getByRole("button", { name: "承認する" }).click();
-await page.getByRole("status").filter({ hasText: "SNSの設定がまだないため" }).waitFor();
-check("SNSの設定がないときは、承認後にコピーして投稿する案内", (await page.getByRole("button", { name: "内容をコピー" }).count()) === 1);
+await page.getByRole("status").filter({ hasText: "ご自身で投稿してください" }).waitFor();
+const xHref = (await page.getByRole("link", { name: "Xで開く" }).getAttribute("href")) ?? "";
+check("承認後は「Xで開く」で、文章入りの投稿画面を開ける（アプリは投稿しない）", xHref.startsWith("https://x.com/intent/post?text="), xHref.slice(0, 60));
+check("「文章をコピー」ボタンもある", (await page.getByRole("button", { name: "文章をコピー" }).count()) === 1);
 
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);

@@ -11,10 +11,10 @@ import { createApproval } from "@/lib/repo/approvals";
 import { audit } from "@/lib/repo/audit";
 import { getEmployee } from "@/lib/repo/employees";
 import { getSettings } from "@/lib/repo/settings";
-import { checkPostLength, configuredPlatforms } from "@/lib/sns/post";
+import { checkPostLength } from "@/lib/sns/post";
 
 // SNS担当（企画制作の春野 創太）が、会社のSNSの投稿案を作る仕組み。
-// 投稿案は1件ずつ「承認依頼」になり、経営者が承認するとアプリが投稿します（そのSNSの設定が済んでいれば）。
+// 投稿案は1件ずつ「承認依頼」になります。投稿は、承認したあと経営者が自分で行います（アプリは投稿しません）。
 
 const SNS_MANAGER_ID = "creative";
 
@@ -50,9 +50,9 @@ export async function runSnsPlanning(sql: Sql, trigger: "manual" | "scheduled"):
   if (!employee) return { ok: false, message: "SNS担当の社員が見つかりません。", ...empty };
   if (settings.emergency_stop) return { ok: false, message: "緊急停止中のため、SNSの投稿案づくりを止めました。", ...empty };
 
-  // 投稿先：設定が済んでいるSNS。まだ1つもなければ X 向けに作る（承認後は、あなたがコピーして投稿）
-  const configured = configuredPlatforms();
-  const platforms = (configured.length ? configured : (["x"] as SnsPlatform[])) as [SnsPlatform, ...SnsPlatform[]];
+  // 投稿案を作るSNS（設定で選ぶ。なければ X）
+  const chosen = SNS_PLATFORMS.filter((p) => settings.sns_platforms?.includes(p));
+  const platforms = (chosen.length ? chosen : (["x"] as SnsPlatform[])) as [SnsPlatform, ...SnsPlatform[]];
   const count = Math.min(7, Math.max(1, settings.sns_posts_per_plan));
 
   const [recent, businesses, deliverables] = await Promise.all([
@@ -84,7 +84,6 @@ ${PLAIN_LANGUAGE_RULES}
 【投稿の決まり】
 - 投稿先: ${platforms.map((p) => SNS_PLATFORM_LABEL[p]).join("、")}
 - X は日本語で130文字以内。Bluesky は280文字以内。
-- X ではリンクを入れると投稿の費用が上がる（1回 約30円）。リンクはなるべく入れず「プロフィールのリンクから」などと書く。
 - 宣伝ばかりにしない。役に立つ情報・考え方・作っている様子などを中心に、宣伝は全体の3分の1まで。
 - うそ・大げさな表現・架空のお客さんの声・根拠のない数字は書かない。
 - ハッシュタグは2つまで。人を傷つける話題、政治や宗教の話題、ほかの人やお店の悪口は書かない。
@@ -168,7 +167,7 @@ ${recent.length ? recent.slice(0, 20).map((r) => `- ${r.content.replace(/\s+/g, 
   });
   const message =
     approvalIds.length > 0
-      ? `SNSの投稿案を${approvalIds.length}件作りました。承認すると投稿されます。`
+      ? `SNSの投稿案を${approvalIds.length}件作りました。承認したら、ご自身で投稿してください。`
       : "今回は、使える投稿案がありませんでした（長すぎる・似ている案を除きました）。";
   return { ok: true, message, created: approvalIds.length, skipped, approvalIds, costJpy: result.costJpy };
 }

@@ -1,6 +1,5 @@
 import "server-only";
-import { defaultExecutorFor } from "@/lib/sns/executor";
-import { checkPostLength, platformOf, postCostJpy } from "@/lib/sns/post";
+import { checkPostLength, platformOf } from "@/lib/sns/post";
 import { enqueueNotification } from "@/lib/notify";
 import { createHash } from "node:crypto";
 import type postgres from "postgres";
@@ -10,6 +9,7 @@ import {
   APPROVAL_ACTION_TYPES,
   OWNER_SENDS_ACTION_TYPES,
   OWNER_DOES_AFTER_EFFECT,
+  OWNER_POSTS_AFTER_EFFECT,
   OWNER_SENDS_AFTER_EFFECT,
   SNS_PLATFORM_LABEL,
   type ApprovalActionType,
@@ -181,24 +181,19 @@ export async function createApprovalTx(tx: Tx, rawInput: CreateApprovalInput, ac
       ? rawInput
       : {
           ...rawInput,
-          afterEffect: (OWNER_SENDS_ACTION_TYPES as string[]).includes(rawInput.actionType)
-            ? OWNER_SENDS_AFTER_EFFECT
-            : OWNER_DOES_AFTER_EFFECT,
+          afterEffect: rawInput.actionType === "send_message" ? OWNER_SENDS_AFTER_EFFECT : OWNER_DOES_AFTER_EFFECT,
         };
   if (rawInput.actionType === "sns_post") {
-    // SNSへの投稿：どのSNSかを記録し、費用はAIの見積もりではなく料金表から計算する
+    // SNSへの投稿：どのSNS向けかを記録する。投稿は経営者が自分で行うので、アプリ側の費用はかからない
     const platform = platformOf({ payload: (rawInput.payload ?? null) as Record<string, unknown> | null, destination: rawInput.destination });
-    const [r] = await tx<{ rate: number }[]>`select usd_jpy_rate::float8 as rate from company_settings where id = 1`;
     const tooLong = platform ? checkPostLength(platform, rawInput.content) : null;
     input = {
       ...input,
       destination: platform ? SNS_PLATFORM_LABEL[platform] : rawInput.destination,
       payload: { ...(rawInput.payload ?? {}), ...(platform ? { platform } : {}) },
-      estimatedCostJpy: postCostJpy(platform, rawInput.content, Number(r?.rate ?? 160)),
+      estimatedCostJpy: 0,
       risks: tooLong ? `【注意】${tooLong}。「内容を修正して再提出」で短くしてください。\n${rawInput.risks}` : rawInput.risks,
-      afterEffect: platform
-        ? `承認すると、${SNS_PLATFORM_LABEL[platform]}の設定が済んでいれば、アプリが自動で投稿します（取り消しは${SNS_PLATFORM_LABEL[platform]}のアプリから手動で行います）。設定がまだなら「内容をコピー」を使って、あなたが投稿します。`
-        : OWNER_DOES_AFTER_EFFECT,
+      afterEffect: OWNER_POSTS_AFTER_EFFECT,
     };
   }
   const c = validateInput(input);
@@ -371,13 +366,12 @@ export async function resubmitApproval(
 export type ApprovedAction = Readonly<Approval>;
 export type ActionExecutor = (action: ApprovedAction) => Promise<{ summary: string }>;
 
-// 実行の仕組みは src/lib/sns/executor.ts（defaultExecutorFor）で決めます。
-// いまアプリが実行できるのは「SNSへの投稿」だけ（鍵が設定されているとき）。
-// send_message（メール・メッセージ）は経営者が自分で送る方針のため、実行しません（下で拒否します）。
+// いまアプリには、外部で自動的に実行する仕組みはありません（executors を渡したときだけ実行します）。
+// メール・メッセージとSNSへの投稿は、経営者が自分で行う方針のため、渡されても実行しません（下で拒否します）。
 
 export type ExecuteResult =
   | { ok: true; summary: string }
-  | { ok: false; reason: "not_approved" | "hash_mismatch" | "not_implemented" | "failed" | "not_found" | "limit"; message: string };
+  | { ok: false; reason: "not_approved" | "hash_mismatch" | "not_implemented" | "failed" | "not_found"; message: string };
 
 /**
  * 承認済みの操作を実行する唯一の入口。サーバー側で以下をすべて確認します。
@@ -416,21 +410,17 @@ export async function executeApprovedAction(
       return {
         ok: false as const,
         reason: "not_implemented" as const,
-        message: "メール・メッセージは、経営者がご自身で送ります（アプリは自動で送りません）",
+        message: a.action_type === "sns_post"
+          ? "SNSへの投稿は、経営者がご自身で行います（アプリは投稿しません）"
+          : "メール・メッセージは、経営者がご自身で送ります（アプリは自動で送りません）",
       };
     }
-    let executor: ActionExecutor | undefined;
-    if (executors) executor = executors[a.action_type];
-    else {
-      const d = await defaultExecutorFor(tx, a);
-      if (d && "blocked" in d) return { ok: false as const, reason: "limit" as const, message: d.blocked };
-      executor = d?.executor as ActionExecutor | undefined;
-    }
+    const executor = executors?.[a.action_type];
     if (!executor) {
       return {
         ok: false as const,
         reason: "not_implemented" as const,
-        message: "この種類の操作を実行する機能はまだありません（Phase 4で実装予定）。承認内容は記録済みです。",
+        message: "この種類の操作をアプリが実行する機能はありません。必要なら、経営者がご自身で行います。承認内容は記録済みです。",
       };
     }
     await tx`update approvals set status = 'executing' where id = ${approvalId}`;

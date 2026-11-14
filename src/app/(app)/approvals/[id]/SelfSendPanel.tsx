@@ -82,3 +82,38 @@ export function OwnerDoPanel({ body }: { body: string }) {
     </div>
   );
 }
+
+/** SNSへの投稿は、あなたが自分で行う。文章が入った投稿画面を開くか、コピーして使う */
+export function SelfPostPanel({ body, composeUrl, platformLabel }: { body: string; composeUrl: string | null; platformLabel: string }) {
+  return (
+    <div className="card space-y-3 p-4">
+      <p className="text-[14px] leading-relaxed">
+        <b>投稿は、あなたが行います。</b>アプリがSNSに投稿することはありません。
+        {composeUrl ? `「${platformLabel}で開く」を押すと、文章が入った投稿画面が開きます。内容を見て、投稿ボタンを押してください。` : "下のボタンで文章をコピーして、SNSに貼りつけてください。"}
+      </p>
+      <div className={`grid gap-2 ${composeUrl ? "grid-cols-2" : "grid-cols-1"}`}>
+        {composeUrl && (
+          <a href={composeUrl} target="_blank" rel="noopener noreferrer" className="btn-primary px-3">
+            <Icon name="send" size={18} stroke={2} />
+            <span className="whitespace-nowrap">{platformLabel}で開く</span>
+          </a>
+        )}
+        <button
+          type="button"
+          className="btn-tinted"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(body);
+              showToast("文章をコピーしました");
+            } catch {
+              showToast("コピーできませんでした", "error");
+            }
+          }}
+        >
+          <Icon name="document" size={18} stroke={2} />
+          文章をコピー
+        </button>
+      </div>
+    </div>
+  );
+}

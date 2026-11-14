@@ -100,9 +100,13 @@ export const EXTERNAL_ACTION_TYPES = APPROVAL_ACTION_TYPES.filter((t) => t !== "
  * 経営者が自分で行う操作。アプリは自動で実行せず、承認後に「コピー」「メールアプリで開く」を出すだけ。
  * （経営者の方針：外部とのメールのやり取りは、必要なら自分で行う）
  */
-export const OWNER_SENDS_ACTION_TYPES: ApprovalActionType[] = ["send_message"];
+export const OWNER_SENDS_ACTION_TYPES: ApprovalActionType[] = ["send_message", "sns_post"];
 export const OWNER_SENDS_AFTER_EFFECT =
   "承認しても、アプリが自動で送ることはありません。承認後に表示される「コピー」または「メールアプリで開く」を使って、経営者がご自身で送ります。";
+
+/** SNSへの投稿も経営者が自分で行う（経営者の方針）。アプリは投稿しない */
+export const OWNER_POSTS_AFTER_EFFECT =
+  "承認しても、アプリがSNSに投稿することはありません。承認後に表示される「Xで開く」「Blueskyで開く」または「内容をコピー」を使って、経営者がご自身で投稿します。";
 
 /** メール以外の外部への操作。アプリには自動で実行する機能がないため、承認後は経営者が自分で行う */
 export const OWNER_DOES_AFTER_EFFECT =

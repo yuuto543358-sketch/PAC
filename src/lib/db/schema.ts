@@ -645,4 +645,12 @@ alter table company_settings add constraint company_settings_sns_monthly_post_li
 alter table company_settings add column if not exists last_sns_plan_on date;
 `,
   },
+  {
+    version: 7,
+    name: "sns_owner_posts",
+    sql: /* sql */ `
+-- SNSへの投稿は経営者が自分で行う。投稿案をどのSNS向けに作るかを選べるようにする
+alter table company_settings add column if not exists sns_platforms text[] not null default '{x}';
+`,
+  },
 ];

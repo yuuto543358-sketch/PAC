@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { runSnsPlanning } from "@/lib/autonomy/sns";
-import { SNS_PLAN_OPTIONS } from "@/lib/constants";
+import { SNS_PLAN_OPTIONS, SNS_PLATFORMS } from "@/lib/constants";
 import { audit } from "@/lib/repo/audit";
 import { kickNotifications } from "@/lib/notify/trigger";
 import type { ActionState } from "@/components/forms";
@@ -32,14 +32,14 @@ export async function updateSnsSettingsAction(_p: ActionState, fd: FormData): Pr
     if (!SNS_PLAN_OPTIONS.some((o) => o.id === freq)) throw new Error("頻度が正しくありません");
     const perPlan = Math.round(Number(fd.get("sns_posts_per_plan")));
     if (!(perPlan >= 1 && perPlan <= 7)) throw new Error("1回に作る数は1〜7件にしてください");
-    const limit = Math.round(Number(fd.get("sns_monthly_post_limit")));
-    if (!(limit >= 0 && limit <= 300)) throw new Error("1か月の上限は0〜300回にしてください");
+    const platforms = SNS_PLATFORMS.filter((p) => fd.get(`platform_${p}`) === "on");
+    if (platforms.length === 0) throw new Error("投稿案を作るSNSを1つ以上選んでください");
     const sql = await getDb();
     await sql`
       update company_settings set sns_plan_frequency = ${freq}, sns_posts_per_plan = ${perPlan},
-        sns_monthly_post_limit = ${limit}, updated_at = now()
+        sns_platforms = ${platforms}::text[], updated_at = now()
       where id = 1`;
-    await audit(sql, "user", "update_sns_settings", "company_settings", "1", { freq, perPlan, limit });
+    await audit(sql, "user", "update_sns_settings", "company_settings", "1", { freq, perPlan, platforms });
     refresh();
     return { ok: true, message: "SNS運用の設定を保存しました", ts: Date.now() };
   } catch (e) {

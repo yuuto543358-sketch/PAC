@@ -194,8 +194,8 @@ describe("tasks", () => {
 });
 
 describe("approvals", () => {
-  // 実行の仕組みのテストは「SNS投稿」で行う（メールは経営者が自分で送るため、アプリは実行しない）
-  async function newApproval(actionType = "sns_post") {
+  // 実行の仕組みのテストは「外部へのファイル共有」で行う（メールとSNSは経営者が自分で行うため、アプリは実行しない）
+  async function newApproval(actionType = "share_file") {
     const sql = await getDb();
     const id = await createApproval(sql, {
       requestedByEmployeeId: "president",
@@ -214,7 +214,7 @@ describe("approvals", () => {
   it("cannot execute without approval", async () => {
     const { sql, id } = await newApproval();
     const ran: string[] = [];
-    const exec = { sns_post: async () => { ran.push(id); return { summary: "sent" }; } };
+    const exec = { share_file: async () => { ran.push(id); return { summary: "sent" }; } };
     const r = await executeApprovedAction(sql, id, exec);
     expect(r).toMatchObject({ ok: false, reason: "not_approved" });
     expect(ran).toHaveLength(0);
@@ -224,7 +224,7 @@ describe("approvals", () => {
     const { sql, id, approval } = await newApproval();
     await decideApproval(sql, id, "approve", "", approval.content_hash);
     let count = 0;
-    const exec = { sns_post: async () => { count++; return { summary: "sent" }; } };
+    const exec = { share_file: async () => { count++; return { summary: "sent" }; } };
     const [r1, r2] = await Promise.all([executeApprovedAction(sql, id, exec), executeApprovedAction(sql, id, exec)]);
     expect([r1.ok, r2.ok].filter(Boolean)).toHaveLength(1);
     expect(count).toBe(1);
@@ -273,7 +273,7 @@ describe("approvals", () => {
     expect(n.status).toBe("pending");
     expect(n.supersedes_id).toBe(id);
     expect(n.content_hash).not.toBe(approval.content_hash);
-    const r = await executeApprovedAction(sql, id, { sns_post: async () => ({ summary: "x" }) });
+    const r = await executeApprovedAction(sql, id, { share_file: async () => ({ summary: "x" }) });
     expect(r.ok).toBe(false);
   });
 
