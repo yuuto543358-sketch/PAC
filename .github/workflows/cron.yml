@@ -31,10 +31,30 @@ jobs:
             echo "APP_URL または CRON_SECRET が未登録のため、何もしません（README 参照）"
             exit 0
           fi
-          status=$(curl -sS -o response.json -w "%{http_code}" --max-time 300 \
-            -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/workflow")
+          # 書き方のゆれを直す：前後の空白・改行、最後の「/」、http:// → https://、/api/... まで書いてしまった場合
+          url=$(printf '%s' "$APP_URL" | tr -d '[:space:]')
+          url="${url%%/api/*}"
+          url="${url%/}"; url="${url%/}"
+          case "$url" in
+            http://*) url="https://${url#http://}" ;;
+            https://*) ;;
+            *) url="https://$url" ;;
+          esac
+          secret=$(printf '%s' "$CRON_SECRET" | tr -d '\r\n')
+          status=$(curl -sS -o response.json -D headers.txt -w "%{http_code}" --max-time 300 \
+            -H "Authorization: Bearer $secret" "$url/api/cron/workflow")
           echo "HTTP $status"
           cat response.json || true
+          echo
+          if [ "$status" = "401" ]; then
+            echo "合言葉が違います。GitHub の CRON_SECRET を、Vercel の CRON_SECRET と同じ値にしてください"
+            exit 1
+          fi
+          if [ "${status#3}" != "$status" ]; then
+            loc=$(grep -i '^location:' headers.txt | head -1 | cut -d' ' -f2- | tr -d '\r')
+            echo "別の住所へ移動するよう言われました（移動先：$loc）。APP_URL を、ブラウザでアプリを開いたときのURL（https://…）にしてください"
+            exit 1
+          fi
           if [ "$status" != "200" ]; then
             echo "定期実行に失敗しました（HTTP $status）。APP_URL と CRON_SECRET を確認してください"
             exit 1
