@@ -20,6 +20,8 @@ export function ChatComposer({
   suggestions,
   disabledReason,
   advancedAllowed,
+  modelLabel,
+  advancedModelLabel,
 }: {
   employeeId: string;
   conversationId: string | null;
@@ -27,6 +29,8 @@ export function ChatComposer({
   suggestions: string[];
   disabledReason: string | null;
   advancedAllowed: boolean;
+  modelLabel: string;
+  advancedModelLabel: string;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -143,10 +147,10 @@ export function ChatComposer({
                 {advancedAllowed ? (
                   <label className="flex items-center gap-1.5">
                     <input type="checkbox" name="advanced" className="h-4 w-4 accent-[var(--brand)]" disabled={pending} />
-                    高性能モデルで考える（費用が高くなります）
+                    高性能モデル（{advancedModelLabel}）で考える（費用が高くなります）
                   </label>
                 ) : (
-                  <span>軽量モデルで応答します</span>
+                  <span>使用モデル：{modelLabel}</span>
                 )}
                 <span className="tabular">{text.length}/2000</span>
               </div>

@@ -5,6 +5,7 @@ import { getEmployee } from "@/lib/repo/employees";
 import { getConversation, latestConversation, listConversations, listMessages, type ChatMessage } from "@/lib/repo/conversations";
 import { getSettings } from "@/lib/repo/settings";
 import { isAiConfigured } from "@/lib/ai/client";
+import { modelName } from "@/lib/constants";
 import { dayLabel, timeOnly, yenPrecise } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icon";
@@ -190,6 +191,8 @@ export default async function ChatPage({
               : null
         }
         advancedAllowed={settings.advanced_model_allowed}
+        modelLabel={modelName(settings.model_standard)}
+        advancedModelLabel={modelName(settings.model_advanced)}
       />
     </div>
   );

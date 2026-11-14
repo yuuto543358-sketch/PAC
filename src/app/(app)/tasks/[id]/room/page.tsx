@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { getTask } from "@/lib/repo/tasks";
 import { getWorkflow, listDeliverables, listMembers, listRoomMessages, type RoomMessage } from "@/lib/workflow/repo";
 import { nextSpeakerId } from "@/lib/workflow/engine";
+import { getSettings } from "@/lib/repo/settings";
 import {
   ACTIVE_WORKFLOW_PHASES,
   DELIVERABLE_FORMATS,
@@ -11,6 +12,7 @@ import {
   MEMBER_ROLE_LABEL,
   ROOM_MESSAGE_KIND_LABEL,
   WORKFLOW_PHASE_LABEL,
+  modelName,
 } from "@/lib/constants";
 import { dayLabel, timeOnly, yenPrecise } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
@@ -41,11 +43,12 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
   const sql = await getDb();
   const task = await getTask(sql, id);
   if (!task) notFound();
-  const [wf, members, messages, deliverables] = await Promise.all([
+  const [wf, members, messages, deliverables, settings] = await Promise.all([
     getWorkflow(sql, id),
     listMembers(sql, id),
     listRoomMessages(sql, id, 200),
     listDeliverables(sql, id),
+    getSettings(sql),
   ]);
   const [pendingAcceptance] = await sql<{ id: string }[]>`
     select id from approvals where task_id = ${id} and action_type = 'accept_deliverable' and status in ('pending','on_hold')
@@ -231,6 +234,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
           autopilot={wf.autopilot}
           speaker={speaker ? { name: speaker.name, color: speaker.avatar_color, style: speaker.avatar_style } : null}
           canResume={!wf.autopilot || wf.phase === "stopped"}
+          modelLabel={modelName(settings.model_standard)}
         />
       )}
     </div>

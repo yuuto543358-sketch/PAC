@@ -16,7 +16,7 @@ import { addMessage, createConversation, getConversation, listMessages } from "@
 import { audit } from "@/lib/repo/audit";
 
 export const ChatOutputSchema = z.object({
-  reply: z.string().describe("経営者への返答（日本語）"),
+  reply: z.string().describe("経営者への返答（専門用語を使わない、やさしい日本語）"),
   proposed_tasks: z
     .array(
       z.object({

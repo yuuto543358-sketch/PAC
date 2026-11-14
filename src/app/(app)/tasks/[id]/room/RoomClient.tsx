@@ -29,6 +29,7 @@ export function RoomClient({
   autopilot,
   speaker,
   canResume,
+  modelLabel,
 }: {
   taskId: string;
   active: boolean;
@@ -37,6 +38,7 @@ export function RoomClient({
   autopilot: boolean;
   speaker: { name: string; color: string; style: string } | null;
   canResume: boolean;
+  modelLabel: string;
 }) {
   const router = useRouter();
   const [working, setWorking] = useState(false);
@@ -166,7 +168,7 @@ export function RoomClient({
           <div className="mt-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-faint">
             <span>
               {active
-                ? "チームが自動で進めています（この画面を閉じても続きます）"
+                ? `チームが自動で進めています（使用モデル：${modelLabel}）`
                 : phase === "waiting_human"
                   ? "経営者の確認待ちです"
                   : phase === "done"

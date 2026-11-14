@@ -145,6 +145,12 @@ export const MODEL_OPTIONS = [
   { id: "gpt-5", label: "GPT-5（高性能・高価格）" },
 ] as const;
 
+/** 画面に表示するモデルの名前（例：「GPT-5 mini」） */
+export function modelName(id: string): string {
+  const names: Record<string, string> = { "gpt-5-nano": "GPT-5 nano", "gpt-5-mini": "GPT-5 mini", "gpt-5": "GPT-5" };
+  return names[id] ?? id;
+}
+
 export const DEFAULT_MODEL_STANDARD = "gpt-5-mini";
 export const DEFAULT_MODEL_ADVANCED = "gpt-5";
 

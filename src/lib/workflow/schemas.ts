@@ -24,7 +24,7 @@ export const KickoffSchema = z.object({
 export type KickoffOutput = z.infer<typeof KickoffSchema>;
 
 export const DiscussionSchema = z.object({
-  message: z.string().describe("グループチャットでの発言（300字以内。自分の専門の観点から具体的に）"),
+  message: z.string().describe("グループチャットでの発言（300字以内。専門用語を使わず、やさしい言葉で具体的に）"),
   kind: z.enum(["opinion", "proposal", "question", "findings"]).describe("発言の種類"),
   question_to_owner: questionToOwner,
 });
@@ -42,11 +42,11 @@ const externalAction = z.object({
 });
 
 export const DraftSchema = z.object({
-  message: z.string().describe("チームへの報告（成果物の要点と、議論をどう反映したか。200字以内）"),
+  message: z.string().describe("チームへの報告（成果物の要点と、議論をどう反映したか。200字以内。やさしい言葉で）"),
   deliverable: z.object({
     title: z.string(),
     format: z.enum(DELIVERABLE_FORMAT_IDS).describe("出力形式。チームで決めた形式に合わせる"),
-    content: z.string().describe("成果物の本文すべて（完成品として、そのまま使える内容）"),
+    content: z.string().describe("成果物の本文すべて（完成品として、そのまま使える内容。専門用語を使わず、やさしい言葉で）"),
   }),
   external_actions: z
     .array(externalAction)
@@ -56,7 +56,7 @@ export const DraftSchema = z.object({
 export type DraftOutput = z.infer<typeof DraftSchema>;
 
 export const ReviewSchema = z.object({
-  message: z.string().describe("監査結果のチームへの発言（200字以内）"),
+  message: z.string().describe("監査結果のチームへの発言（200字以内。やさしい言葉で）"),
   verdict: z.enum(["approve", "revise"]).describe("合格なら approve、修正が必要なら revise"),
   points: z.array(z.string()).describe("修正してほしい点（revise のとき。具体的に）"),
   risks: z.array(z.string()).describe("経営者に伝えるべきリスク・注意点"),
@@ -64,7 +64,7 @@ export const ReviewSchema = z.object({
 export type ReviewOutput = z.infer<typeof ReviewSchema>;
 
 export const FinalReportSchema = z.object({
-  report: z.string().describe("経営者への完了報告（社長として。結論・成果物の要点・監査結果・承認してほしいこと。500字以内）"),
+  report: z.string().describe("経営者への完了報告（社長として。結論・成果物の要点・心配なこと・決めてほしいこと。500字以内。専門用語を使わず、やさしい言葉で）"),
   summary: z.string().describe("一行の要約（60字以内）"),
   lessons: z
     .array(z.object({ employee_id: z.string(), lesson: z.string().describe("この業務から学んだこと（次に活かす注意点）") }))

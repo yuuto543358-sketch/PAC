@@ -1,5 +1,5 @@
 import "server-only";
-import { FIXED_COMPANY_PRINCIPLES } from "@/lib/ai/prompts";
+import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
 import { DELIVERABLE_FORMATS, MEMBER_ROLE_LABEL, type WorkflowPhase } from "@/lib/constants";
 import type { EmployeeWithStats } from "@/lib/repo/employees";
 import type { CompanySettings } from "@/lib/repo/settings";
@@ -70,6 +70,9 @@ ${settings.custom_rules.trim() ? `\n【経営者が定めた社内ルール】\n
 【あなたの過去の学び（社内の記憶）】
 ${memory}
 
+${PLAIN_LANGUAGE_RULES}
+- 成果物・監査の指摘・社長の報告も、このルールで書く（経営者がそのまま読んで行動できるように）。
+
 【できること・できないこと】
 - できる: チーム内での議論、文章・資料・計画・表などの作成、品質やリスクの確認
 - まだできない: Web検索・Webページの閲覧、外部への送信・投稿・購入・登録などの実行
@@ -118,14 +121,15 @@ ${candidates}
 - 経営者に確認しないと進められない重要な不明点がある場合だけ question_to_owner に書く。`;
     }
     case "discussion":
-      return `グループチャットで、あなたの専門の観点から意見・提案・調査メモを1つ発言してください。
+      return `グループチャットで、あなたの得意な分野の立場から、意見・提案・調べたことを1つ発言してください。
+- 専門用語は使わず、やさしい言葉で（言葉づかいのルールを守る）。
 - 他の人の発言と重複しない、具体的で役に立つ内容に。
 - リーダーが最初に発言する場合は、進め方とたたき台の方針を示す。
 - 300字以内。`;
     case "drafting":
       return `あなたはリーダーです。これまでの議論と計画をもとに、成果物を完成させてください。
 - 形式は計画の形式（${workflow.plan?.output_format ?? "markdown_report"}）を基本に、内容に最も合う形式を選ぶ: ${formatList}
-- そのまま経営者に渡せる完成品にする（見出し・箇条書きを使って読みやすく）。表（csv_table）の場合は1行目を見出しにしたCSVにする。
+- そのまま経営者に渡せる完成品にする（見出し・箇条書きを使って読みやすく）。専門用語は使わず、やさしい言葉で書く。表（csv_table）の場合は1行目を見出しにしたCSVにする。
 - 外部への操作が必要なら external_actions に承認依頼の案を書く（実行はしない）。`;
     case "rework":
       return `あなたはリーダーです。監査コメントと経営者の指示を反映して、成果物を修正した新しい版を作ってください。
@@ -133,12 +137,12 @@ ${candidates}
 - 本文は修正後の完成品をすべて書く（差分ではなく全文）。`;
     case "review":
       return `あなたは監査役です。最新の成果物を確認してください。
-- 確認の観点: 業務のゴールと完成の条件を満たしているか／事実と推測が区別されているか／費用・法律・評判などのリスク／経営者が誤解しない分かりやすさ
+- 確認の観点: 業務のゴールと完成の条件を満たしているか／事実と推測が区別されているか／費用・法律・評判などのリスク／**専門用語やカタカナ語が残っていないか、経営者がそのまま読んでわかるか**（わかりにくければ revise にして、言い換えを指摘する）
 - 問題がなければ approve。修正が必要なら revise とし、points に具体的な修正点を書く。
 - 細かすぎる指摘で何度も差し戻さない。重要な問題だけを指摘する。`;
     case "final_report":
       return `あなたは社長です。チームの成果を確認し、経営者への完了報告を書いてください。
-- 結論、成果物の要点、監査で指摘されたリスク、経営者に承認・判断してほしいことを簡潔に。
+- 結論、成果物の要点、監査で指摘された心配なこと、経営者に決めてほしいことを、やさしい言葉で簡潔に。
 - lessons には、チームの各社員（id）が次の仕事に活かすべき学びを書く。`;
     default:
       return "";
