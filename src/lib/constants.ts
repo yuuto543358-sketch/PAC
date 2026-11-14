@@ -96,8 +96,16 @@ export const EXTERNAL_ACTION_TYPES = APPROVAL_ACTION_TYPES.filter((t) => t !== "
   Exclude<ApprovalActionType, "accept_deliverable">,
   ...Exclude<ApprovalActionType, "accept_deliverable">[],
 ];
+/**
+ * 経営者が自分で行う操作。アプリは自動で実行せず、承認後に「コピー」「メールアプリで開く」を出すだけ。
+ * （経営者の方針：外部とのメールのやり取りは、必要なら自分で行う）
+ */
+export const OWNER_SENDS_ACTION_TYPES: ApprovalActionType[] = ["send_message"];
+export const OWNER_SENDS_AFTER_EFFECT =
+  "承認しても、アプリが自動で送ることはありません。承認後に表示される「コピー」または「メールアプリで開く」を使って、経営者がご自身で送ります。";
+
 export const APPROVAL_ACTION_LABEL: Record<ApprovalActionType, string> = {
-  send_message: "メール・メッセージの送信",
+  send_message: "メール・メッセージ（あなたが送る）",
   sns_post: "SNSへの投稿",
   publish_web: "Webサイトへの公開",
   purchase: "商品の購入",

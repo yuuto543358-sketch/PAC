@@ -20,6 +20,7 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
     await audit(sql, "user", `approval_${decision}`, "approval", id);
     const [a] = await sql<{ task_id: string | null; action_type: string }[]>`select task_id, action_type from approvals where id = ${id}`;
     const isDeliverable = a?.action_type === "accept_deliverable";
+    const ownerSends = a?.action_type === "send_message";
     // 成果物を差し戻したら、チームがすぐ修正に取りかかる
     if (decision === "reject" && isDeliverable && a?.task_id) scheduleTeamRun([a.task_id]);
     refresh();
@@ -27,7 +28,9 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
       decision === "approve"
         ? isDeliverable
           ? "承認しました。業務完了です"
-          : "承認しました"
+          : ownerSends
+            ? "承認しました。下のボタンから、ご自身で送ってください"
+            : "承認しました"
         : decision === "reject"
           ? isDeliverable
             ? "差し戻しました。チームが修正します"

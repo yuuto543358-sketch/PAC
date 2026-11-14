@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import postgres from "postgres";
 import { closeDb, getDb } from "@/lib/db";
+import { OWNER_SENDS_AFTER_EFFECT } from "@/lib/constants";
 import { BudgetBlockedError, failApiCall, finalizeApiCall, reserveApiCall } from "@/lib/budget";
 import { createTask, changeTaskStatus, getTaskLogs } from "@/lib/repo/tasks";
 import {
@@ -193,12 +194,13 @@ describe("tasks", () => {
 });
 
 describe("approvals", () => {
-  async function newApproval() {
+  // 実行の仕組みのテストは「SNS投稿」で行う（メールは経営者が自分で送るため、アプリは実行しない）
+  async function newApproval(actionType = "sns_post") {
     const sql = await getDb();
     const id = await createApproval(sql, {
       requestedByEmployeeId: "president",
-      actionType: "send_message",
-      title: "取引先へのメール送信",
+      actionType,
+      title: "取引先へのお知らせ",
       content: "こんにちは。",
       reason: "依頼のため",
       destination: "a@example.com",
@@ -212,7 +214,7 @@ describe("approvals", () => {
   it("cannot execute without approval", async () => {
     const { sql, id } = await newApproval();
     const ran: string[] = [];
-    const exec = { send_message: async () => { ran.push(id); return { summary: "sent" }; } };
+    const exec = { sns_post: async () => { ran.push(id); return { summary: "sent" }; } };
     const r = await executeApprovedAction(sql, id, exec);
     expect(r).toMatchObject({ ok: false, reason: "not_approved" });
     expect(ran).toHaveLength(0);
@@ -222,7 +224,7 @@ describe("approvals", () => {
     const { sql, id, approval } = await newApproval();
     await decideApproval(sql, id, "approve", "", approval.content_hash);
     let count = 0;
-    const exec = { send_message: async () => { count++; return { summary: "sent" }; } };
+    const exec = { sns_post: async () => { count++; return { summary: "sent" }; } };
     const [r1, r2] = await Promise.all([executeApprovedAction(sql, id, exec), executeApprovedAction(sql, id, exec)]);
     expect([r1.ok, r2.ok].filter(Boolean)).toHaveLength(1);
     expect(count).toBe(1);
@@ -245,7 +247,7 @@ describe("approvals", () => {
     await expect(decideApproval(sql, id, "approve", "", "wrong-hash")).rejects.toThrow(/内容が変わっています/);
     expect(approval.content_hash).toBe(
       computeContentHash({
-        action_type: "send_message",
+        action_type: approval.action_type,
         title: approval.title,
         content: approval.content,
         destination: approval.destination,
@@ -271,8 +273,29 @@ describe("approvals", () => {
     expect(n.status).toBe("pending");
     expect(n.supersedes_id).toBe(id);
     expect(n.content_hash).not.toBe(approval.content_hash);
-    const r = await executeApprovedAction(sql, id, { send_message: async () => ({ summary: "x" }) });
+    const r = await executeApprovedAction(sql, id, { sns_post: async () => ({ summary: "x" }) });
     expect(r.ok).toBe(false);
+  });
+
+  it("メール・メッセージは経営者が自分で送る：アプリは送らず、説明は固定の文になる", async () => {
+    const { sql, id, approval } = await newApproval("send_message");
+    expect(approval.after_effect).toBe(OWNER_SENDS_AFTER_EFFECT);
+    await decideApproval(sql, id, "approve", "", approval.content_hash);
+    let sent = 0;
+    // 仮に送信の仕組みが登録されていても、メールは実行しない
+    const r = await executeApprovedAction(sql, id, { send_message: async () => { sent++; return { summary: "sent" }; } });
+    expect(r).toMatchObject({ ok: false, reason: "not_implemented" });
+    expect(sent).toBe(0);
+    expect((await getApproval(sql, id))!.status).toBe("approved");
+    // 修正して再提出しても、説明は固定の文のまま
+    const { id: id2, approval: a2 } = await newApproval("send_message");
+    const newId = await resubmitApproval(
+      sql,
+      id2,
+      { title: a2.title, content: "修正後", destination: a2.destination, estimatedCostJpy: 0, reason: "", risks: "", afterEffect: "自動で送信されます" },
+      a2.content_hash,
+    );
+    expect((await getApproval(sql, newId))!.after_effect).toBe(OWNER_SENDS_AFTER_EFFECT);
   });
 });
 

@@ -3,7 +3,13 @@ import { createHash } from "node:crypto";
 import type postgres from "postgres";
 type JSONValue = postgres.JSONValue;
 import { begin, type Db, type Sql, type Tx } from "@/lib/db";
-import { APPROVAL_ACTION_TYPES, type ApprovalActionType, type ApprovalStatus } from "@/lib/constants";
+import {
+  APPROVAL_ACTION_TYPES,
+  OWNER_SENDS_ACTION_TYPES,
+  OWNER_SENDS_AFTER_EFFECT,
+  type ApprovalActionType,
+  type ApprovalStatus,
+} from "@/lib/constants";
 import { addTaskLog } from "./tasks";
 
 export type Approval = {
@@ -162,7 +168,11 @@ function validateInput(input: CreateApprovalInput): ApprovalContent {
   };
 }
 
-export async function createApprovalTx(tx: Tx, input: CreateApprovalInput, actorType = "employee") {
+export async function createApprovalTx(tx: Tx, rawInput: CreateApprovalInput, actorType = "employee") {
+  // メール・メッセージは経営者が自分で送る。AIが何と書いても「承認後に何が起こるか」は固定の説明にする
+  const input = (OWNER_SENDS_ACTION_TYPES as string[]).includes(rawInput.actionType)
+    ? { ...rawInput, afterEffect: OWNER_SENDS_AFTER_EFFECT }
+    : rawInput;
   const c = validateInput(input);
   const hash = computeContentHash(c);
   const [row] = await tx<{ id: string }[]>`
@@ -324,8 +334,8 @@ export type ApprovedAction = Readonly<Approval>;
 export type ActionExecutor = (action: ApprovedAction) => Promise<{ summary: string }>;
 
 /**
- * 実行機能の登録場所。Phase 1 では何も登録されていないため、承認済みでも外部への実行は行われません。
- * Phase 4 で、例えば send_message にメール送信機能を登録します。
+ * 実行機能の登録場所。いまは何も登録されていないため、承認済みでも外部への実行は行われません。
+ * send_message（メール・メッセージ）は経営者が自分で送る方針のため、ここには登録しません（下で拒否します）。
  */
 export const ACTION_EXECUTORS: Partial<Record<ApprovalActionType, ActionExecutor>> = {};
 
@@ -364,6 +374,13 @@ export async function executeApprovedAction(
         ok: false as const,
         reason: "hash_mismatch" as const,
         message: "承認後に内容が変わっているため実行できません。再承認が必要です。",
+      };
+    }
+    if (OWNER_SENDS_ACTION_TYPES.includes(a.action_type)) {
+      return {
+        ok: false as const,
+        reason: "not_implemented" as const,
+        message: "メール・メッセージは、経営者がご自身で送ります（アプリは自動で送りません）",
       };
     }
     const executor = executors[a.action_type];

@@ -119,7 +119,7 @@ await page.click("nav >> text=承認");
 await page.getByText(/未確認 \d+件/).waitFor();
 await shot("05-approvals");
 await page.locator("main ul li a", { hasText: "送信の承認依頼" }).first().click();
-await page.getByText("実行しようとしている内容").waitFor();
+await page.getByText("送る内容（AIが書いた文面）").waitFor();
 for (const label of ["実行先", "担当社員", "発生する費用", "実行する理由", "想定されるリスク", "承認後に何が起こるか"]) {
   check(`承認画面に「${label}」`, (await page.getByText(label, { exact: true }).count()) > 0);
 }
@@ -134,9 +134,13 @@ check("修正して再提出すると新しい承認依頼になる", true);
 
 // 承認
 await page.getByRole("button", { name: "承認する" }).click();
-await page.getByRole("status").filter({ hasText: /^承認しました$/ }).waitFor();
-await page.getByText("Phase 4で実装予定").waitFor();
-check("承認後も外部実行はされない（未実装と表示）", true);
+await page.getByRole("status").filter({ hasText: "承認しました。下のボタンから、ご自身で送ってください" }).waitFor();
+await page.getByText("このメール（メッセージ）は、あなたが自分で送ります。").waitFor();
+check("メールは自分で送る（アプリは送らない）と表示", true);
+const mailLink = page.getByRole("link", { name: "メールアプリで開く" });
+const href = (await mailLink.getAttribute("href")) ?? "";
+check("「メールアプリで開く」に宛先と本文が入る", href.startsWith("mailto:example%40example.com?subject=") && href.includes(encodeURIComponent("修正後の送信本文です。")), href.slice(0, 80));
+check("「本文をコピー」ボタンがある", (await page.getByRole("button", { name: "本文をコピー" }).count()) === 1);
 await shot("07-approved");
 
 // 成果物の最終確認（承認 → 業務完了）

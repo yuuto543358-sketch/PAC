@@ -62,7 +62,7 @@ export function mockDraft(ctx: PromptContext): DraftOutput {
             reason: "業務の依頼内容に送信が含まれるため",
             estimated_cost_jpy: 0,
             risks: "宛先の間違い",
-            after_effect: "実行機能の実装後、メールが送信されます",
+            after_effect: "経営者がご自身で送ります",
           },
         ]
       : [],

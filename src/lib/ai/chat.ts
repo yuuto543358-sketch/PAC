@@ -102,7 +102,7 @@ function mockReply(employeeName: string, employeeId: string, text: string): Chat
             reason: "経営者からの依頼のため",
             estimated_cost_jpy: 0,
             risks: "宛先の間違い・内容の誤り",
-            after_effect: "承認後、実行機能が実装されると送信されます（現在は記録のみ）",
+            after_effect: "経営者がご自身で送ります",
             related_task_title: wantsTask ? title : null,
           },
         ]

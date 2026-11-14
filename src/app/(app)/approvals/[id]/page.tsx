@@ -8,6 +8,8 @@ import { Alert, ApprovalStatusBadge, IconTile, Page, PageHeader, PhaseNotice, Se
 import { Icon } from "@/components/Icon";
 import { APPROVAL_ACTION_STYLE } from "@/lib/approval-style";
 import { DecisionForm, ResubmitForm } from "./forms";
+import { SelfSendPanel } from "./SelfSendPanel";
+import { OWNER_SENDS_ACTION_TYPES } from "@/lib/constants";
 import { DocumentView } from "@/components/DocumentView";
 
 // 差し戻し後のチームの作業（バックグラウンド）を待つ時間（秒）
@@ -35,6 +37,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
   const open = a.status === "pending" || a.status === "on_hold";
   const isDeliverable = a.action_type === "accept_deliverable";
   const deliverableVersion = Number(a.payload?.deliverableVersion) || null;
+  const ownerSends = OWNER_SENDS_ACTION_TYPES.includes(a.action_type);
 
   const rows: [string, string][] = [
     ["操作の種類", APPROVAL_ACTION_LABEL[a.action_type]],
@@ -108,8 +111,19 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
             </article>
           </Section>
         ) : (
-          <Section title="実行しようとしている内容">
+          <Section title={ownerSends ? "送る内容（AIが書いた文面）" : "実行しようとしている内容"}>
             <div className="card p-4 text-[16px] leading-relaxed whitespace-pre-wrap">{a.content}</div>
+            {ownerSends && open && (
+              <p className="mt-2 px-1 text-xs text-muted">
+                承認すると、この文面を送るための「本文をコピー」「メールアプリで開く」ボタンが出ます。送るのはあなたです（アプリは自動で送りません）。
+              </p>
+            )}
+          </Section>
+        )}
+
+        {a.status === "approved" && ownerSends && (
+          <Section title="あなたが送る">
+            <SelfSendPanel subject={a.title} body={a.content} destination={a.destination} />
           </Section>
         )}
 
@@ -156,7 +170,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
           </Section>
         )}
 
-        {a.status === "approved" && !isDeliverable && (
+        {a.status === "approved" && !isDeliverable && !ownerSends && (
           <PhaseNotice phase="Phase 4">
             承認は記録されました。実際に外部へ実行する機能はまだありません。実装後も、サーバーが「承認済み」かつ「承認時と内容が同じ」ことを確認した場合だけ実行されます。
           </PhaseNotice>
