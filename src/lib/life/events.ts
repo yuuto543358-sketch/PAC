@@ -17,12 +17,16 @@ export type LifeEvent = {
   last_done_date: string | null;
   status: "active" | "archived";
   created_on: string;
+  prep: boolean;
+  prep_task_id: string | null;
+  prep_for: string | null;
 };
 
 export type UpcomingEvent = LifeEvent & { nextDate: string | null; daysLeft: number | null; remindNow: boolean };
 
 const COLS = `id, title, to_char(event_date, 'YYYY-MM-DD') as event_date, repeat, amount_jpy, remind_days, category_id, note,
-  to_char(last_done_date, 'YYYY-MM-DD') as last_done_date, status,
+  to_char(last_done_date, 'YYYY-MM-DD') as last_done_date, status, prep, prep_task_id,
+  to_char(prep_for, 'YYYY-MM-DD') as prep_for,
   to_char((created_at at time zone 'Asia/Tokyo')::date, 'YYYY-MM-DD') as created_on`;
 
 function addMonthsKeepDay(date: string, months: number, day: number): string {
@@ -54,7 +58,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function createEvent(
   sql: Sql,
-  v: { title: string; date: string; repeat: string; amountJpy: number | null; remindDays: number; categoryId?: string | null; note?: string },
+  v: { title: string; date: string; repeat: string; amountJpy: number | null; remindDays: number; categoryId?: string | null; note?: string; prep?: boolean },
 ): Promise<string> {
   const title = v.title.trim().slice(0, 80);
   if (!title) throw new Error("予定の名前を入力してください");
@@ -63,8 +67,8 @@ export async function createEvent(
   if (v.amountJpy != null && !(v.amountJpy >= 0 && v.amountJpy <= 100_000_000)) throw new Error("金額が正しくありません");
   const remind = Math.min(90, Math.max(0, Math.round(v.remindDays)));
   const [row] = await sql<{ id: string }[]>`
-    insert into life_events (title, event_date, repeat, amount_jpy, remind_days, category_id, note)
-    values (${title}, ${v.date}::date, ${repeat}, ${v.amountJpy}, ${remind}, ${v.categoryId ?? null}, ${(v.note ?? "").slice(0, 500)})
+    insert into life_events (title, event_date, repeat, amount_jpy, remind_days, category_id, note, prep)
+    values (${title}, ${v.date}::date, ${repeat}, ${v.amountJpy}, ${remind}, ${v.categoryId ?? null}, ${(v.note ?? "").slice(0, 500)}, ${v.prep ?? true})
     returning id`;
   await audit(sql, "owner", "life_event_created", "life_event", row.id);
   return row.id;

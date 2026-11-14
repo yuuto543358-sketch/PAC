@@ -1,0 +1,41 @@
+# AI社員を1日に何回か動かすための、GitHub の無料の定期実行。
+# Vercel 無料プランの定期実行は1日1回（朝7時半）だけなので、昼・夕方・夜はここからアプリを起こします。
+# 使うには、GitHub の Settings → Secrets and variables → Actions に、次の2つを登録してください（README 参照）。
+#   APP_URL     … アプリのURL（例：https://xxxx.vercel.app）。最後の「/」はつけない
+#   CRON_SECRET … Vercel に登録したものと同じ値
+# 登録していなければ、何もせずに終わります（エラーにはなりません）。
+name: AI社員の定期実行
+
+on:
+  schedule:
+    # 時刻は世界標準時（日本時間 −9時間）。GitHub の都合で、数分〜数十分おくれることがあります
+    - cron: "0 3 * * *"   # 日本時間 12:00
+    - cron: "30 8 * * *"  # 日本時間 17:30
+    - cron: "30 12 * * *" # 日本時間 21:30
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: アプリの定期実行を呼ぶ
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL または CRON_SECRET が未登録のため、何もしません（README 参照）"
+            exit 0
+          fi
+          status=$(curl -sS -o response.json -w "%{http_code}" --max-time 300 \
+            -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/workflow")
+          echo "HTTP $status"
+          cat response.json || true
+          if [ "$status" != "200" ]; then
+            echo "定期実行に失敗しました（HTTP $status）。APP_URL と CRON_SECRET を確認してください"
+            exit 1
+          fi

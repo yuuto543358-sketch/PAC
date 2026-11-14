@@ -7,6 +7,7 @@ import { openQuestions } from "@/lib/life/questions";
 import { Empty, Page, PageHeader, Section, Stat } from "@/components/ui";
 import { Icon, type IconName } from "@/components/Icon";
 import { AskNowButton, QuestionCard } from "./LifeForms";
+import { ResearchNowButton } from "./QolForms";
 
 export const metadata = { title: "ライフ" };
 export const maxDuration = 300;
@@ -21,6 +22,8 @@ export default async function LifePage() {
     sql<{ id: string; title: string; priority: string }[]>`
       select id, title, priority from life_suggestions where status = 'new' order by created_at desc limit 3`,
   ]);
+  const memos = await sql<{ id: string; title: string }[]>`
+    select id, title from reports where report_type = 'employee' order by created_at desc limit 3`;
   const links: { href: string; label: string; icon: IconName }[] = [
     { href: "/life/checkins", label: "毎日のチェック", icon: "trend" },
     { href: "/life/habits", label: "小さな習慣", icon: "check" },
@@ -127,6 +130,25 @@ export default async function LifePage() {
               ))}
             </ul>
           )}
+        </Section>
+
+        <Section title="社員の自主研究" action={<Link href="/reports" className="font-medium text-brand">報告書で見る</Link>}>
+          {memos.length === 0 ? (
+            <p className="card p-4 text-[14px] text-muted">毎週木曜に、社員が1人ずつ、あなたの暮らしに役立つことを調べてメモにします。</p>
+          ) : (
+            <ul className="card divide-y divide-separator">
+              {memos.map((m) => (
+                <li key={m.id}>
+                  <Link href="/reports" className="block truncate px-4 py-3 text-[15px]">
+                    {m.title.replace(/^自主研究/, "")}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-2">
+            <ResearchNowButton />
+          </div>
         </Section>
 
         <Link href="/life/settings" className="block text-center text-[14px] font-semibold text-brand">

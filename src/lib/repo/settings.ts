@@ -44,6 +44,16 @@ export type CompanySettings = {
   last_life_review_on: Date | null;
   /** 週のふりかえり（月曜の朝）を作るか */
   life_review_enabled: boolean;
+  /** 予定が近づいたら、チームに下調べを頼むか */
+  life_prep_enabled: boolean;
+  /** 記録の変化に気づいて、森野が声をかけるか */
+  life_nudge_enabled: boolean;
+  /** 毎週、社員が自主研究のメモを書くか */
+  life_research_enabled: boolean;
+  last_life_nudge_on: Date | null;
+  last_life_prep_on: Date | null;
+  last_life_research_on: Date | null;
+  last_cron_at: Date | null;
   updated_at: Date;
 };
 

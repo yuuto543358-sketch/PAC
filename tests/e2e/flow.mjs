@@ -495,6 +495,27 @@ await page.goto(`${BASE}/life/habits`);
 check("ふりかえりから、おすすめの習慣が届く（始めるかは自分で選ぶ）", (await page.getByRole("button", { name: "始める" }).count()) > 0);
 await shot("31-habits");
 
+// ===== 裏で動く仕事：定期実行（GitHub と同じ呼び方）→ 先回りの準備・自主研究 =====
+const cronOk = await page.request.get(`${BASE}/api/cron/workflow`, { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "cron-secret-for-local-test-0123456789"}` } });
+check("合言葉つきの定期実行は動く", cronOk.status() === 200);
+await page.goto(`${BASE}/life/events`);
+check("予定が近づくと、白石の依頼でチームが下調べを始める", (await page.getByText("白石の依頼で、チームが下調べしています →").count()) > 0);
+await page.goto(`${BASE}/settings`);
+check("設定に「最後に自動で動いた時刻」が出る", (await page.getByText("まだ動いていません").count()) === 0 && (await page.getByText("最後に自動で動いた時刻").count()) === 1);
+await page.goto(`${BASE}/life`);
+for (let attempt = 0; attempt < 3; attempt++) {
+  await page.getByRole("button", { name: "今週の担当に、いま自主研究を頼む（約3〜6円）" }).click();
+  const res = page.getByText(/自主研究のメモを書きました|1分ほど待ってください/).first();
+  await res.waitFor({ timeout: 60_000 });
+  if (/メモを書きました/.test(await res.innerText())) break;
+  await page.waitForTimeout(61_000);
+  await page.reload();
+}
+await page.goto(`${BASE}/reports`);
+check("社員の自主研究のメモが報告書に届く", (await page.getByText("社員の自主研究").count()) > 0);
+await page.goto(`${BASE}/life/settings`);
+check("裏で動く仕事は設定でオン・オフできる", (await page.getByText("社員の自主研究（毎週木曜に1人ずつ・約3〜6円）").count()) === 1);
+
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);
 check("定期実行は合言葉なしでは動かない", cronRes.status() === 401);

@@ -15,7 +15,15 @@ export default async function LifeSettingsPage() {
       <Page>
         <div className="card p-4">
           <LifeSettingsForm
-            initial={{ frequency: settings.life_question_frequency, perBatch: settings.life_questions_per_batch, autoTask: settings.life_auto_task }}
+            initial={{
+              frequency: settings.life_question_frequency,
+              perBatch: settings.life_questions_per_batch,
+              autoTask: settings.life_auto_task,
+              review: settings.life_review_enabled,
+              prep: settings.life_prep_enabled,
+              nudge: settings.life_nudge_enabled,
+              research: settings.life_research_enabled,
+            }}
             categories={categories}
           />
         </div>

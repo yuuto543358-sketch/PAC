@@ -281,7 +281,7 @@ export const REPORT_TYPE_LABEL: Record<string, string> = {
   weekly: "週報",
   monthly: "月報",
   bizdev: "事業開発",
-  employee: "社員",
+  employee: "社員の自主研究",
   task: "業務の完了報告",
 };
 

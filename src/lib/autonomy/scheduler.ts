@@ -34,7 +34,10 @@ type ClaimColumn =
   | "last_sns_plan_on"
   | "last_life_question_on"
   | "last_life_analysis_on"
-  | "last_life_review_on";
+  | "last_life_review_on"
+  | "last_life_nudge_on"
+  | "last_life_prep_on"
+  | "last_life_research_on";
 
 /**
  * 「今日この仕事をするのは自分」という権利を取る。すでに今日実行済みなら false。
@@ -61,6 +64,9 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
     result.life = await runLifeJobs(sql, date, weekday, now, (col) => claim(sql, col, date));
     if (result.life.questions?.created) result.ran.push("life_questions");
     if (result.life.review) result.ran.push("life_review");
+    if (result.life.nudges) result.ran.push("life_nudges");
+    if (result.life.prepTaskIds?.length) result.ran.push("life_prep");
+    if (result.life.researchReportId) result.ran.push("self_research");
     if (result.life.analyses.length) result.ran.push("life_analysis");
     result.taskIds.push(...result.life.taskIds);
   }

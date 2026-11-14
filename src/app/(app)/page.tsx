@@ -14,7 +14,8 @@ import { habitProgressList } from "@/lib/life/habits";
 import { listEvents } from "@/lib/life/events";
 import { listGoals } from "@/lib/life/goals";
 import { jstDateParts } from "@/lib/format";
-import { CheckinForm, HabitCheck } from "./life/QolForms";
+import { CheckinForm, DismissNudgeButton, HabitCheck } from "./life/QolForms";
+import { activeNudges } from "@/lib/life/nudges";
 import { GoalBar } from "@/components/GoalBar";
 import { ACTIVE_WORKFLOW_PHASES, BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, REPORT_TYPE_LABEL, WORKFLOW_PHASE_LABEL } from "@/lib/constants";
 import { isAiConfigured } from "@/lib/ai/client";
@@ -26,13 +27,14 @@ import { Alert, ChevronRight, List, ListRow, Page, Ring, Section, Stat, TaskStat
 export default async function HomePage() {
   const sql = await getDb();
   const { date: today } = jstDateParts(new Date());
-  const [todayCheckin, habits, events, goals, [lastReview]] = await Promise.all([
+  const [todayCheckin, habits, events, goals, [lastReview], nudges] = await Promise.all([
     getCheckin(sql, today),
     habitProgressList(sql, today),
     listEvents(sql, today),
     listGoals(sql, today),
     sql<{ id: string; ai_summary: string; week_start: string }[]>`
       select id, ai_summary, to_char(week_start, 'YYYY-MM-DD') as week_start from life_reviews where ai_used order by created_at desc limit 1`,
+    activeNudges(sql),
   ]);
   const soon = events.filter((e) => e.daysLeft != null && (e.remindNow || e.daysLeft <= 14)).slice(0, 3);
   const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport, money, lifeQuestions] = await Promise.all([
@@ -118,6 +120,22 @@ export default async function HomePage() {
             </>
           )}
         </div>
+
+        {nudges.length > 0 && (
+          <Section title="森野からひとこと">
+            <ul className="card divide-y divide-separator">
+              {nudges.map((n) => (
+                <li key={n.id} className="flex items-start gap-2 py-1 pr-2 pl-4">
+                  <Link href={n.url} className="min-w-0 flex-1 py-2">
+                    <span className="block text-[15px] font-semibold">{n.title}</span>
+                    <span className="block text-[13px] leading-relaxed text-muted">{n.body}</span>
+                  </Link>
+                  <DismissNudgeButton id={n.id} />
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         <Section
           title={habits.length ? `今日の習慣（${habits.filter((h) => h.doneToday).length}/${habits.length}）` : "今日の習慣"}

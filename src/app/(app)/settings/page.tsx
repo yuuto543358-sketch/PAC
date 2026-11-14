@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
+import { dateTime } from "@/lib/format";
 import { getBudget, getSettings } from "@/lib/repo/settings";
 import { listEmployees } from "@/lib/repo/employees";
 import { FIXED_COMPANY_PRINCIPLES } from "@/lib/ai/prompts";
@@ -109,6 +110,10 @@ export default async function SettingsPage() {
             <p>
               自動で動かすには、Vercel の環境変数 <code>CRON_SECRET</code> の設定が必要です（README 参照）。{" "}
               {cronConfigured ? <span className="font-semibold text-success">設定済み</span> : <span className="font-semibold text-danger">未設定</span>}
+            </p>
+            <p>
+              最後に自動で動いた時刻：<b className="text-ink">{settings.last_cron_at ? dateTime(settings.last_cron_at) : "まだ動いていません"}</b>
+              （1日4回動かす設定をすると、朝・昼・夕方・夜に更新されます。README 参照）
             </p>
           </div>
         </Section>

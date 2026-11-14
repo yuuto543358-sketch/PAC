@@ -175,13 +175,14 @@ export async function answerQuestion(sql: Sql, questionId: string, action: Answe
 
 export async function updateLifeSettings(
   sql: Sql,
-  s: { frequency: string; perBatch: number; autoTask: boolean },
+  s: { frequency: string; perBatch: number; autoTask: boolean; review?: boolean; prep?: boolean; nudge?: boolean; research?: boolean },
 ) {
   if (!["off", "low", "normal", "high"].includes(s.frequency)) throw new Error("頻度が正しくありません");
   if (!(s.perBatch >= 1 && s.perBatch <= 3)) throw new Error("1回の質問数は1〜3問にしてください");
   await sql`
     update company_settings set life_question_frequency = ${s.frequency}, life_questions_per_batch = ${s.perBatch},
-      life_auto_task = ${s.autoTask}, updated_at = now()
+      life_auto_task = ${s.autoTask}, life_review_enabled = ${s.review ?? true}, life_prep_enabled = ${s.prep ?? true},
+      life_nudge_enabled = ${s.nudge ?? true}, life_research_enabled = ${s.research ?? true}, updated_at = now()
     where id = 1`;
   await audit(sql, "owner", "life_settings_updated", "company_settings", "1", s);
 }

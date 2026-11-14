@@ -111,6 +111,10 @@ export async function updateLifeSettingsAction(_p: ActionState, fd: FormData): P
       frequency: String(fd.get("frequency") ?? "normal"),
       perBatch: Math.round(Number(fd.get("perBatch"))),
       autoTask: fd.get("autoTask") === "on",
+      review: fd.get("review") === "on",
+      prep: fd.get("prep") === "on",
+      nudge: fd.get("nudge") === "on",
+      research: fd.get("research") === "on",
     });
     const cats = fd.getAll("category").map(String);
     for (const id of cats) {

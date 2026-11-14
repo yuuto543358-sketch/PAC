@@ -937,4 +937,46 @@ begin
 end $$;
 `,
   },
+  {
+    version: 10,
+    name: "proactive",
+    sql: /* sql */ `
+-- ===== AI社員が裏で動く仕事：先回りの準備・変化への声かけ・自主研究 =====
+
+-- これから起きること：近づいたらチームに下調べを頼むか／頼んだ業務
+alter table life_events add column if not exists prep boolean not null default true;
+alter table life_events add column if not exists prep_task_id uuid references tasks(id);
+alter table life_events add column if not exists prep_for date;
+
+-- 森野からのひとこと（記録の変化に気づいたとき）
+create table if not exists life_nudges (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null,
+  subject text not null default '',
+  title text not null,
+  body text not null default '',
+  url text not null default '/',
+  ai_used boolean not null default false,
+  dismissed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists life_nudges_created_idx on life_nudges(created_at desc);
+
+alter table company_settings add column if not exists life_prep_enabled boolean not null default true;
+alter table company_settings add column if not exists life_nudge_enabled boolean not null default true;
+alter table company_settings add column if not exists life_research_enabled boolean not null default true;
+alter table company_settings add column if not exists last_life_nudge_on date;
+alter table company_settings add column if not exists last_life_prep_on date;
+alter table company_settings add column if not exists last_life_research_on date;
+-- 最後に自動の仕事が動いた時刻（設定画面で確認できるように）
+alter table company_settings add column if not exists last_cron_at timestamptz;
+
+alter table life_nudges enable row level security;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then revoke all on table life_nudges from anon; end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then revoke all on table life_nudges from authenticated; end if;
+end $$;
+`,
+  },
 ];

@@ -154,7 +154,7 @@ export function LifeSettingsForm({
   initial,
   categories,
 }: {
-  initial: { frequency: string; perBatch: number; autoTask: boolean };
+  initial: { frequency: string; perBatch: number; autoTask: boolean; review: boolean; prep: boolean; nudge: boolean; research: boolean };
   categories: { id: string; name: string; is_active: boolean; ai_allowed: boolean }[];
 }) {
   return (
@@ -186,6 +186,20 @@ export function LifeSettingsForm({
           <span className="block text-xs text-muted">同時に進めるのは2件まで。調べる・比べる・確認するところまでで、契約や購入はしません</span>
         </span>
       </label>
+      <fieldset className="space-y-2">
+        <legend className="label">AI社員が裏で動く仕事</legend>
+        {[
+          { name: "review", label: "週のふりかえり（月曜の朝・約1円）", on: initial.review },
+          { name: "nudge", label: "記録の変化に気づいて、森野が声をかける（月 約10〜30円）", on: initial.nudge },
+          { name: "prep", label: "予定が近づいたら、白石がチームに下調べを頼む（1件 約10〜20円）", on: initial.prep },
+          { name: "research", label: "社員の自主研究（毎週木曜に1人ずつ・約3〜6円）", on: initial.research },
+        ].map((t) => (
+          <label key={t.name} className="flex items-start gap-2.5 text-sm">
+            <input type="checkbox" name={t.name} defaultChecked={t.on} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" />
+            <span>{t.label}</span>
+          </label>
+        ))}
+      </fieldset>
       <fieldset className="space-y-2">
         <legend className="label">カテゴリ</legend>
         <ul className="divide-y divide-separator rounded-[12px] bg-surface-2/70">

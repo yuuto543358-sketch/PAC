@@ -9,6 +9,9 @@ import { createHabit, setHabitLog, setHabitStatus } from "@/lib/life/habits";
 import { archiveEvent, createEvent, markEventDone } from "@/lib/life/events";
 import { addGoalProgress, createGoal, setGoalStatus } from "@/lib/life/goals";
 import { runWeeklyReview } from "@/lib/life/review";
+import { dismissNudge } from "@/lib/life/nudges";
+import { runSelfResearch } from "@/lib/life/research";
+import { kickNotifications } from "@/lib/notify/trigger";
 import type { ActionState } from "@/components/forms";
 
 const ok = (message: string): ActionState => ({ ok: true, message, ts: Date.now() });
@@ -99,6 +102,7 @@ export async function createEventAction(_p: ActionState, fd: FormData): Promise<
       amountJpy: numOrNull(fd.get("amount")),
       remindDays: Number(fd.get("remindDays") ?? 7),
       note: String(fd.get("note") ?? ""),
+      prep: fd.get("prep") === "on",
     });
     refresh();
     return ok("予定を登録しました");
@@ -175,6 +179,31 @@ export async function runReviewAction(): Promise<ActionState> {
     const r = await runWeeklyReview(sql, "manual");
     refresh();
     return ok(r.message);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function dismissNudgeAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    await assertAuth();
+    const sql = await getDb();
+    await dismissNudge(sql, String(fd.get("id") ?? ""));
+    refresh();
+    return ok("わかりました");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function runResearchNowAction(): Promise<ActionState> {
+  try {
+    await assertAuth();
+    const sql = await getDb();
+    const r = await runSelfResearch(sql, today(), "manual");
+    kickNotifications();
+    refresh();
+    return r.reportId ? ok(r.message) : { ok: false, error: r.message, ts: Date.now() };
   } catch (e) {
     return fail(e);
   }

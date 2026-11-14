@@ -8,6 +8,8 @@ import {
   createHabitAction,
   eventAction,
   runReviewAction,
+  dismissNudgeAction,
+  runResearchNowAction,
   saveCheckinAction,
   setGoalStatusAction,
   setHabitStatusAction,
@@ -199,6 +201,13 @@ export function NewEventForm() {
         </label>
       </div>
       <input name="note" maxLength={500} className="field" placeholder="メモ（なくてもOK）" />
+      <label className="flex items-start gap-2.5 text-sm">
+        <input type="checkbox" name="prep" defaultChecked className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" />
+        <span>
+          近づいたら、白石にチームで下調べを頼んでもらう
+          <span className="block text-xs text-muted">30日前から、相場・やること・安くする方法などを報告書にしておきます（1件 約10〜20円）</span>
+        </span>
+      </label>
       <SubmitButton className="btn-primary w-full">予定を登録する</SubmitButton>
     </ActionForm>
   );
@@ -296,6 +305,27 @@ export function RunReviewButton() {
     <ActionForm action={runReviewAction}>
       <SubmitButton className="btn-primary w-full" pendingText="森野がふりかえっています…（1分ほど）">
         この1週間をふりかえる（約1円）
+      </SubmitButton>
+    </ActionForm>
+  );
+}
+
+export function DismissNudgeButton({ id }: { id: string }) {
+  return (
+    <ActionForm action={dismissNudgeAction} className="contents">
+      <input type="hidden" name="id" value={id} />
+      <button type="submit" className="press flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-faint" aria-label="このひとことを閉じる">
+        <Icon name="close" size={16} stroke={2.4} />
+      </button>
+    </ActionForm>
+  );
+}
+
+export function ResearchNowButton() {
+  return (
+    <ActionForm action={runResearchNowAction}>
+      <SubmitButton className="btn-secondary w-full" pendingText="社員が調べています…（1分ほど）">
+        今週の担当に、いま自主研究を頼む（約3〜6円）
       </SubmitButton>
     </ActionForm>
   );

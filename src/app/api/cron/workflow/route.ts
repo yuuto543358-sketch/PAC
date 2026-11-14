@@ -23,6 +23,7 @@ export async function GET(request: Request) {
   try {
     const sql = await getDb();
     const started = Date.now();
+    await sql`update company_settings set last_cron_at = now() where id = 1`;
     let jobs = null;
     try {
       jobs = await runScheduledJobs(sql);
