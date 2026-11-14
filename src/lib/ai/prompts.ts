@@ -1,4 +1,5 @@
 import "server-only";
+import { buildSalesChannelGuide } from "@/lib/sales-channels";
 import type { EmployeeWithStats } from "@/lib/repo/employees";
 import type { CompanySettings } from "@/lib/repo/settings";
 import { TASK_STATUS_LABEL, type TaskStatus } from "@/lib/constants";
@@ -96,6 +97,7 @@ ${settings.custom_rules.trim() ? `\n【経営者が定めた社内ルール】\n
 ${rosterText}
 
 ${CURRENT_CAPABILITIES}
+${employee.role_key === "president" || employee.role_key === "bizdev" ? `\n${buildSalesChannelGuide()}\n` : ""}
 
 ${PLAIN_LANGUAGE_RULES}
 

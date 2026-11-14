@@ -5,6 +5,7 @@ import type { EmployeeWithStats } from "@/lib/repo/employees";
 import type { CompanySettings } from "@/lib/repo/settings";
 import type { Task } from "@/lib/repo/tasks";
 import type { Deliverable, Member, RoomMessage, Workflow } from "./repo";
+import { buildSalesChannelGuide, isSalesRelated } from "@/lib/sales-channels";
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 900;
@@ -99,7 +100,7 @@ ${team}
 【計画】
 ${plan}
 
-【経営者からの指示（最優先で反映すること）】
+${isSalesRelated(task) ? `${buildSalesChannelGuide({ webSearch: ctx.webSearch })}\n\n` : ""}【経営者からの指示（最優先で反映すること）】
 ${ownerInstructions.length ? ownerInstructions.map((m) => `- ${m.content}`).join("\n") : "（なし）"}
 
 【グループチャットの直近の発言】

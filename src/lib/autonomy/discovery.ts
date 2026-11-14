@@ -14,6 +14,7 @@ import { getEmployee } from "@/lib/repo/employees";
 import { getSettings } from "@/lib/repo/settings";
 import { createTask } from "@/lib/repo/tasks";
 import { initWorkflow } from "@/lib/workflow/repo";
+import { buildSalesChannelGuide } from "@/lib/sales-channels";
 
 // 事業開発担当（朝日 ひかり）が、少ない費用で始められる事業の候補を自分で探す仕組み。
 // 見つけた候補は「事業開発」画面に保存し、設定によってはチームに調査を任せます（外部への操作は一切しません）。
@@ -116,6 +117,11 @@ ${PLAIN_LANGUAGE_RULES}
 - 法律や規約に反しない、人をだまさない、健全な事業であること
 - お金をかけずに「うまくいきそうか」を確かめる方法があること
 - これまでの候補と同じ・よく似たものは出さないこと
+
+- 売る場所の方針（下）に合う場所で売れること（無料で始められ、手続きが簡単で、手取りが多い）
+- monetization には、どこで売るか（いちばん良い場所1つ）と、1件あたりの手取りの目安を書くこと
+
+${buildSalesChannelGuide({ webSearch: input.webSearch })}
 
 【これまでの候補（重複させないこと）】
 ${existing}

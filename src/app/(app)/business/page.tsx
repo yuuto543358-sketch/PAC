@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/repo/settings";
 import { Empty, Page, PageHeader, Section } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { FindWorkButton } from "./BusinessActions";
+import { netPerSale, SALES_CHANNEL_POLICY, SALES_CHANNELS, SALES_CHANNELS_CHECKED_ON } from "@/lib/sales-channels";
 
 export const metadata = { title: "事業開発" };
 // 「今すぐ仕事を探す」はAIの返事を待つため、長めに待てるようにする
@@ -94,6 +95,37 @@ export default async function BusinessPage({ searchParams }: { searchParams: Pro
               ))}
             </ul>
           )}
+        </Section>
+        <Section title="売る場所の選び方">
+          <details className="card group overflow-hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3.5 text-[15px] font-semibold">
+              <Icon name="wallet" size={18} stroke={2} className="text-muted" />
+              あなたの方針と、売る場所の比べ方
+              <Icon name="chevronRight" size={16} stroke={2.4} className="ml-auto text-faint transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="space-y-3 border-t border-separator px-4 py-3.5 text-[13px] leading-relaxed">
+              <ul className="list-disc space-y-0.5 pl-5">
+                {SALES_CHANNEL_POLICY.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+              <p className="text-muted">チームは、この方針で商品ごとにいちばん良い売る場所を1つ選びます。下は {SALES_CHANNELS_CHECKED_ON} に調べた目安です（変わることがあります）。</p>
+              <ul className="divide-y divide-separator rounded-[12px] bg-surface-2/70">
+                {SALES_CHANNELS.map((c) => (
+                  <li key={c.id} className="px-3 py-2.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-semibold">{c.name}</span>
+                      <span className="shrink-0 text-[12px] text-muted">1,000円 → 手取り約{netPerSale(c, 1000).net.toLocaleString("ja-JP")}円</span>
+                    </div>
+                    <p className="text-[12px] text-muted">
+                      {c.bestFor}／手数料 {c.feeText}／手続き：{c.ease}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12px] text-faint">方針を変えたいときは、設定の「社内ルール」に書くと、チームはそれを優先します。</p>
+            </div>
+          </details>
         </Section>
       </Page>
     </>
