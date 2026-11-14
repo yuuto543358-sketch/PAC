@@ -7,16 +7,17 @@ import { countPendingApprovals } from "@/lib/repo/approvals";
 import { latestPresidentMessage } from "@/lib/repo/conversations";
 import { listEmployees } from "@/lib/repo/employees";
 import { listActiveTeams } from "@/lib/workflow/repo";
-import { ACTIVE_WORKFLOW_PHASES, WORKFLOW_PHASE_LABEL } from "@/lib/constants";
+import { listBusinessProjects } from "@/lib/repo/business";
+import { ACTIVE_WORKFLOW_PHASES, BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, REPORT_TYPE_LABEL, WORKFLOW_PHASE_LABEL } from "@/lib/constants";
 import { isAiConfigured } from "@/lib/ai/client";
 import { greeting, longDate, relativeTime, yen } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icon";
-import { Alert, ChevronRight, List, ListRow, Page, PhaseNotice, Ring, Section, Stat, TaskStatusBadge } from "@/components/ui";
+import { Alert, ChevronRight, List, ListRow, Page, Ring, Section, Stat, TaskStatusBadge } from "@/components/ui";
 
 export default async function HomePage() {
   const sql = await getDb();
-  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams] = await Promise.all([
+  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -27,6 +28,10 @@ export default async function HomePage() {
     listTasks(sql, { view: "active" }, 5),
     listRecentActivity(sql, 6),
     listActiveTeams(sql, 5),
+    listBusinessProjects(sql, { limit: 3 }),
+    sql<{ id: string; report_type: string; title: string; created_at: Date }[]>`
+      select id, report_type, title, created_at from reports where report_type in ('daily','weekly')
+      order by created_at desc limit 1`.then((r) => r[0] ?? null),
   ]);
   const president = employees.find((e) => e.id === "president");
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
@@ -194,9 +199,57 @@ export default async function HomePage() {
               </span>
             </Link>
           )}
-          <div className="mt-3">
-            <PhaseNotice phase="Phase 2〜3">社長が自動で作成する日次・週次の報告書</PhaseNotice>
-          </div>
+          <Link href="/reports" className="card press mt-3 flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#7c3aed]/12 text-[#7c3aed]">
+              <Icon name="report" size={20} stroke={2} />
+            </span>
+            <span className="min-w-0 flex-1">
+              {latestReport ? (
+                <>
+                  <span className="block text-[12px] font-semibold text-[#7c3aed]">
+                    最新の{REPORT_TYPE_LABEL[latestReport.report_type] ?? "報告"}・{relativeTime(latestReport.created_at)}
+                  </span>
+                  <span className="block truncate text-[15px] font-semibold">{latestReport.title}</span>
+                </>
+              ) : (
+                <>
+                  <span className="block text-[15px] font-semibold">日報・週報</span>
+                  <span className="block text-[12px] text-muted">まだありません。報告書の画面で作れます</span>
+                </>
+              )}
+            </span>
+            <ChevronRight />
+          </Link>
+        </Section>
+
+        <Section title="新しい事業の候補" action={<Link href="/business" className="font-medium text-brand">すべて</Link>}>
+          {candidates.length === 0 ? (
+            <Link href="/business" className="card press flex items-center gap-3 p-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#c2410c]/12 text-[#c2410c]">
+                <Icon name="briefcase" size={20} stroke={2} />
+              </span>
+              <span className="min-w-0 flex-1 text-[14px] text-muted">
+                まだ候補はありません。「事業開発」の画面で、AI社員に仕事を探してもらえます。
+              </span>
+              <ChevronRight />
+            </Link>
+          ) : (
+            <List>
+              {candidates.map((b) => (
+                <ListRow
+                  key={b.id}
+                  href={`/business/${b.id}`}
+                  title={b.name}
+                  subtitle={b.summary}
+                  trailing={
+                    <span className={`shrink-0 rounded-full px-2 py-px text-[11px] font-semibold ${BUSINESS_STATUS_TONE[b.status]}`}>
+                      {BUSINESS_STATUS_LABEL[b.status]}
+                    </span>
+                  }
+                />
+              ))}
+            </List>
+          )}
         </Section>
 
         <Section title="社員の様子" action={<Link href="/employees" className="font-medium text-brand">すべて</Link>}>

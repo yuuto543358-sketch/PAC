@@ -53,7 +53,8 @@ describe("やさしい言葉のルール", () => {
     expect(buildTeamContext(ctx)).toContain(PLAIN_LANGUAGE_RULES);
     expect(buildStepInstruction("discussion", ctx)).toContain("やさしい言葉");
     expect(buildStepInstruction("drafting", ctx)).toContain("やさしい言葉");
-    expect(buildStepInstruction("review", ctx)).toContain("専門用語");
+    // 監査役は言葉づかいの添削はしない（内容だけを見る）
+    expect(buildStepInstruction("review", ctx)).toContain("添削はしない");
     expect(buildStepInstruction("final_report", ctx)).toContain("やさしい言葉");
   });
 });

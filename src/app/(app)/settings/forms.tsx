@@ -127,17 +127,48 @@ export function ModelForm({ initial }: { initial: { model_standard: string; mode
   );
 }
 
-export function AutorunForm({ initial }: { initial: string }) {
+export function AutorunForm({
+  initial,
+}: {
+  initial: { autorun_frequency: string; web_research_enabled: boolean; discovery_auto_start: boolean };
+}) {
   return (
     <ActionForm action={updateAutorunAction}>
-      <select name="autorun_frequency" defaultValue={initial} className="field">
-        {AUTORUN_OPTIONS.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <SubmitButton className="btn-secondary w-full">頻度を保存</SubmitButton>
+      <label className="block">
+        <span className="label">自動で動く頻度</span>
+        <select name="autorun_frequency" defaultValue={initial.autorun_frequency} className="field">
+          {AUTORUN_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-start gap-2.5 text-sm">
+        <input
+          type="checkbox"
+          name="web_research_enabled"
+          defaultChecked={initial.web_research_enabled}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
+        />
+        <span>
+          Web検索を使ってよい
+          <span className="block text-xs text-muted">調査担当と事業開発担当が、インターネットで最新の情報を調べます（1回あたり数円かかります）</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2.5 text-sm">
+        <input
+          type="checkbox"
+          name="discovery_auto_start"
+          defaultChecked={initial.discovery_auto_start}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
+        />
+        <span>
+          見つけた事業の候補を、チームに自動で調べさせる
+          <span className="block text-xs text-muted">同時に調べるのは2件までです。オフにすると、候補を保存するだけになります</span>
+        </span>
+      </label>
+      <SubmitButton className="btn-secondary w-full">自動で動く設定を保存</SubmitButton>
     </ActionForm>
   );
 }

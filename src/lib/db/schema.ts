@@ -509,4 +509,30 @@ begin
 end $$;
 `,
   },
+  {
+    version: 4,
+    name: "phase3_autonomy",
+    sql: /* sql */ `
+-- ===== Phase 3: 自主的な仕事の発見・Web調査・事業候補・自動報告 =====
+alter table company_settings add column if not exists web_research_enabled boolean not null default true;
+alter table company_settings add column if not exists discovery_auto_start boolean not null default true;
+alter table company_settings add column if not exists last_discovery_on date;
+alter table company_settings add column if not exists last_daily_report_on date;
+alter table company_settings add column if not exists last_weekly_report_on date;
+
+-- Web検索の回数（費用の計算に使う）
+alter table api_usage add column if not exists web_search_calls int not null default 0;
+
+-- 事業候補
+alter table business_projects add column if not exists sources jsonb not null default '[]'::jsonb;
+alter table business_projects add column if not exists discovered_by text references employees(id);
+alter table business_projects add column if not exists validation_task_id uuid references tasks(id);
+alter table business_projects add column if not exists owner_note text not null default '';
+update business_projects set status = 'idea' where status not in ('idea','validating','promising','adopted','rejected','on_hold');
+alter table business_projects drop constraint if exists business_projects_status_check;
+alter table business_projects add constraint business_projects_status_check
+  check (status in ('idea','validating','promising','adopted','rejected','on_hold'));
+create index if not exists business_projects_created_idx on business_projects(created_at desc);
+`,
+  },
 ];

@@ -86,11 +86,16 @@ export async function updateAutorunAction(_p: ActionState, fd: FormData): Promis
     await assertAuth();
     const freq = String(fd.get("autorun_frequency") ?? "off");
     if (!AUTORUN_OPTIONS.some((o) => o.id === freq)) throw new Error("頻度が正しくありません");
+    const web = fd.get("web_research_enabled") === "on";
+    const autoStart = fd.get("discovery_auto_start") === "on";
     const sql = await getDb();
-    await sql`update company_settings set autorun_frequency = ${freq}, updated_at = now() where id = 1`;
-    await audit(sql, "user", "update_autorun", "company_settings", "1", { freq });
+    await sql`
+      update company_settings set autorun_frequency = ${freq}, web_research_enabled = ${web},
+        discovery_auto_start = ${autoStart}, updated_at = now()
+      where id = 1`;
+    await audit(sql, "user", "update_autorun", "company_settings", "1", { freq, web, autoStart });
     refresh();
-    return ok("自動実行の頻度を保存しました（実際の自動実行は Phase 3 で有効になります）");
+    return ok("自動で動く設定を保存しました");
   } catch (e) {
     return fail(e);
   }

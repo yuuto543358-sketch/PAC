@@ -1,6 +1,6 @@
 import "server-only";
 import { begin, type Db, type Sql } from "@/lib/db";
-import { actualCostUsd, estimateCostJpy, getPricing, type UsageLike } from "@/lib/pricing";
+import { actualCostUsd, ESTIMATE_SAFETY_FACTOR, estimateCostJpy, getPricing, type UsageLike } from "@/lib/pricing";
 import { getBudget, getSettings } from "@/lib/repo/settings";
 
 /** 予算などの理由でAI呼び出しを止めたときのエラー（利用者に表示してよい内容） */
@@ -66,6 +66,8 @@ export type ReserveInput = {
   employeeId?: string | null;
   taskId?: string | null;
   conversationId?: string | null;
+  /** トークン以外にかかる最大費用（米ドル。Web検索など） */
+  extraMaxUsd?: number;
 };
 
 export type Reservation = {
@@ -114,7 +116,9 @@ export async function reserveApiCall(sql: Sql, input: ReserveInput): Promise<Res
     if (!(rate > 0)) {
       throw new BudgetBlockedError("為替レートの設定が正しくありません。", "invalid_rate");
     }
-    const estimate = estimateCostJpy(input.model, input.estInputTokens, input.maxOutputTokens, rate);
+    const tokenEstimate = estimateCostJpy(input.model, input.estInputTokens, input.maxOutputTokens, rate);
+    const estimate =
+      tokenEstimate === null ? null : tokenEstimate + Math.max(0, input.extraMaxUsd ?? 0) * rate * ESTIMATE_SAFETY_FACTOR;
     if (estimate === null || !Number.isFinite(estimate)) {
       throw new BudgetBlockedError("費用を見積もれないため、安全のため呼び出しを止めました。", "estimate_failed");
     }
@@ -207,6 +211,7 @@ export async function finalizeApiCall(
       input_tokens = ${usage.input_tokens ?? 0}, output_tokens = ${usage.output_tokens ?? 0},
       cache_read_tokens = ${usage.cached_input_tokens ?? 0},
       cache_write_tokens = ${usage.cache_write_tokens ?? 0},
+      web_search_calls = ${usage.web_search_calls ?? 0},
       cost_usd = ${usd}, cost_jpy = ${jpy}, completed_at = now(), request_id = ${requestId ?? null}
     where id = ${reservation.usageId} and status = 'reserved'`;
   return { costJpy: jpy, known: true };

@@ -15,6 +15,14 @@ export type CompanySettings = {
   emergency_stop: boolean;
   hosting_cost_jpy_monthly: number;
   session_version: number;
+  /** 調査担当が議論のときにWeb検索を使ってよいか */
+  web_research_enabled: boolean;
+  /** 見つけた事業候補を、自動でチームに調べさせるか */
+  discovery_auto_start: boolean;
+  /** 自動の仕事探し・報告書を最後に行った日（日本時間。二重実行を防ぐため） */
+  last_discovery_on: Date | null;
+  last_daily_report_on: Date | null;
+  last_weekly_report_on: Date | null;
   updated_at: Date;
 };
 

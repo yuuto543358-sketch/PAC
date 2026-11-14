@@ -203,6 +203,7 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
     deliverable,
     knowledge,
     todayJst: todayJst(),
+    webSearch: shouldUseWebSearch(wf.phase, speaker, settings),
   };
   const phase = wf.phase as keyof typeof CONFIG;
   const cfg = CONFIG[phase];
@@ -222,6 +223,7 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
       purpose: `team:${phase}`,
       employeeId: speaker.id,
       taskId: wf.task_id,
+      webSearch: ctx.webSearch ? { maxCalls: 1 } : null,
       mock: () => (cfg.mock as (c: PromptContext) => unknown)(ctx),
     });
   } catch (err) {
@@ -234,7 +236,7 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
   }
   if (!result.ok) return handleFailure(sql, wf, members, speaker, result.message);
 
-  const meta = { costJpy: result.costJpy };
+  const meta: Meta = result.sources.length ? { costJpy: result.costJpy, sources: result.sources } : { costJpy: result.costJpy };
   await begin(sql, async (tx) => {
     switch (wf.phase) {
       case "kickoff":
@@ -264,7 +266,12 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
 
 // ===== 段階ごとの反映 =====
 
-type Meta = { costJpy: number };
+type Meta = { costJpy: number; sources?: { url: string; title: string }[] };
+
+/** Web検索を使うのは「調査担当が議論で発言するとき」だけ（費用を抑えるため） */
+export function shouldUseWebSearch(phase: WorkflowPhase, speaker: { role_key: string }, settings: { web_research_enabled: boolean }) {
+  return phase === "discussion" && speaker.role_key === "research" && settings.web_research_enabled;
+}
 
 async function askOwner(tx: Tx, wf: Workflow, speakerId: string, question: string, resume: WorkflowPhase) {
   await addRoomMessage(tx, { taskId: wf.task_id, authorType: "employee", employeeId: speakerId, kind: "question_to_owner", content: question });

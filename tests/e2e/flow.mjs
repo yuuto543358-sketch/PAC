@@ -86,7 +86,7 @@ await page.waitForURL(/\/room/);
 check("社長のチャットからチームのグループチャットへ移動できる", true);
 await page.getByText("成果物の確認をお願いします").waitFor({ timeout: 90000 });
 check("チームが自動で 計画→議論→作成→監査→報告 まで進む", true);
-for (const kind of ["計画", "提案", "意見", "監査", "報告"]) {
+for (const kind of ["計画", "調査メモ", "意見", "監査", "報告"]) {
   check(`グループチャットに「${kind}」の発言`, (await page.locator("main span", { hasText: new RegExp(`^${kind}$`) }).count()) > 0);
 }
 check("グループチャット画面では下のメニューを隠す", (await page.locator("nav[aria-label=メインメニュー]").count()) === 0);
@@ -224,11 +224,50 @@ await page.getByRole("button", { name: "保存する" }).click();
 await page.getByText("社員情報を保存しました").waitFor();
 check("社員の名前を変更できる", true);
 
-// 準備中の画面
+// 自動で動く設定（Phase 3）
+await page.goto(`${BASE}/settings#autorun`);
+await page.locator("select[name=autorun_frequency]").selectOption("daily");
+await page.getByRole("button", { name: "自動で動く設定を保存" }).click();
+await page.getByText("自動で動く設定を保存しました").waitFor();
+check("自動で動く頻度を保存", true);
+await page.reload();
+check("保存した頻度が表示される", (await page.locator("select[name=autorun_frequency]").inputValue()) === "daily");
+await page.locator("select[name=autorun_frequency]").selectOption("off");
+await page.getByRole("button", { name: "自動で動く設定を保存" }).click();
+await page.getByText("自動で動く設定を保存しました").waitFor();
+
+// 事業開発：今すぐ仕事を探す（Phase 3）
 await page.goto(`${BASE}/business`);
-check("事業開発は準備中と明示", (await page.getByText("Phase 3〜4で実装予定").count()) > 0);
+await page.getByRole("button", { name: "今すぐ仕事を探す" }).click();
+await page.getByRole("status").filter({ hasText: /事業の候補を|似ていたため/ }).waitFor({ timeout: 60_000 });
+check("今すぐ仕事を探す", true);
+await page.reload();
+const firstCandidate = page.locator("main a[href^='/business/']").first();
+check("事業の候補が一覧に出る", (await firstCandidate.count()) > 0);
+await shot("18-business");
+await firstCandidate.click();
+await page.getByText("くわしい内容").waitFor();
+check("候補の詳細を表示", true);
+await page.locator("select[name=status]").selectOption("promising");
+await page.getByRole("button", { name: "状態を保存" }).click();
+await page.getByText("事業の候補の状態を変更しました").waitFor();
+check("候補の状態を変更", true);
+await page.waitForTimeout(800);
+check("保存後も選んだ状態が表示される", (await page.locator("select[name=status]").inputValue()) === "promising");
+await shot("19-business-detail");
+
+// 報告書：今すぐ日報を作る（Phase 3）
 await page.goto(`${BASE}/reports`);
 check("報告書に社長の完了報告が保存される", (await page.getByText("業務完了報告：").count()) > 0);
+await page.getByRole("button", { name: "日報を作る" }).click();
+await page.getByRole("status").filter({ hasText: "日報を作りました" }).waitFor({ timeout: 60_000 });
+await page.reload();
+check("日報が保存される（AIが休憩中なら数字だけの日報）", (await page.getByText(/^日報(：|（数字のまとめ）)/).count()) > 0);
+await shot("20-reports");
+
+// 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
+const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);
+check("定期実行は合言葉なしでは動かない", cronRes.status() === 401);
 
 // PWA
 const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();

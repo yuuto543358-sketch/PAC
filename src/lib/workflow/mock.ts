@@ -36,7 +36,7 @@ export function mockKickoff(ctx: PromptContext): KickoffOutput {
 export function mockDiscussion(ctx: PromptContext): DiscussionOutput {
   return {
     message: `【テスト用モック】${ctx.speaker.name}です。${ctx.speaker.expertise[0] ?? "専門"}の観点では、まず小さく試せる案に絞るのが良いと考えます。`,
-    kind: ctx.speaker.id === ctx.workflow.lead_id ? "proposal" : "opinion",
+    kind: ctx.webSearch ? "findings" : ctx.speaker.id === ctx.workflow.lead_id ? "proposal" : "opinion",
     question_to_owner: null,
   };
 }

@@ -73,7 +73,7 @@ describe("チームでの自動進行", () => {
     const kinds = msgs.filter((m) => m.author_type === "employee").map((m) => `${m.employee_id}:${m.kind}`);
     expect(kinds).toEqual([
       "president:plan",
-      "research:proposal",
+      "research:findings", // 調査担当は Web検索して「調べた結果」を発言する
       "bizdev:opinion",
       "research:deliverable",
       "finance:review",

@@ -4,7 +4,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import type { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { BudgetBlockedError, failApiCall, finalizeApiCall, reserveApiCall } from "@/lib/budget";
-import { roughTokenCount, type UsageLike } from "@/lib/pricing";
+import { getPricing, roughTokenCount, WEB_SEARCH_CALL_USD, type UsageLike } from "@/lib/pricing";
 
 // このファイルは「サーバー専用」です（"server-only"）。
 // OpenAI の APIキーはサーバーの環境変数からだけ読み、画面（ブラウザ）には絶対に送りません。
@@ -58,17 +58,94 @@ export type StructuredCallInput<T extends z.ZodType> = {
   employeeId?: string | null;
   taskId?: string | null;
   conversationId?: string | null;
+  /** Web検索を使わせる場合の設定（使わない場合は省略） */
+  webSearch?: { maxCalls: number } | null;
   /** テスト用モックモードで返す内容 */
   mock: () => z.infer<T>;
 };
 
+/** Web検索で参照したページ */
+export type WebSource = { url: string; title: string };
+
 export type StructuredCallResult<T> =
-  | { ok: true; data: T; usageId: string; costJpy: number; costKnown: boolean }
+  | {
+      ok: true;
+      data: T;
+      usageId: string;
+      costJpy: number;
+      costKnown: boolean;
+      /** Web検索で参照したページ（検索しなかった場合は空） */
+      sources: WebSource[];
+      /** Web検索の回数 */
+      searchCalls: number;
+    }
   | { ok: false; reason: "refusal" | "truncated" | "invalid"; message: string; usageId: string; costJpy: number };
 
-function toUsageLike(u: OpenAI.Responses.ResponseUsage | undefined | null): UsageLike | null {
+/** Web検索1回で読み込まれる内容の量（トークン）の、多めの見積もり */
+const WEB_SEARCH_EST_INPUT_TOKENS = 15_000;
+/** 1回の呼び出しで許すWeb検索の最大回数（安全のための上限） */
+export const WEB_SEARCH_MAX_CALLS_LIMIT = 3;
+
+/** Web検索にかかる最大費用（米ドル）。検索料金＋読み込む内容の入力料金を、多めに見積もる */
+export function webSearchMaxUsd(model: string, maxCalls: number): number {
+  const p = getPricing(model);
+  const perCall = WEB_SEARCH_CALL_USD + (p ? (WEB_SEARCH_EST_INPUT_TOKENS * p.inputPerMTok) / 1_000_000 : 0);
+  return Math.max(0, maxCalls) * perCall;
+}
+
+function safeHttpUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    // 追跡用のパラメータ（utm_source=openai など）は外す
+    for (const key of [...u.searchParams.keys()]) {
+      if (key.startsWith("utm_")) u.searchParams.delete(key);
+    }
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** 応答から「Web検索の回数」と「参照したページ」を取り出す */
+export function extractWebSearch(response: Pick<OpenAI.Responses.Response, "output">): {
+  calls: number;
+  sources: WebSource[];
+} {
+  let calls = 0;
+  const map = new Map<string, WebSource>();
+  const add = (rawUrl: string | undefined | null, title?: string | null) => {
+    if (!rawUrl) return;
+    const url = safeHttpUrl(rawUrl);
+    if (!url) return;
+    const prev = map.get(url);
+    const t = (title ?? "").trim().slice(0, 200);
+    if (!prev) map.set(url, { url, title: t });
+    else if (!prev.title && t) prev.title = t;
+  };
+  for (const item of response.output ?? []) {
+    if (item.type === "web_search_call") {
+      // 課金を多めに数えるため、ページを開く操作なども1回として数える
+      calls++;
+      const action = item.action;
+      if (action?.type === "search") for (const src of action.sources ?? []) add(src.url);
+      else if (action?.type === "open_page") add(action.url);
+    } else if (item.type === "message") {
+      for (const c of item.content) {
+        if (c.type !== "output_text") continue;
+        for (const a of c.annotations ?? []) {
+          if (a.type === "url_citation") add(a.url, a.title);
+        }
+      }
+    }
+  }
+  return { calls, sources: [...map.values()].slice(0, 12) };
+}
+
+function toUsageLike(u: OpenAI.Responses.ResponseUsage | undefined | null, webSearchCalls = 0): UsageLike | null {
   if (!u) return null;
   return {
+    web_search_calls: webSearchCalls,
     input_tokens: u.input_tokens,
     output_tokens: u.output_tokens,
     cached_input_tokens: u.input_tokens_details?.cached_tokens ?? 0,
@@ -99,6 +176,10 @@ export async function callStructured<T extends z.ZodType>(
     roughTokenCount(JSON.stringify(input.schema.toJSONSchema?.() ?? {})) +
     300;
 
+  const searchCalls = input.webSearch
+    ? Math.min(WEB_SEARCH_MAX_CALLS_LIMIT, Math.max(1, Math.floor(input.webSearch.maxCalls)))
+    : 0;
+
   const reservation = await reserveApiCall(sql, {
     model: input.model,
     purpose: input.purpose,
@@ -107,6 +188,7 @@ export async function callStructured<T extends z.ZodType>(
     employeeId: input.employeeId,
     taskId: input.taskId,
     conversationId: input.conversationId,
+    extraMaxUsd: searchCalls > 0 ? webSearchMaxUsd(input.model, searchCalls) : 0,
   });
 
   if (isMockMode()) {
@@ -122,9 +204,20 @@ export async function callStructured<T extends z.ZodType>(
       output_tokens: Math.min(input.maxTokens, roughTokenCount(JSON.stringify(data))),
       cached_input_tokens: 0,
       cache_write_tokens: 0,
+      web_search_calls: searchCalls > 0 ? 1 : 0,
     };
     const fin = await finalizeApiCall(sql, reservation, fakeUsage, "mock");
-    return { ok: true, data, usageId: reservation.usageId, costJpy: fin.costJpy, costKnown: fin.known };
+    const sources: WebSource[] =
+      searchCalls > 0 ? [{ url: "https://example.com/mock-source", title: "（テスト用の参照ページ）" }] : [];
+    return {
+      ok: true,
+      data,
+      usageId: reservation.usageId,
+      costJpy: fin.costJpy,
+      costKnown: fin.known,
+      sources,
+      searchCalls: searchCalls > 0 ? 1 : 0,
+    };
   }
 
   let response;
@@ -140,6 +233,20 @@ export async function callStructured<T extends z.ZodType>(
       store: false,
       // 同じ社員への呼び出しで、入力の共通部分のキャッシュ（割引）が効きやすくする
       prompt_cache_key: input.purpose.slice(0, 64),
+      ...(searchCalls > 0
+        ? {
+            tools: [
+              {
+                type: "web_search" as const,
+                // 読み込む量を少なくして費用を抑える
+                search_context_size: "low" as const,
+                user_location: { type: "approximate" as const, country: "JP", timezone: "Asia/Tokyo" },
+              },
+            ],
+            max_tool_calls: searchCalls,
+            include: ["web_search_call.action.sources" as const],
+          }
+        : {}),
     });
   } catch (err) {
     // APIConnectionError は APIError の一種なので、先に判定する
@@ -173,7 +280,8 @@ export async function callStructured<T extends z.ZodType>(
     throw new AiUnavailableError("AIの応答を処理できませんでした。もう一度お試しください。");
   }
 
-  const fin = await finalizeApiCall(sql, reservation, toUsageLike(response.usage), response.id);
+  const web = extractWebSearch(response);
+  const fin = await finalizeApiCall(sql, reservation, toUsageLike(response.usage, web.calls), response.id);
   const fail = (reason: "refusal" | "truncated" | "invalid", message: string) => ({
     ok: false as const,
     reason,
@@ -197,6 +305,8 @@ export async function callStructured<T extends z.ZodType>(
     usageId: reservation.usageId,
     costJpy: fin.costJpy,
     costKnown: fin.known,
+    sources: web.sources,
+    searchCalls: web.calls,
   };
 }
 

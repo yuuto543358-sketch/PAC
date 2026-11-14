@@ -56,7 +56,15 @@ export type RoomMessage = {
   avatar_style: string | null;
   kind: string;
   content: string;
-  meta: { deliverableVersion?: number; costJpy?: number; verdict?: string; href?: string; tone?: string };
+  meta: {
+    deliverableVersion?: number;
+    costJpy?: number;
+    verdict?: string;
+    href?: string;
+    tone?: string;
+    /** Web検索で参照したページ */
+    sources?: { url: string; title: string }[];
+  };
   created_at: Date;
 };
 

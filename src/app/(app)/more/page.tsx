@@ -9,7 +9,6 @@ export const metadata = { title: "メニュー" };
 export default async function MorePage() {
   const sql = await getDb();
   const settings = await getSettings(sql);
-  const soon = <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">準備中</span>;
   return (
     <>
       <PageHeader title="メニュー" />
@@ -26,8 +25,8 @@ export default async function MorePage() {
         <Section title="経営">
           <List>
             <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="API予算・使用額・利用履歴・運用費" />
-            <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="事業候補の管理" trailing={soon} />
-            <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="社長の業務完了報告（定期報告は準備中）" />
+            <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="AIが見つけた事業の候補" />
+            <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="日報・週報・業務の完了報告" />
           </List>
         </Section>
 
@@ -51,7 +50,7 @@ export default async function MorePage() {
             ログアウト
           </button>
         </form>
-        <p className="text-center text-[12px] text-faint">PERSONAL AI COMPANY ・ Phase 1 ・ バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
+        <p className="text-center text-[12px] text-faint">PERSONAL AI COMPANY ・ Phase 3 ・ バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
       </Page>
     </>
   );

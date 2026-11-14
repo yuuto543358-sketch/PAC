@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SourceList } from "@/components/SourceList";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getTask } from "@/lib/repo/tasks";
@@ -107,6 +108,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
           >
             {m.content}
           </div>
+          {m.meta.sources && m.meta.sources.length > 0 && <SourceList sources={m.meta.sources} className="mt-2 w-full max-w-sm" />}
           {del && (
             <Link
               href={`/tasks/${task.id}/deliverables/${del.version}`}

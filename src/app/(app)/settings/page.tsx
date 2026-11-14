@@ -13,6 +13,7 @@ export const metadata = { title: "設定" };
 export default async function SettingsPage() {
   const sql = await getDb();
   const [settings, budget, employees] = await Promise.all([getSettings(sql), getBudget(sql), listEmployees(sql)]);
+  const cronConfigured = Boolean(process.env.CRON_SECRET);
   return (
     <>
       <PageHeader title="設定" back="/more" backLabel="メニュー" />
@@ -75,12 +76,36 @@ export default async function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="自動実行の頻度">
-          <div className="card p-4">
-            <AutorunForm initial={settings.autorun_frequency} />
+        <Section title="自動で動く仕事">
+          <div id="autorun" className="card scroll-mt-20 space-y-3 p-4">
+            <AutorunForm
+              initial={{
+                autorun_frequency: settings.autorun_frequency,
+                web_research_enabled: settings.web_research_enabled,
+                discovery_auto_start: settings.discovery_auto_start,
+              }}
+            />
           </div>
-          <div className="mt-2">
-            <PhaseNotice phase="Phase 3">定期的な事業機会の調査・未完了業務の確認・週次報告などの自動実行（保存した頻度で動きます）</PhaseNotice>
+          <div className="mt-2 space-y-1.5 px-1 text-xs leading-relaxed text-muted">
+            <p>毎日、夜中（午前3時ごろ）に自動で動きます。</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す・社長が日報を書く。月曜は週報も書く。
+              </li>
+              <li>
+                <b className="text-ink">週1回</b>：月曜だけ、仕事を探して週報を書く。
+              </li>
+              <li>
+                <b className="text-ink">停止</b>：自動では何もしません（「事業開発」「報告書」の画面のボタンで、いつでも手動で動かせます）。
+              </li>
+            </ul>
+            <p>
+              費用の目安：仕事探し1回 約3〜10円（Web検索を使うと高め）、報告書1回 約1円。どれも予算の上限を超えそうなときは自動で止まります。外部への送信・登録・購入は、必ずあなたの承認が必要です。
+            </p>
+            <p>
+              自動で動かすには、Vercel の環境変数 <code>CRON_SECRET</code> の設定が必要です（README 参照）。{" "}
+              {cronConfigured ? <span className="font-semibold text-success">設定済み</span> : <span className="font-semibold text-danger">未設定</span>}
+            </p>
           </div>
         </Section>
 
@@ -91,7 +116,7 @@ export default async function SettingsPage() {
         </Section>
 
         <Section title="通知設定">
-          <PhaseNotice phase="Phase 3">承認依頼・予算超過のプッシュ通知（iPhoneのホーム画面アプリへの通知）。現在は、ホーム画面の「重要なお知らせ」と承認タブの数字でお知らせします。</PhaseNotice>
+          <PhaseNotice phase="Phase 4">承認依頼・予算超過のプッシュ通知（iPhoneのホーム画面アプリへの通知）。現在は、ホーム画面の「重要なお知らせ」と承認タブの数字でお知らせします。</PhaseNotice>
         </Section>
 
         <Section title="セキュリティ">

@@ -1,32 +1,45 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { dateTime } from "@/lib/format";
-import { Empty, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import { REPORT_TYPE_LABEL } from "@/lib/constants";
+import { getSettings } from "@/lib/repo/settings";
+import { Empty, Page, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { DocumentView } from "@/components/DocumentView";
+import { ReportNowButtons } from "../business/BusinessActions";
 
 export const metadata = { title: "報告書" };
+export const maxDuration = 300;
 
 type ReportRow = { id: string; report_type: string; title: string; content: string; task_id: string | null; created_at: Date };
 
-const TYPE_LABEL: Record<string, string> = {
-  task: "業務完了報告",
-  daily: "日次報告",
-  weekly: "週次報告",
-  monthly: "月次報告",
-  bizdev: "事業開発レポート",
-  employee: "社員別活動報告",
-};
-
 export default async function ReportsPage() {
   const sql = await getDb();
-  const reports = await sql<ReportRow[]>`
-    select id, report_type, title, content, task_id, created_at from reports order by created_at desc limit 50`;
+  const [reports, settings] = await Promise.all([
+    sql<ReportRow[]>`
+      select id, report_type, title, content, task_id, created_at from reports order by created_at desc limit 50`,
+    getSettings(sql),
+  ]);
+  const autoLabel =
+    settings.autorun_frequency === "daily" ? "毎日（月曜は週報も）" : settings.autorun_frequency === "weekly" ? "毎週月曜" : "停止中";
   return (
     <>
       <PageHeader title="報告書" subtitle={`${reports.length}件`} back="/more" backLabel="メニュー" />
       <Page>
+        <div className="card space-y-3 p-4">
+          <p className="text-[14px] leading-relaxed">
+            社長の<b>天城 翔</b>が、会社の様子をまとめて報告します。数字はシステムが自動で集計した事実です。
+          </p>
+          <ReportNowButtons />
+          <p className="text-xs text-muted">
+            1回 約1円。自動の報告：<b className="text-ink">{autoLabel}</b>
+            <Link href="/settings#autorun" className="ml-1 font-semibold text-brand">
+              設定を変える
+            </Link>
+          </p>
+        </div>
         {reports.length === 0 ? (
-          <Empty icon="report">まだ報告書はありません。チームが業務を完了すると、社長の完了報告がここに保存されます。</Empty>
+          <Empty icon="report">まだ報告書はありません。上のボタンで作るか、チームが業務を完了すると、ここに保存されます。</Empty>
         ) : (
           <ul className="space-y-3">
             {reports.map((r) => (
@@ -37,14 +50,14 @@ export default async function ReportsPage() {
                       <Icon name="report" size={20} stroke={2} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[12px] font-semibold text-brand">{TYPE_LABEL[r.report_type] ?? r.report_type}</span>
+                      <span className="block text-[12px] font-semibold text-brand">{REPORT_TYPE_LABEL[r.report_type] ?? r.report_type}</span>
                       <span className="block truncate text-[15px] font-semibold">{r.title}</span>
                       <span className="block text-[12px] text-muted">{dateTime(r.created_at)}</span>
                     </span>
                     <Icon name="chevronRight" size={16} stroke={2.4} className="text-faint transition-transform group-open:rotate-90" />
                   </summary>
                   <div className="border-t border-separator px-4 py-3.5">
-                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{r.content}</p>
+                    <DocumentView content={r.content} format="markdown_report" />
                     {r.task_id && (
                       <Link href={`/tasks/${r.task_id}`} className="mt-3 inline-flex items-center gap-1 text-[14px] font-semibold text-brand">
                         業務と成果物を見る
@@ -57,9 +70,6 @@ export default async function ReportsPage() {
             ))}
           </ul>
         )}
-        <Section title="今後追加する報告書">
-          <PhaseNotice phase="Phase 3">日次・週次・月次報告、事業開発レポート、社員別活動報告の自動作成（定期実行）</PhaseNotice>
-        </Section>
       </Page>
     </>
   );
