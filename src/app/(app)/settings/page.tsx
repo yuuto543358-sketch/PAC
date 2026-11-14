@@ -91,7 +91,7 @@ export default async function SettingsPage() {
             />
           </div>
           <div className="mt-2 space-y-1.5 px-1 text-xs leading-relaxed text-muted">
-            <p>毎日、夜中（午前3時ごろ）に自動で動きます。</p>
+            <p>毎日、朝（午前7時半ごろ）に自動で動きます。</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
                 <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す・社長が日報を書く。月曜は週報、毎月1日は月報も書く。

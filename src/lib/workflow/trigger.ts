@@ -7,7 +7,7 @@ import { dispatchNotifications } from "@/lib/notify";
 
 /**
  * 画面に結果を返したあと、バックグラウンドでチームの作業を進めます。
- * （Vercel では処理の制限時間内に限ります。続きは画面を開いたとき・夜間の定期実行で進みます）
+ * （Vercel では処理の制限時間内に限ります。続きは画面を開いたとき・毎朝の定期実行で進みます）
  */
 export function scheduleTeamRun(taskIds?: string[]) {
   after(async () => {

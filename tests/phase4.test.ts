@@ -26,6 +26,8 @@ beforeEach(async () => {
   await sql`update company_settings set emergency_stop = false, notify_approvals = true, notify_budget = true,
     autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null,
     last_monthly_report_on = null, discovery_auto_start = false`;
+  // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
+  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31'`;
   // 前のテストの通知・受け取り先を片づける（テスト用DBだけで行う操作）
   await sql`update notifications set status = 'skipped' where status = 'pending'`;
   await sql`delete from push_subscriptions`;

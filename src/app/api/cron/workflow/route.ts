@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * 夜間の定期実行（Vercel Cron から1日1回呼ばれる）。
+ * 毎朝の定期実行（Vercel Cron から1日1回、日本時間の午前7時半ごろに呼ばれる）。
  * 1. 設定の「自動で動く頻度」に合わせて、仕事探し・日報・週報を作る（同じ日に2回は動かない）
  * 2. 止まっているチームの作業を続きから進める
  * 環境変数 CRON_SECRET を設定した場合だけ動きます（設定がなければ何もしません）。

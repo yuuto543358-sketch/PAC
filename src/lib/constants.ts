@@ -316,3 +316,34 @@ export const SNS_PLAN_OPTIONS = [
   { id: "weekly", label: "週1回（月曜）" },
   { id: "daily", label: "1日1回" },
 ] as const;
+
+// ===== ライフインテリジェンス =====
+
+export const LIFE_SOURCE_LABEL: Record<string, string> = { owner: "本人の回答", auto: "自動で記録", ai_estimate: "AIの推定" };
+export const LIFE_CONFIDENCE_LABEL: Record<string, string> = { high: "確か", medium: "だいたい", low: "あいまい" };
+export const LIFE_QUESTION_STATUS_LABEL: Record<string, string> = {
+  pending: "回答待ち",
+  answered: "回答済み",
+  skipped: "スキップ",
+  later: "後で回答",
+  unknown: "分からない",
+  expired: "期限切れ",
+};
+export const LIFE_FREQUENCY_OPTIONS = [
+  { id: "off", label: "停止（質問しない）" },
+  { id: "low", label: "少なめ（週1回・月曜）" },
+  { id: "normal", label: "ふつう（週2回・月曜と木曜）" },
+  { id: "high", label: "多め（毎日）" },
+] as const;
+export const LIFE_SUGGESTION_STATUSES = ["new", "considering", "adopted", "rejected", "done"] as const;
+export type LifeSuggestionStatus = (typeof LIFE_SUGGESTION_STATUSES)[number];
+export const LIFE_SUGGESTION_STATUS_LABEL: Record<LifeSuggestionStatus, string> = {
+  new: "新着",
+  considering: "検討中",
+  adopted: "採用",
+  rejected: "却下",
+  done: "実行済み",
+};
+export const LIFE_PRIORITY_LABEL: Record<string, string> = { high: "高", medium: "中", low: "低" };
+/** 生活の改善提案から、同時に進める「業務」の上限（費用を抑えるため） */
+export const MAX_ACTIVE_LIFE_TASKS = 2;

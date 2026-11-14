@@ -31,6 +31,12 @@ export default async function MorePage() {
           </List>
         </Section>
 
+        <Section title="暮らし">
+          <List>
+            <ListRow href="/life" leading={<IconTile name="sparkles" color="#0f766e" />} title="ライフ" subtitle="生活情報・質問・分析・改善提案" />
+          </List>
+        </Section>
+
         <Section title="会社">
           <List>
             <ListRow href="/employees" leading={<IconTile name="users" color="#2563eb" />} title="社員" subtitle="プロフィール・評価・チャット" />

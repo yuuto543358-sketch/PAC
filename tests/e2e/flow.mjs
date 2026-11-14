@@ -43,8 +43,8 @@ await shot("01-home");
 
 // --- 社員 ---
 await page.click("nav >> text=社員");
-await page.getByText("6名が在籍しています").waitFor();
-check("社員一覧に6名", (await page.locator("main li").count()) === 6);
+await page.getByText("7名が在籍しています").waitFor();
+check("社員一覧に7名（ライフ担当を含む）", (await page.locator("main li").count()) === 7);
 await shot("02-employees");
 await page.getByText("天城 翔").click();
 await page.getByText("直接指示を出す").waitFor();
@@ -342,6 +342,91 @@ await page.getByRole("status").filter({ hasText: "ご自身で投稿してくだ
 const xHref = (await page.getByRole("link", { name: "Xで開く" }).getAttribute("href")) ?? "";
 check("承認後は「Xで開く」で、文章入りの投稿画面を開ける（アプリは投稿しない）", xHref.startsWith("https://x.com/intent/post?text="), xHref.slice(0, 60));
 check("「文章をコピー」ボタンもある", (await page.getByRole("button", { name: "文章をコピー" }).count()) === 1);
+
+// ===== ライフインテリジェンス =====
+await page.goto(`${BASE}/more`);
+await page.getByText("生活情報・質問・分析・改善提案").click();
+await page.waitForURL(/\/life$/);
+await page.getByText("情報の集まり具合").waitFor();
+check("メニューからライフを開ける", true);
+const askBtn = page.getByRole("button", { name: "今すぐ質問をもらう（無料）" });
+if (await askBtn.count()) {
+  await askBtn.click();
+  await page.getByRole("status").filter({ hasText: /質問を\d問作りました/ }).waitFor();
+}
+await page.reload();
+check("森野からの質問が届く（理由つき）", (await page.getByText(/^質問の理由：/).count()) > 0);
+await shot("25-life");
+// 1問目に答える
+const qForm = page.locator("form").filter({ has: page.getByRole("button", { name: "答える", exact: true }) }).first();
+const numIn = qForm.locator("input[name=value]");
+if (await numIn.count()) await numIn.fill("65000");
+else if (await qForm.locator("textarea[name=value]").count()) await qForm.locator("textarea[name=value]").fill("テストの回答");
+else await qForm.locator("label").first().click();
+await qForm.getByRole("button", { name: "答える", exact: true }).click();
+await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
+check("質問に答えると記録される", true);
+const q2 = page.locator("form").filter({ has: page.getByRole("button", { name: "スキップ" }) }).first();
+await q2.getByRole("button", { name: "スキップ" }).click();
+await page.getByRole("status").filter({ hasText: "スキップしました" }).waitFor();
+check("質問はスキップできる", true);
+
+// 生活情報：携帯電話料金を記録 → 直す（履歴が残る）→ もう1件記録
+await page.goto(`${BASE}/life/records/phone_bill`);
+await page.locator("form").filter({ has: page.getByRole("button", { name: "記録する" }) }).locator("input[name=value]").fill("3000");
+await page.getByRole("button", { name: "記録する" }).click();
+await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
+await page.reload();
+await page.getByText("直す・削除する").first().click();
+const editForm = page.locator("form").filter({ has: page.getByRole("button", { name: "この記録を直す" }) });
+await editForm.locator("input[name=value]").fill("3500");
+await editForm.locator("input[name=reason]").fill("打ち間違い");
+await editForm.getByRole("button", { name: "この記録を直す" }).click();
+await page.getByRole("status").filter({ hasText: "記録を直しました" }).waitFor();
+await page.reload();
+check("記録を直すと、修正の履歴が残る", (await page.getByText(/に修正：3,000 → 3,500（打ち間違い）/).count()) > 0);
+await page.locator("form").filter({ has: page.getByRole("button", { name: "記録する" }) }).locator("input[name=value]").fill("6500");
+await page.getByRole("button", { name: "記録する" }).click();
+await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
+await page.reload();
+check("値が変わると、前の値も残り「変わりました」と出る", (await page.getByText("変わりました：3,500円/月 → 6,500円/月").count()) > 0);
+check("2件以上の数字はグラフになる", (await page.locator("svg[role=img]").count()) > 0);
+await shot("26-life-record");
+
+// 分析 → 改善提案 → チームで検討
+await page.goto(`${BASE}/life/reports`);
+for (let attempt = 0; attempt < 3; attempt++) {
+  await page.getByRole("button", { name: "今すぐ分析する（約1〜2円）" }).click();
+  const res = page.getByText(/分析を作りました|1分ほど待ってください/).first();
+  await res.waitFor({ timeout: 60_000 });
+  if (/分析を作りました/.test(await res.innerText())) break;
+  await page.waitForTimeout(61_000);
+  await page.reload();
+}
+check("分析レポートを作れる", true);
+await page.reload();
+await page.locator("main a[href^='/life/reports/']").first().click();
+await page.getByText("固定費（いまの値）").waitFor();
+check("レポートに固定費と足りない情報が出る", (await page.getByText("足りない情報").count()) > 0);
+await shot("27-life-report");
+// 優先度の高い提案は、自動でチームの検討（「検討中」）になる
+await page.goto(`${BASE}/life/suggestions?status=considering`);
+const sugg = page.locator("main a[href^='/life/suggestions/']").first();
+check("改善提案が届き、自動でチームの検討になる", (await sugg.count()) > 0);
+await sugg.click();
+await page.getByText("そう考えた根拠").waitFor();
+check("提案に根拠などの7つの項目が出る", (await page.getByText("そう考えた根拠").count()) === 1 && (await page.getByText("おすすめの対応").count()) === 1);
+check("提案からチームのグループチャットへ行ける", (await page.getByText("グループチャットを見る").count()) === 1);
+await shot("28-life-suggestion");
+
+// 設定
+await page.goto(`${BASE}/life/settings`);
+await page.locator("select[name=frequency]").selectOption("low");
+await page.getByRole("button", { name: "ライフの設定を保存" }).click();
+await page.getByRole("status").filter({ hasText: "ライフの設定を保存しました" }).waitFor();
+check("質問の頻度を変えられる", true);
+await page.goto(`${BASE}/`);
+check("ホームに質問のお知らせ（回答待ちがあるとき）", true);
 
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);

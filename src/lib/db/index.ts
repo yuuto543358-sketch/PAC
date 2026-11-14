@@ -1,6 +1,7 @@
 import "server-only";
 import postgres from "postgres";
 import { MIGRATIONS } from "./schema";
+import { LIFE_CATEGORIES, LIFE_FIELDS } from "@/lib/life/catalog";
 import { SEED_DEPARTMENTS, SEED_EMPLOYEES } from "./seed";
 import { parseDatabaseUrl, type DatabaseUrlInfo } from "./url";
 import { createStepLogger, TimeoutError, withTimeout, type StepLogger } from "@/lib/log";
@@ -201,6 +202,22 @@ async function seed(tx: Tx) {
   await tx`insert into budgets (id) values (1) on conflict do nothing`;
   for (const d of SEED_DEPARTMENTS) {
     await tx`insert into departments ${tx(d)} on conflict (id) do nothing`;
+  }
+  // ライフインテリジェンスのカテゴリと項目（表があるときだけ。なければ追加、あれば変えない）
+  const [hasLife] = await tx<{ ok: boolean }[]>`select to_regclass('life_fields') is not null as ok`;
+  if (hasLife?.ok) {
+    for (const c of LIFE_CATEGORIES) {
+      await tx`insert into life_categories ${tx(c)} on conflict (id) do nothing`;
+    }
+    for (const f of LIFE_FIELDS) {
+      await tx`
+        insert into life_fields (id, category_id, label, value_type, unit, choices, kind, period, refresh_days,
+          importance, question, reason, depends_on, sort_order)
+        values (${f.id}, ${f.category_id}, ${f.label}, ${f.value_type}, ${f.unit ?? ""}, ${f.choices ?? []}::text[],
+          ${f.kind ?? "state"}, ${f.period ?? "none"}, ${f.refresh_days}, ${f.importance}, ${f.question}, ${f.reason},
+          ${f.depends_on ?? ""}, ${f.sort_order})
+        on conflict (id) do nothing`;
+    }
   }
   for (const e of SEED_EMPLOYEES) {
     await tx`

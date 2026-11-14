@@ -18,7 +18,7 @@ import { Alert, ChevronRight, List, ListRow, Page, Ring, Section, Stat, TaskStat
 
 export default async function HomePage() {
   const sql = await getDb();
-  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport, money] = await Promise.all([
+  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport, money, lifeQuestions] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -34,6 +34,9 @@ export default async function HomePage() {
       select id, report_type, title, created_at from reports where report_type in ('daily','weekly','monthly')
       order by created_at desc limit 1`.then((r) => r[0] ?? null),
     ledgerTotals(sql),
+    sql<{ n: number }[]>`
+      select count(*)::int as n from life_questions
+      where status = 'pending' or (status = 'later' and remind_after <= now())`.then((r) => r[0]?.n ?? 0),
   ]);
   const president = employees.find((e) => e.id === "president");
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
@@ -123,6 +126,19 @@ export default async function HomePage() {
               )}
             </div>
           </Section>
+        )}
+
+        {lifeQuestions > 0 && (
+          <Link href="/life" className="card press flex items-center gap-3 p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#0f766e]/12 text-[#0f766e]">
+              <Icon name="chat" size={20} stroke={2} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold">森野から質問が{lifeQuestions}問届いています</span>
+              <span className="block text-[12px] text-muted">答えると、暮らしの改善提案に役立ちます（スキップもOK）</span>
+            </span>
+            <ChevronRight />
+          </Link>
         )}
 
         <Section title="本日の会社の状況">

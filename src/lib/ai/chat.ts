@@ -5,6 +5,7 @@ import { EXTERNAL_ACTION_TYPES, APPROVAL_ACTION_LABEL } from "@/lib/constants";
 import { BudgetBlockedError } from "@/lib/budget";
 import { AiUnavailableError, callStructured, type ChatTurn } from "@/lib/ai/client";
 import { buildChatSystemPrompt } from "@/lib/ai/prompts";
+import { buildLifeSnapshot } from "@/lib/life/snapshot";
 import { getSettings } from "@/lib/repo/settings";
 import { listEmployees } from "@/lib/repo/employees";
 import { listTasks, createTask } from "@/lib/repo/tasks";
@@ -146,7 +147,9 @@ export async function sendChatMessage(
   const phases = await sql<{ task_id: string; phase: string }[]>`
     select task_id, phase from task_workflows where task_id in ${sql(openTasks.length ? openTasks.map((t) => t.id) : ["00000000-0000-0000-0000-000000000000"])}`;
   const phaseOf = new Map(phases.map((p) => [p.task_id, p.phase]));
+  const lifeSnapshot = employee.role_key === "life" ? await buildLifeSnapshot(sql) : null;
   const system = buildChatSystemPrompt({
+    lifeSnapshot,
     settings,
     employee,
     roster,

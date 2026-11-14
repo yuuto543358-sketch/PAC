@@ -42,7 +42,7 @@ export default async function SnsPage() {
               }}
             />
           </div>
-          <p className="mt-2 px-1 text-xs text-muted">自動で作るのは夜中（午前3時ごろ）です（CRON_SECRET の設定が必要）。</p>
+          <p className="mt-2 px-1 text-xs text-muted">自動で作るのは毎朝（午前7時半ごろ）です（CRON_SECRET の設定が必要）。</p>
         </Section>
 
         <Section title="これまでの投稿案">

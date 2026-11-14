@@ -156,7 +156,7 @@ describe("Supabase Transaction pooler 対策", () => {
     for (const r of results) {
       const spend = r[2];
       expect(spend.monthJpy).toBeGreaterThanOrEqual(0);
-      expect(r[6].length).toBe(6);
+      expect(r[6].length).toBe(7); // 社員7人
     }
     expect(p2.maxInFlight()).toBe(1);
     await sql.end();

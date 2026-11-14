@@ -70,3 +70,11 @@ export function dayLabel(d: Date | string): string {
 export function timeOnly(d: Date | string): string {
   return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(new Date(d));
 }
+
+/** 日本時間の日付（YYYY-MM-DD）と曜日（0=日曜） */
+export function jstDateParts(now: Date): { date: string; weekday: number } {
+  const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);
+  const wd = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", weekday: "short" }).format(now);
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
+  return { date, weekday };
+}

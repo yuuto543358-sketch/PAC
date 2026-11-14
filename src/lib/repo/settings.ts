@@ -33,6 +33,14 @@ export type CompanySettings = {
   /** 投稿案を作るSNS（x / bluesky） */
   sns_platforms: string[];
   last_sns_plan_on: Date | null;
+  /** 生活の質問の頻度（off / low / normal / high） */
+  life_question_frequency: string;
+  /** 1回の質問数（1〜3） */
+  life_questions_per_batch: number;
+  /** 大事な改善提案を、自動でチームの業務にするか */
+  life_auto_task: boolean;
+  last_life_question_on: Date | null;
+  last_life_analysis_on: Date | null;
   updated_at: Date;
 };
 

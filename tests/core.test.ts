@@ -38,15 +38,15 @@ afterAll(async () => {
 });
 
 describe("migrations & seed", () => {
-  it("creates tables and seeds 6 employees idempotently", async () => {
+  it("creates tables and seeds 7 employees idempotently", async () => {
     const sql = await getDb();
     const emps = await sql`select id from employees order by sort_order`;
-    expect(emps.map((e) => e.id)).toEqual(["president", "bizdev", "research", "creative", "secretary", "finance"]);
+    expect(emps.map((e) => e.id)).toEqual(["president", "bizdev", "research", "creative", "secretary", "finance", "life"]);
     // 2回目の起動でも壊れない
     await closeDb();
     const sql2 = await getDb();
     const [{ n }] = await sql2`select count(*)::int as n from employees`;
-    expect(n).toBe(6);
+    expect(n).toBe(7);
   });
 
   it("forbids deleting or editing logs", async () => {

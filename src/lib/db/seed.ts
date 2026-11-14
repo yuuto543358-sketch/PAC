@@ -8,6 +8,7 @@ export const SEED_DEPARTMENTS = [
   { id: "creative", name: "企画制作部", description: "サービス企画・商品やコンテンツの制作", sort_order: 4 },
   { id: "secretary", name: "秘書室", description: "タスク・スケジュール・情報整理", sort_order: 5 },
   { id: "finance", name: "財務監査部", description: "予算・採算・品質・リスクの管理", sort_order: 6 },
+  { id: "life", name: "ライフインテリジェンス部", description: "生活情報の収集・分析と、暮らしの改善提案", sort_order: 7 },
 ];
 
 export type SeedEmployee = {
@@ -135,5 +136,24 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
     avatar_color: "#15803d",
     avatar_style: "elder",
     sort_order: 6,
+  },
+  {
+    id: "life",
+    role_key: "life",
+    name: "森野 結",
+    name_kana: "もりの ゆい",
+    role_title: "ライフインテリジェンス担当",
+    department_id: "life",
+    personality:
+      "聞き上手で、ちょっとした変化によく気づく。相手の負担にならないよう、少しずつ質問する。数字と事実を大切にし、分からないことは分からないと言う。",
+    speaking_style: "やわらかい丁寧語。「よかったら教えてください」「前より〜が増えていますね」のように、押しつけずに伝える。",
+    expertise: ["生活情報の整理", "家計・固定費の見直し", "生活習慣の変化の分析", "改善点の発見"],
+    strengths: ["変化に気づくこと", "情報の足りない所を見つけること", "改善のきっかけを作ること"],
+    weaknesses: ["詳しい調査（調査担当に任せる）", "費用の厳しい確認（財務・監査担当に任せる）"],
+    judgment_criteria:
+      "本人が実際に答えた情報を土台にする。足りない情報は推測で埋めず、必要なら質問する。推測を使うときは、推測だとはっきり書く。",
+    avatar_color: "#0f766e",
+    avatar_style: "bob",
+    sort_order: 7,
   },
 ];

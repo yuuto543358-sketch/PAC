@@ -5,8 +5,9 @@ import { getSettings } from "@/lib/repo/settings";
 import { runDiscovery, type DiscoveryResult } from "./discovery";
 import { generateCompanyReport, type ReportResult } from "./reports";
 import { runSnsPlanning, type SnsPlanResult } from "./sns";
+import { runLifeJobs, type LifeJobsResult } from "@/lib/life/jobs";
 
-// 定期実行（1日1回、夜中に動く）で行う「自主的な仕事」。
+// 定期実行（1日1回、朝7時半ごろに動く）で行う「自主的な仕事」。
 // 設定の「自動で動く頻度」が「停止」なら何もしません。
 // 同じ日に2回動いても二重に実行しないよう、実行した日をデータベースに記録します。
 
@@ -16,25 +17,23 @@ export type ScheduledJobsResult = {
   skipped: string[];
   discovery?: DiscoveryResult;
   sns?: SnsPlanResult;
+  life?: LifeJobsResult;
   reports: ReportResult[];
   /** チームでの作業を始めた業務 */
   taskIds: string[];
 };
 
-/** 日本時間の日付（YYYY-MM-DD）と曜日（0=日曜） */
-export function jstDateParts(now: Date): { date: string; weekday: number } {
-  const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);
-  const wd = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", weekday: "short" }).format(now);
-  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
-  return { date, weekday };
-}
+export { jstDateParts } from "@/lib/format";
+import { jstDateParts } from "@/lib/format";
 
 type ClaimColumn =
   | "last_discovery_on"
   | "last_daily_report_on"
   | "last_weekly_report_on"
   | "last_monthly_report_on"
-  | "last_sns_plan_on";
+  | "last_sns_plan_on"
+  | "last_life_question_on"
+  | "last_life_analysis_on";
 
 /**
  * 「今日この仕事をするのは自分」という権利を取る。すでに今日実行済みなら false。
@@ -55,6 +54,14 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   const settings = await getSettings(sql);
   const freq = settings.autorun_frequency;
   const result: ScheduledJobsResult = { frequency: freq, ran: [], skipped: [], reports: [], taskIds: [] };
+  {
+    // ライフインテリジェンス：質問づくりはAIを使わないので、緊急停止中でも行う（分析は中で緊急停止を確認する）
+    const { date } = jstDateParts(now);
+    result.life = await runLifeJobs(sql, date, now, (col) => claim(sql, col, date));
+    if (result.life.questions?.created) result.ran.push("life_questions");
+    if (result.life.analyses.length) result.ran.push("life_analysis");
+    result.taskIds.push(...result.life.taskIds);
+  }
   if (settings.emergency_stop) {
     result.skipped.push("緊急停止中のため");
     return result;

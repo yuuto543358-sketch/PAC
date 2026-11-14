@@ -64,6 +64,8 @@ export function buildChatSystemPrompt(opts: {
   roster: EmployeeWithStats[];
   openTasks: OpenTaskBrief[];
   todayJst: string;
+  /** ライフ担当との会話のときだけ：本人の生活情報のまとめ（「AIに渡さない」カテゴリは含まない） */
+  lifeSnapshot?: string | null;
 }) {
   const { settings, employee, roster, openTasks, todayJst } = opts;
   const isPresident = employee.role_key === "president";
@@ -105,6 +107,8 @@ ${settings.custom_rules.trim() ? `\n【経営者が定めた社内ルール】\n
 ${rosterText}
 
 ${CURRENT_CAPABILITIES}
+- 暮らし（家計・固定費・健康・仕事の負担など）の相談は、ライフインテリジェンス担当（森野 結）が受け持つ。ライフ担当は質問で生活情報を集め、分析と改善提案を行う（アプリの「ライフ」画面）。
+${opts.lifeSnapshot ? `\n【経営者の生活情報（本人の回答。推定は「推定」と書いてある）】\n${opts.lifeSnapshot}\n- 書いていない情報は分からないものとして扱い、推測で数字を作らない。\n` : ""}
 ${OWNER_POLICIES}
 ${employee.role_key === "president" || employee.role_key === "bizdev" ? `\n${buildSalesChannelGuide()}\n` : ""}
 

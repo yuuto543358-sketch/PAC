@@ -653,4 +653,173 @@ alter table company_settings add column if not exists last_sns_plan_on date;
 alter table company_settings add column if not exists sns_platforms text[] not null default '{x}';
 `,
   },
+  {
+    version: 8,
+    name: "life_intelligence",
+    sql: /* sql */ `
+-- ===== ライフインテリジェンス（生活情報の収集・分析・改善提案） =====
+
+-- カテゴリ（家計・住居など）。あとから追加・変更できる
+create table if not exists life_categories (
+  id text primary key,
+  name text not null,
+  description text not null default '',
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  -- false にすると、このカテゴリの情報はAI（OpenAI）に渡さない
+  ai_allowed boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- 「何の情報か」の一覧（例：携帯電話料金・円/月・半年ごとに確認）。AIが新しい項目を提案して増えることもある
+create table if not exists life_fields (
+  id text primary key,
+  category_id text not null references life_categories(id),
+  label text not null,
+  value_type text not null check (value_type in ('number','text','choice')),
+  unit text not null default '',
+  choices text[] not null default '{}',
+  -- state: いまの状態（家賃など。変わったら新しい記録が増える）／ periodic: 期間ごとの記録（今月の食費など）
+  kind text not null default 'state' check (kind in ('state','periodic')),
+  period text not null default 'none' check (period in ('none','week','month')),
+  refresh_days int not null default 180 check (refresh_days between 1 and 730),
+  importance int not null default 3 check (importance between 1 and 5),
+  question text not null,
+  reason text not null default '',
+  -- 例：'car_owned=はい'（車を持っている人にだけ聞く）
+  depends_on text not null default '',
+  is_active boolean not null default true,
+  sort_order int not null default 0,
+  created_by text not null default 'system' check (created_by in ('system','ai','owner')),
+  created_at timestamptz not null default now()
+);
+
+-- 生活の記録（回答ごとに1行。上書きしない）
+create table if not exists life_records (
+  id uuid primary key default gen_random_uuid(),
+  field_id text not null references life_fields(id),
+  value_num numeric(14,2),
+  value_text text not null default '' check (length(value_text) <= 2000),
+  period_start date,
+  period_end date,
+  source text not null check (source in ('owner','auto','ai_estimate')),
+  confidence text not null default 'high' check (confidence in ('high','medium','low')),
+  note text not null default '',
+  question_id uuid,
+  confirmed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists life_records_field_idx on life_records(field_id, confirmed_at desc);
+
+-- 記録の修正の履歴（修正前と修正後）。記録を削除すると、履歴もいっしょに消える
+create table if not exists life_record_history (
+  id bigserial primary key,
+  record_id uuid not null references life_records(id) on delete cascade,
+  old_value_num numeric(14,2),
+  old_value_text text not null default '',
+  new_value_num numeric(14,2),
+  new_value_text text not null default '',
+  reason text not null default '',
+  changed_at timestamptz not null default now()
+);
+create or replace function pac_life_history_guard() returns trigger
+language plpgsql as $$
+begin
+  raise exception 'PAC: 修正の履歴は変更できません';
+end $$;
+drop trigger if exists life_history_guard on life_record_history;
+create trigger life_history_guard before update on life_record_history
+  for each row execute function pac_life_history_guard();
+
+-- AI社員からの質問
+create table if not exists life_questions (
+  id uuid primary key default gen_random_uuid(),
+  field_id text references life_fields(id),
+  text text not null,
+  reason text not null default '',
+  status text not null default 'pending'
+    check (status in ('pending','answered','skipped','later','unknown','expired')),
+  source text not null default 'rule' check (source in ('rule','ai','owner')),
+  employee_id text references employees(id),
+  batch_on date not null default ((now() at time zone 'Asia/Tokyo')::date),
+  period_start date,
+  period_end date,
+  asked_at timestamptz not null default now(),
+  answered_at timestamptz,
+  remind_after timestamptz,
+  record_id uuid references life_records(id) on delete set null
+);
+create index if not exists life_questions_status_idx on life_questions(status, asked_at desc);
+create index if not exists life_questions_field_idx on life_questions(field_id, asked_at desc);
+
+-- 分析レポート（数字はプログラムが計算した事実。AIはコメントだけ）
+create table if not exists life_reports (
+  id uuid primary key default gen_random_uuid(),
+  period_months int not null check (period_months in (1,3,6,12)),
+  period_start date not null,
+  period_end date not null,
+  stats jsonb not null default '{}'::jsonb,
+  ai_summary text not null default '',
+  ai_used boolean not null default false,
+  data_gaps text[] not null default '{}',
+  employee_id text references employees(id),
+  created_at timestamptz not null default now()
+);
+create index if not exists life_reports_created_idx on life_reports(created_at desc);
+
+-- 改善提案
+create table if not exists life_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  problem text not null default '',
+  evidence text not null default '',
+  benefit text not null default '',
+  cost_text text not null default '',
+  difficulty text not null default 'ふつう' check (difficulty in ('やさしい','ふつう','むずかしい')),
+  priority text not null default 'medium' check (priority in ('high','medium','low')),
+  recommendation text not null default '',
+  is_estimate boolean not null default true,
+  category_id text references life_categories(id),
+  related_field_ids text[] not null default '{}',
+  status text not null default 'new' check (status in ('new','considering','adopted','rejected','done')),
+  -- 調査・比較・企画が必要で、チームで検討したほうがよい提案
+  needs_team boolean not null default false,
+  task_id uuid references tasks(id),
+  report_id uuid references life_reports(id),
+  owner_note text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists life_suggestions_status_idx on life_suggestions(status, created_at desc);
+
+-- 設定
+alter table company_settings add column if not exists life_question_frequency text not null default 'normal';
+alter table company_settings drop constraint if exists company_settings_life_question_frequency_check;
+alter table company_settings add constraint company_settings_life_question_frequency_check
+  check (life_question_frequency in ('off','low','normal','high'));
+alter table company_settings add column if not exists life_questions_per_batch int not null default 3;
+alter table company_settings drop constraint if exists company_settings_life_questions_per_batch_check;
+alter table company_settings add constraint company_settings_life_questions_per_batch_check
+  check (life_questions_per_batch between 1 and 3);
+alter table company_settings add column if not exists life_auto_task boolean not null default true;
+alter table company_settings add column if not exists last_life_question_on date;
+alter table company_settings add column if not exists last_life_analysis_on date;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['life_categories','life_fields','life_records','life_record_history',
+    'life_questions','life_reports','life_suggestions'] loop
+    execute format('alter table %I enable row level security', t);
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on table %I from anon', t);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+      execute format('revoke all on table %I from authenticated', t);
+    end if;
+  end loop;
+end $$;
+`,
+  },
 ];
