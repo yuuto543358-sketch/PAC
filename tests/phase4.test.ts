@@ -115,18 +115,18 @@ describe("収益・費用の記録", () => {
 });
 
 describe("外部への操作の説明", () => {
-  it("メール以外も「アプリは実行しない」という固定の説明になる", async () => {
+  it("メール・SNS以外の外部への操作は「アプリは実行しない」という固定の説明になる", async () => {
     const sql = await getDb();
     const id = await createApproval(sql, {
       requestedByEmployeeId: "creative",
-      actionType: "sns_post",
-      title: `SNS投稿 ${uniq()}`,
-      content: "投稿文",
+      actionType: "subscribe",
+      title: `有料サービスへの登録 ${uniq()}`,
+      content: "登録内容",
       reason: "",
-      destination: "X",
+      destination: "あるサービス",
       estimatedCostJpy: 0,
       risks: "",
-      afterEffect: "承認するとすぐに投稿されます",
+      afterEffect: "承認するとすぐに登録されます",
     });
     expect((await getApproval(sql, id))!.after_effect).toBe(OWNER_DOES_AFTER_EFFECT);
   });

@@ -7,7 +7,7 @@ import { DELIVERABLE_FORMATS, DELIVERABLE_STATUS_LABEL } from "@/lib/constants";
 import { dateTime } from "@/lib/format";
 import { DocumentView } from "@/components/DocumentView";
 import { Page, PageHeader, Section } from "@/components/ui";
-import { OutputButtons } from "./OutputButtons";
+import { NoteCopyButtons, OutputButtons } from "./OutputButtons";
 
 export default async function DeliverablePage({ params }: { params: Promise<{ id: string; version: string }> }) {
   const { id, version } = await params;
@@ -42,6 +42,11 @@ export default async function DeliverablePage({ params }: { params: Promise<{ id
           </p>
           <div className="mt-4">
             <OutputButtons content={d.content} filename={`${safeName}_v${d.version}.${fmt.ext}`} mime={fmt.mime} />
+            {d.format === "note_article" && (
+              <div className="mt-2.5">
+                <NoteCopyButtons content={d.content} />
+              </div>
+            )}
           </div>
         </div>
 

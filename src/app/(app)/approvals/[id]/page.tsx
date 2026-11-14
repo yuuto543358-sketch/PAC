@@ -38,6 +38,10 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
   const isDeliverable = a.action_type === "accept_deliverable";
   const deliverableVersion = Number(a.payload?.deliverableVersion) || null;
   const ownerSends = OWNER_SENDS_ACTION_TYPES.includes(a.action_type);
+  const isSns = a.action_type === "sns_post";
+  const executedEvent = events.find((e) => e.event === "executed");
+  const failedEvent = events.find((e) => e.event === "execution_failed");
+  const postUrl = executedEvent?.note.match(/https?:\/\/\S+$/)?.[0] ?? null;
 
   const rows: [string, string][] = [
     ["操作の種類", APPROVAL_ACTION_LABEL[a.action_type]],
@@ -111,8 +115,13 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
             </article>
           </Section>
         ) : (
-          <Section title={ownerSends ? "送る内容（AIが書いた文面）" : "実行しようとしている内容"}>
+          <Section title={ownerSends ? "送る内容（AIが書いた文面）" : isSns ? `投稿する文章（${a.destination || "SNS"}）` : "実行しようとしている内容"}>
             <div className="card p-4 text-[16px] leading-relaxed whitespace-pre-wrap">{a.content}</div>
+            {isSns && (
+              <p className="mt-2 px-1 text-xs text-muted">
+                {a.content.length}文字・{a.estimated_cost_jpy > 0 ? `投稿の費用の目安 ${yen(a.estimated_cost_jpy)}（Xの利用料。リンク入りは高くなります）` : "投稿の費用はかかりません"}
+              </p>
+            )}
             {ownerSends && open && (
               <p className="mt-2 px-1 text-xs text-muted">
                 承認すると、この文面を送るための「本文をコピー」「メールアプリで開く」ボタンが出ます。送るのはあなたです（アプリは自動で送りません）。
@@ -167,6 +176,29 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
               </div>
             </details>
             )}
+          </Section>
+        )}
+
+        {a.status === "executed" && isSns && (
+          <Section title="投稿しました">
+            <div className="card space-y-2 p-4 text-[14px]">
+              <p>{executedEvent?.note.replace(/\s*https?:\/\/\S+$/, "") ?? "投稿しました"}</p>
+              {postUrl && (
+                <a href={postUrl} target="_blank" rel="noopener noreferrer" className="btn-tinted w-full">
+                  投稿を見る
+                </a>
+              )}
+              <p className="text-xs text-muted">投稿を消したいときは、そのSNSのアプリから消してください。</p>
+            </div>
+          </Section>
+        )}
+
+        {a.status === "execution_failed" && (
+          <Section title="投稿できませんでした">
+            <div className="card p-4 text-[14px] text-danger">{failedEvent?.note ?? "原因が分かりませんでした"}</div>
+            <div className="mt-2.5">
+              <OwnerDoPanel body={a.content} />
+            </div>
           </Section>
         )}
 

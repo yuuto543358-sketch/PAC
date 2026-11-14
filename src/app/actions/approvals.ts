@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
-import { decideApproval, resubmitApproval } from "@/lib/repo/approvals";
+import { decideApproval, executeApprovedAction, resubmitApproval } from "@/lib/repo/approvals";
 import { audit } from "@/lib/repo/audit";
 import { scheduleTeamRun } from "@/lib/workflow/trigger";
 import type { ActionState } from "@/components/forms";
@@ -23,7 +23,20 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
     const ownerSends = a?.action_type === "send_message";
     // 成果物を差し戻したら、チームがすぐ修正に取りかかる
     if (decision === "reject" && isDeliverable && a?.task_id) scheduleTeamRun([a.task_id]);
+    // SNSへの投稿は、承認したらすぐにアプリが投稿する（そのSNSの設定が済んでいるとき）
+    let snsMessage: string | null = null;
+    let snsFailed = false;
+    if (decision === "approve" && a?.action_type === "sns_post") {
+      const r = await executeApprovedAction(sql, id);
+      if (r.ok) snsMessage = `承認しました。${r.summary.replace(/\s*https?:\/\/\S+$/, "")}`;
+      else if (r.reason === "not_implemented") snsMessage = "承認しました。SNSの設定がまだないため、「内容をコピー」を使って投稿してください";
+      else {
+        snsFailed = true;
+        snsMessage = `承認しましたが、投稿できませんでした：${r.message}`;
+      }
+    }
     refresh();
+    if (snsMessage) return snsFailed ? { ok: false, error: snsMessage, ts: Date.now() } : { ok: true, message: snsMessage, ts: Date.now() };
     const msg =
       decision === "approve"
         ? isDeliverable

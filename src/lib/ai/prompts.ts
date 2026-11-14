@@ -35,6 +35,14 @@ export const PLAIN_LANGUAGE_RULES = `
 - 社員どうしの話し合いでも同じルールで話す（経営者が読んでわかるように）。
 `.trim();
 
+/** 経営者の方針（2026年11月の指示より） */
+export const OWNER_POLICIES = `
+【経営者の方針】
+- 取材・インタビュー・外注・広告など、人の手やお金がかかる外部への依頼はしない。AIの知識とWeb調査だけで完結させる。
+- 実際に取材したかのような架空の話・架空の人の声・根拠のない数字は書かない。体験談や事例を使うときは「例」「想定」とはっきり書く。
+- SNSの運用はSNS担当（企画制作）が行う。投稿は経営者が承認したものだけが投稿される。
+`.trim();
+
 export const CURRENT_CAPABILITIES = `
 【現在あなたが使える機能】
 - 経営者との会話
@@ -97,6 +105,7 @@ ${settings.custom_rules.trim() ? `\n【経営者が定めた社内ルール】\n
 ${rosterText}
 
 ${CURRENT_CAPABILITIES}
+${OWNER_POLICIES}
 ${employee.role_key === "president" || employee.role_key === "bizdev" ? `\n${buildSalesChannelGuide()}\n` : ""}
 
 ${PLAIN_LANGUAGE_RULES}

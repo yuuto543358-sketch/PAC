@@ -1,5 +1,5 @@
 import "server-only";
-import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { FIXED_COMPANY_PRINCIPLES, OWNER_POLICIES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
 import { DELIVERABLE_FORMATS, MEMBER_ROLE_LABEL, type WorkflowPhase } from "@/lib/constants";
 import type { EmployeeWithStats } from "@/lib/repo/employees";
 import type { CompanySettings } from "@/lib/repo/settings";
@@ -67,6 +67,8 @@ export function buildTeamContext(ctx: PromptContext) {
 【会社の基本原則（変更不可）】
 ${FIXED_COMPANY_PRINCIPLES}
 ${settings.custom_rules.trim() ? `\n【経営者が定めた社内ルール】\n${settings.custom_rules.trim()}\n` : ""}
+${OWNER_POLICIES}
+
 【あなた】
 - 性格: ${speaker.personality}
 - 話し方: ${speaker.speaking_style}
@@ -146,14 +148,16 @@ ${candidates}
 - 外部への操作が必要なら external_actions に承認依頼の案を書く（実行はしない）。
 - 外部への操作（メール・SNS投稿・出品・登録など）は、承認のあと経営者が自分で行う。チームは、そのまま使える内容を用意する。
 - メール・メッセージは経営者が自分で送る。send_message の content には、そのまま送れる本文の全文を書き、destination には送り先（分かればメールアドレス）を書く。
-- グループチャットで Web検索の「参照したページ」がある場合は、成果物の最後に「参考にしたページ」として題名とURLを載せる。`;
+- グループチャットで Web検索の「参照したページ」がある場合は、成果物の最後に「参考にしたページ」として題名とURLを載せる。
+- note で売る記事を作るときは、形式を note_article にして、次の見出しの順に書く（経営者がそのまま貼り付けられるように）：
+  「# 記事のタイトル」→「値段: ○○円」→「## 無料で読める部分」→「## 有料部分」→「## ハッシュタグ」（#から始まる言葉を3〜5個）`;
     case "rework":
       return `あなたはリーダーです。監査コメントと経営者の指示を反映して、成果物を修正した新しい版を作ってください。
 - 指摘された点をすべて反映し、message で「何をどう直したか」を説明する。
 - 本文は修正後の完成品をすべて書く（差分ではなく全文）。`;
     case "review":
       return `あなたは監査役です。最新の成果物を確認してください。
-- 確認の観点: 業務のゴールと完成の条件を満たしているか／事実と推測が区別されているか／費用・法律・評判などのリスク
+- 確認の観点: 業務のゴールと完成の条件を満たしているか／事実と推測が区別されているか／費用・法律・評判などのリスク／架空の取材・架空の人の声・根拠のない数字がないか
 - 言葉づかいの細かい添削はしない（内容の問題だけを見る）。
 - 問題がなければ approve。修正が必要なら revise とし、points に具体的な修正点を書く。
 - 細かすぎる指摘で何度も差し戻さない。重要な問題だけを指摘する。`;

@@ -227,6 +227,7 @@ export const DELIVERABLE_FORMATS = [
   { id: "csv_table", label: "表（CSV）", ext: "csv", mime: "text/csv" },
   { id: "checklist", label: "チェックリスト", ext: "md", mime: "text/markdown" },
   { id: "slide_outline", label: "スライド構成案", ext: "md", mime: "text/markdown" },
+  { id: "note_article", label: "note記事（貼り付け用）", ext: "md", mime: "text/markdown" },
 ] as const;
 export type DeliverableFormat = (typeof DELIVERABLE_FORMATS)[number]["id"];
 export const DELIVERABLE_FORMAT_IDS = DELIVERABLE_FORMATS.map((f) => f.id) as [DeliverableFormat, ...DeliverableFormat[]];
@@ -300,3 +301,14 @@ export const LEDGER_CATEGORIES: Record<LedgerKind, string[]> = {
   income: ["売上", "その他の収入"],
   expense: ["材料・仕入れ", "広告", "手数料", "ツール・サービス", "その他の費用"],
 };
+
+// ===== SNS運用 =====
+
+export const SNS_PLATFORMS = ["x", "bluesky"] as const;
+export type SnsPlatform = (typeof SNS_PLATFORMS)[number];
+export const SNS_PLATFORM_LABEL: Record<SnsPlatform, string> = { x: "X（旧Twitter）", bluesky: "Bluesky" };
+export const SNS_PLAN_OPTIONS = [
+  { id: "off", label: "停止（ボタンを押したときだけ作る）" },
+  { id: "weekly", label: "週1回（月曜）" },
+  { id: "daily", label: "1日1回" },
+] as const;

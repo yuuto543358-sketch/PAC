@@ -1,4 +1,6 @@
 import "server-only";
+import { defaultExecutorFor } from "@/lib/sns/executor";
+import { checkPostLength, platformOf, postCostJpy } from "@/lib/sns/post";
 import { enqueueNotification } from "@/lib/notify";
 import { createHash } from "node:crypto";
 import type postgres from "postgres";
@@ -9,6 +11,7 @@ import {
   OWNER_SENDS_ACTION_TYPES,
   OWNER_DOES_AFTER_EFFECT,
   OWNER_SENDS_AFTER_EFFECT,
+  SNS_PLATFORM_LABEL,
   type ApprovalActionType,
   type ApprovalStatus,
 } from "@/lib/constants";
@@ -173,7 +176,7 @@ function validateInput(input: CreateApprovalInput): ApprovalContent {
 export async function createApprovalTx(tx: Tx, rawInput: CreateApprovalInput, actorType = "employee") {
   // アプリには外部で自動実行する機能がない（メールは経営者の方針で自分で送る）。
   // AIが何と書いても「承認後に何が起こるか」は、事実どおりの固定の説明にする
-  const input =
+  let input: CreateApprovalInput =
     rawInput.actionType === "accept_deliverable"
       ? rawInput
       : {
@@ -182,6 +185,22 @@ export async function createApprovalTx(tx: Tx, rawInput: CreateApprovalInput, ac
             ? OWNER_SENDS_AFTER_EFFECT
             : OWNER_DOES_AFTER_EFFECT,
         };
+  if (rawInput.actionType === "sns_post") {
+    // SNSへの投稿：どのSNSかを記録し、費用はAIの見積もりではなく料金表から計算する
+    const platform = platformOf({ payload: (rawInput.payload ?? null) as Record<string, unknown> | null, destination: rawInput.destination });
+    const [r] = await tx<{ rate: number }[]>`select usd_jpy_rate::float8 as rate from company_settings where id = 1`;
+    const tooLong = platform ? checkPostLength(platform, rawInput.content) : null;
+    input = {
+      ...input,
+      destination: platform ? SNS_PLATFORM_LABEL[platform] : rawInput.destination,
+      payload: { ...(rawInput.payload ?? {}), ...(platform ? { platform } : {}) },
+      estimatedCostJpy: postCostJpy(platform, rawInput.content, Number(r?.rate ?? 160)),
+      risks: tooLong ? `【注意】${tooLong}。「内容を修正して再提出」で短くしてください。\n${rawInput.risks}` : rawInput.risks,
+      afterEffect: platform
+        ? `承認すると、${SNS_PLATFORM_LABEL[platform]}の設定が済んでいれば、アプリが自動で投稿します（取り消しは${SNS_PLATFORM_LABEL[platform]}のアプリから手動で行います）。設定がまだなら「内容をコピー」を使って、あなたが投稿します。`
+        : OWNER_DOES_AFTER_EFFECT,
+    };
+  }
   const c = validateInput(input);
   const hash = computeContentHash(c);
   const [row] = await tx<{ id: string }[]>`
@@ -352,15 +371,13 @@ export async function resubmitApproval(
 export type ApprovedAction = Readonly<Approval>;
 export type ActionExecutor = (action: ApprovedAction) => Promise<{ summary: string }>;
 
-/**
- * 実行機能の登録場所。いまは何も登録されていないため、承認済みでも外部への実行は行われません。
- * send_message（メール・メッセージ）は経営者が自分で送る方針のため、ここには登録しません（下で拒否します）。
- */
-export const ACTION_EXECUTORS: Partial<Record<ApprovalActionType, ActionExecutor>> = {};
+// 実行の仕組みは src/lib/sns/executor.ts（defaultExecutorFor）で決めます。
+// いまアプリが実行できるのは「SNSへの投稿」だけ（鍵が設定されているとき）。
+// send_message（メール・メッセージ）は経営者が自分で送る方針のため、実行しません（下で拒否します）。
 
 export type ExecuteResult =
   | { ok: true; summary: string }
-  | { ok: false; reason: "not_approved" | "hash_mismatch" | "not_implemented" | "failed" | "not_found"; message: string };
+  | { ok: false; reason: "not_approved" | "hash_mismatch" | "not_implemented" | "failed" | "not_found" | "limit"; message: string };
 
 /**
  * 承認済みの操作を実行する唯一の入口。サーバー側で以下をすべて確認します。
@@ -372,7 +389,7 @@ export type ExecuteResult =
 export async function executeApprovedAction(
   sql: Sql,
   approvalId: string,
-  executors: Partial<Record<ApprovalActionType, ActionExecutor>> = ACTION_EXECUTORS,
+  executors?: Partial<Record<ApprovalActionType, ActionExecutor>>,
 ): Promise<ExecuteResult> {
   const prepared = await begin(sql, async (tx) => {
     const [a] = await tx<Approval[]>`select * from approvals where id = ${approvalId} for update`;
@@ -402,7 +419,13 @@ export async function executeApprovedAction(
         message: "メール・メッセージは、経営者がご自身で送ります（アプリは自動で送りません）",
       };
     }
-    const executor = executors[a.action_type];
+    let executor: ActionExecutor | undefined;
+    if (executors) executor = executors[a.action_type];
+    else {
+      const d = await defaultExecutorFor(tx, a);
+      if (d && "blocked" in d) return { ok: false as const, reason: "limit" as const, message: d.blocked };
+      executor = d?.executor as ActionExecutor | undefined;
+    }
     if (!executor) {
       return {
         ok: false as const,

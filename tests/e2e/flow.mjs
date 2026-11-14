@@ -317,6 +317,30 @@ await page.getByRole("status").filter({ hasText: "通知の設定を保存しま
 check("通知のオン・オフを保存", true);
 await shot("23-notify");
 
+// SNS運用：SNS担当が投稿案を作り、承認すると投稿（設定がなければコピーして自分で投稿）
+await page.goto(`${BASE}/sns`);
+// テストは短時間にAIを何度も使うため、「1分あたりの上限」（安全装置）で止まったら1分待ってやり直す
+for (let attempt = 0; attempt < 3; attempt++) {
+  await page.getByRole("button", { name: "今すぐ投稿案を作る" }).click();
+  // 成功はお知らせ（上に出る）、上限で止まったときはボタンの下に赤い文字で出る
+  const result = page.getByText(/SNSの投稿案を\d+件作りました|1分ほど待ってください/).first();
+  await result.waitFor({ timeout: 60_000 });
+  if (/件作りました/.test(await result.innerText())) break;
+  if (attempt === 0) check("AIの使いすぎ防止（1分あたりの上限）が働く", true);
+  await page.waitForTimeout(61_000);
+  await page.reload(); // 前の赤い文字を消してから、もう一度
+}
+await page.getByRole("status").filter({ hasText: /SNSの投稿案を\d+件作りました/ }).waitFor({ timeout: 60_000 });
+check("SNSの投稿案を作れる", true);
+await page.reload();
+await shot("24-sns");
+await page.locator("main a[href^='/approvals/']").first().click();
+await page.getByText(/投稿する文章（X（旧Twitter））/).waitFor();
+check("SNSの承認依頼に投稿先が出る", true);
+await page.getByRole("button", { name: "承認する" }).click();
+await page.getByRole("status").filter({ hasText: "SNSの設定がまだないため" }).waitFor();
+check("SNSの設定がないときは、承認後にコピーして投稿する案内", (await page.getByRole("button", { name: "内容をコピー" }).count()) === 1);
+
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);
 check("定期実行は合言葉なしでは動かない", cronRes.status() === 401);

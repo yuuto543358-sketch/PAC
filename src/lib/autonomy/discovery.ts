@@ -3,7 +3,7 @@ import { enqueueNotification } from "@/lib/notify";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured, type WebSource } from "@/lib/ai/client";
-import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { FIXED_COMPANY_PRINCIPLES, OWNER_POLICIES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
 import { MAX_ACTIVE_DISCOVERED_TASKS } from "@/lib/constants";
 import { findDuplicate } from "@/lib/dedupe";
 import { todayJst } from "@/lib/format";
@@ -101,6 +101,9 @@ function buildSystemPrompt(input: {
 【会社の基本原則（変更不可）】
 ${FIXED_COMPANY_PRINCIPLES}
 ${input.philosophy.trim() ? `\n【会社の理念】\n${input.philosophy.trim()}\n` : ""}${input.customRules.trim() ? `\n【経営者が定めた社内ルール】\n${input.customRules.trim()}\n` : ""}
+${OWNER_POLICIES}
+- 候補は、AIだけで作れる商品・サービスを優先する（取材や外注がいらないもの）。
+
 【あなた】
 - 性格: ${input.employee.personality}
 - 話し方: ${input.employee.speaking_style}

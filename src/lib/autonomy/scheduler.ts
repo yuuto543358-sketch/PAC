@@ -4,6 +4,7 @@ import { createStepLogger } from "@/lib/log";
 import { getSettings } from "@/lib/repo/settings";
 import { runDiscovery, type DiscoveryResult } from "./discovery";
 import { generateCompanyReport, type ReportResult } from "./reports";
+import { runSnsPlanning, type SnsPlanResult } from "./sns";
 
 // 定期実行（1日1回、夜中に動く）で行う「自主的な仕事」。
 // 設定の「自動で動く頻度」が「停止」なら何もしません。
@@ -14,6 +15,7 @@ export type ScheduledJobsResult = {
   ran: string[];
   skipped: string[];
   discovery?: DiscoveryResult;
+  sns?: SnsPlanResult;
   reports: ReportResult[];
   /** チームでの作業を始めた業務 */
   taskIds: string[];
@@ -27,7 +29,12 @@ export function jstDateParts(now: Date): { date: string; weekday: number } {
   return { date, weekday };
 }
 
-type ClaimColumn = "last_discovery_on" | "last_daily_report_on" | "last_weekly_report_on" | "last_monthly_report_on";
+type ClaimColumn =
+  | "last_discovery_on"
+  | "last_daily_report_on"
+  | "last_weekly_report_on"
+  | "last_monthly_report_on"
+  | "last_sns_plan_on";
 
 /**
  * 「今日この仕事をするのは自分」という権利を取る。すでに今日実行済みなら false。
@@ -48,16 +55,28 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   const settings = await getSettings(sql);
   const freq = settings.autorun_frequency;
   const result: ScheduledJobsResult = { frequency: freq, ran: [], skipped: [], reports: [], taskIds: [] };
-  if (freq !== "daily" && freq !== "weekly") {
-    result.skipped.push("自動で動く頻度が「停止」のため");
-    return result;
-  }
   if (settings.emergency_stop) {
     result.skipped.push("緊急停止中のため");
     return result;
   }
   const { date, weekday } = jstDateParts(now);
   const isMonday = weekday === 1;
+
+  // SNSの投稿案: 「SNS運用」の設定で動く（仕事探し・報告書の頻度とは別）
+  const snsFreq = settings.sns_plan_frequency;
+  if (snsFreq === "daily" || (snsFreq === "weekly" && isMonday)) {
+    if (await claim(sql, "last_sns_plan_on", date)) {
+      result.sns = await runSnsPlanning(sql, "scheduled");
+      result.ran.push("sns_plan");
+    } else {
+      result.skipped.push("SNSの投稿案は今日すでに作成済み");
+    }
+  }
+
+  if (freq !== "daily" && freq !== "weekly") {
+    result.skipped.push("自動で動く頻度が「停止」のため");
+    return result;
+  }
 
   // 仕事探し: 毎日（daily）または月曜（weekly）
   if (freq === "daily" || isMonday) {

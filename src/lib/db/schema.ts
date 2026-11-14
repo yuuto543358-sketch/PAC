@@ -625,4 +625,24 @@ begin
 end $$;
 `,
   },
+  {
+    version: 6,
+    name: "sns_operation",
+    sql: /* sql */ `
+-- ===== SNS運用（SNS担当のAIが投稿案を作り、経営者の承認後に投稿する） =====
+alter table company_settings add column if not exists sns_plan_frequency text not null default 'off';
+alter table company_settings drop constraint if exists company_settings_sns_plan_frequency_check;
+alter table company_settings add constraint company_settings_sns_plan_frequency_check
+  check (sns_plan_frequency in ('off','weekly','daily'));
+alter table company_settings add column if not exists sns_posts_per_plan int not null default 3;
+alter table company_settings drop constraint if exists company_settings_sns_posts_per_plan_check;
+alter table company_settings add constraint company_settings_sns_posts_per_plan_check
+  check (sns_posts_per_plan between 1 and 7);
+alter table company_settings add column if not exists sns_monthly_post_limit int not null default 60;
+alter table company_settings drop constraint if exists company_settings_sns_monthly_post_limit_check;
+alter table company_settings add constraint company_settings_sns_monthly_post_limit_check
+  check (sns_monthly_post_limit between 0 and 300);
+alter table company_settings add column if not exists last_sns_plan_on date;
+`,
+  },
 ];

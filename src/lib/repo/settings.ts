@@ -24,6 +24,13 @@ export type CompanySettings = {
   last_daily_report_on: Date | null;
   last_weekly_report_on: Date | null;
   last_monthly_report_on: Date | null;
+  /** SNSの投稿案を自動で作る頻度 */
+  sns_plan_frequency: string;
+  /** 1回に作る投稿案の数 */
+  sns_posts_per_plan: number;
+  /** 1か月に投稿してよい上限 */
+  sns_monthly_post_limit: number;
+  last_sns_plan_on: Date | null;
   updated_at: Date;
 };
 
