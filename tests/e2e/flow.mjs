@@ -428,12 +428,28 @@ await page.getByRole("button", { name: "ライフの設定を保存" }).click();
 await page.getByRole("status").filter({ hasText: "ライフの設定を保存しました" }).waitFor();
 check("質問の頻度を変えられる", true);
 await page.goto(`${BASE}/`);
-check("ホームに質問のお知らせ（回答待ちがあるとき）", true);
+{
+  const turn = page.locator("section[aria-label=あなたの番]");
+  check("ホームの「あなたの番」に森野からの質問が件数つきで出る", (await turn.getByText("森野からの質問").count()) === 1 && /\d+問/.test(await turn.innerText()));
+}
 
 // ===== QOL：毎日のチェック・習慣・これから起きること・目標・ふりかえり =====
 await page.goto(`${BASE}/`);
 check("タブに「ライフ」がある", (await page.locator("nav[aria-label=メインメニュー] a[href='/life']").count()) === 1);
 await page.getByText("今日の調子は？（10秒）").waitFor();
+{
+  // ホームの並び：あなたの番（承認 → 質問）→ 今日のチェック → 習慣。重なっていた欄はない
+  const y = async (loc) => (await loc.first().boundingBox())?.y ?? -1;
+  const turn = page.locator("section[aria-label=あなたの番]");
+  const turnText = await turn.innerText();
+  const yTurn = await y(turn);
+  const yCheck = await y(page.getByText("今日の調子は？（10秒）"));
+  check("ホームの「あなたの番」は件数つきで、今日のチェックより上", /あなたの番（\d+件）/.test(turnText) && yTurn >= 0 && yTurn < yCheck);
+  check("「あなたの番」の中は 承認待ち → 森野からの質問 の順", turnText.indexOf("承認待ち") >= 0 && turnText.indexOf("承認待ち") < turnText.indexOf("森野からの質問"));
+  check("ホームに「進行中の業務」の欄はなく、「チームの進行状況」に一本化", (await page.getByText("進行中の業務", { exact: true }).count()) === 0 && (await page.getByText("チームの進行状況").count()) === 1);
+  const recent = page.locator("section", { has: page.getByRole("heading", { name: "最近の動き" }) });
+  check("「最近の動き」は最新3件まで＋「すべて見る」", (await recent.locator("ol > li").count()) <= 3 && (await recent.getByRole("link", { name: "すべて見る" }).count()) === 1);
+}
 for (const [name, v] of [["mood", 4], ["energy", 3], ["sleep", 2], ["stress", 3]]) {
   await page.locator(`label:has(input[name=${name}][value="${v}"])`).first().click();
 }
@@ -463,7 +479,7 @@ await page.getByRole("status").filter({ hasText: "予定を登録しました" }
 await page.reload();
 check("これから起きることを登録すると、残り日数と出費が出る", (await page.getByText("あと3日").count()) > 0 && (await page.getByText("80,000円").count()) > 0);
 await page.goto(`${BASE}/`);
-check("ホームの「もうすぐ」に予定が出る", (await page.getByText("あと3日・80,000円").count()) > 0);
+check("ホームの「これからのこと」に予定が出る", (await page.getByText("あと3日・80,000円").count()) > 0);
 
 await page.goto(`${BASE}/life/goals`);
 await page.fill("input[name=title]", "体重を3kg減らす");

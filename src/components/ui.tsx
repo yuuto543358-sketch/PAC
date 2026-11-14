@@ -12,8 +12,8 @@ import { Icon, type IconName } from "./Icon";
 
 export { PageHeader } from "./PageHeader";
 
-export function Page({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <main className={`mx-auto w-full max-w-2xl space-y-6 px-4 pt-3 pb-32 ${className}`}>{children}</main>;
+export function Page({ children, className = "", tight = false }: { children: ReactNode; className?: string; tight?: boolean }) {
+  return <main className={`mx-auto w-full max-w-2xl ${tight ? "space-y-4" : "space-y-6"} px-4 pt-3 pb-32 ${className}`}>{children}</main>;
 }
 
 export function Section({ title, children, action, footer }: { title?: string; children: ReactNode; action?: ReactNode; footer?: ReactNode }) {

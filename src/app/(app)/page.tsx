@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getBudget, getSettings } from "@/lib/repo/settings";
 import { getSpendSummary } from "@/lib/budget";
-import { countTasks, listRecentActivity, listTasks } from "@/lib/repo/tasks";
+import { countTasks, listRecentActivity } from "@/lib/repo/tasks";
 import { countPendingApprovals } from "@/lib/repo/approvals";
 import { latestPresidentMessage } from "@/lib/repo/conversations";
 import { listEmployees } from "@/lib/repo/employees";
@@ -22,7 +22,7 @@ import { isAiConfigured } from "@/lib/ai/client";
 import { greeting, longDate, relativeTime, yen } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { Icon, type IconName } from "@/components/Icon";
-import { Alert, ChevronRight, List, ListRow, Page, Ring, Section, Stat, TaskStatusBadge } from "@/components/ui";
+import { Alert, ChevronRight, List, ListRow, Page, Ring, Section } from "@/components/ui";
 
 export default async function HomePage() {
   const sql = await getDb();
@@ -37,7 +37,7 @@ export default async function HomePage() {
     activeNudges(sql),
   ]);
   const soon = events.filter((e) => e.daysLeft != null && (e.remindNow || e.daysLeft <= 14)).slice(0, 3);
-  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport, money, lifeQuestions] = await Promise.all([
+  const [settings, budget, spend, counts, pending, lastMsg, employees, activity, teams, candidates, latestReport, money, lifeQuestions] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -45,7 +45,6 @@ export default async function HomePage() {
     countPendingApprovals(sql),
     latestPresidentMessage(sql),
     listEmployees(sql),
-    listTasks(sql, { view: "active" }, 5),
     listRecentActivity(sql, 6),
     listActiveTeams(sql, 5),
     listBusinessProjects(sql, { limit: 3 }),
@@ -58,6 +57,8 @@ export default async function HomePage() {
       where status = 'pending' or (status = 'later' and remind_after <= now())`.then((r) => r[0]?.n ?? 0),
   ]);
   const president = employees.find((e) => e.id === "president");
+  const yourTurnCount = pending + lifeQuestions + nudges.length;
+  const recentActivity = activity.slice(0, 3);
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
   const usedPct = hardLimit > 0 ? Math.round((spend.monthJpy / hardLimit) * 100) : 0;
 
@@ -68,12 +69,10 @@ export default async function HomePage() {
   else if (spend.monthJpy >= budget.monthly_target_jpy)
     notices.push({ tone: "warn", text: `今月のAPI利用額が目標（${yen(budget.monthly_target_jpy)}）を超えました。`, href: "/finance" });
   if (spend.todayJpy >= budget.daily_limit_jpy) notices.push({ tone: "warn", text: "今日のAPI利用額が1日の上限に達しました。", href: "/finance" });
-  if (pending > 0) notices.push({ tone: "warn", text: `承認待ちの案件が ${pending} 件あります。`, href: "/approvals" });
 
   const quick: { href: string; label: string; icon: IconName; color: string; badge?: number }[] = [
     { href: "/employees/president/chat", label: "社長に相談", icon: "chat", color: "#2348b8" },
     { href: "/employees/life/chat", label: "森野に相談", icon: "sparkles", color: "#0f766e" },
-    { href: "/approvals", label: "承認する", icon: "approve", color: "#c2410c", badge: pending },
     { href: "/tasks/new", label: "業務を登録", icon: "plus", color: "#475569" },
   ];
 
@@ -82,48 +81,80 @@ export default async function HomePage() {
       <header className="pt-safe relative overflow-hidden bg-gradient-to-br from-brand-deep via-[#1d3a99] to-[#3157d0] text-white">
         <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" aria-hidden />
         <div className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-sky-300/10 blur-2xl" aria-hidden />
-        <div className="relative mx-auto max-w-2xl px-5 pt-5 pb-20">
+        <div className="relative mx-auto max-w-2xl px-5 pt-4 pb-16">
           <div className="flex items-center justify-between">
             <p className="text-[13px] font-medium text-white/75">{longDate()}</p>
             <Link href="/settings" className="press flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-white/90" aria-label="設定">
               <Icon name="settings" size={20} />
             </Link>
           </div>
-          <p className="mt-3 text-[15px] text-white/85">{greeting()}。あなた専属の会社が、今日の暮らしをサポートします。</p>
-          <h1 className="mt-1 text-[28px] leading-tight font-bold tracking-tight">{settings.company_name}</h1>
+          <p className="mt-2 text-[15px] text-white/85">{greeting()}。今日の暮らしもサポートします。</p>
+          <h1 className="mt-0.5 text-[24px] leading-tight font-bold tracking-tight">{settings.company_name}</h1>
           <p className="mt-1 text-[13px] text-white/70">{settings.philosophy}</p>
         </div>
       </header>
 
-      <Page className="-mt-14 relative">
-        {/* ===== 今日のあなた ===== */}
-        <div className="card p-4 shadow-float">
-          {todayCheckin ? (
-            <Link href="/life/checkins" className="press flex items-center gap-4">
-              <Ring value={qolScore(todayCheckin)} max={5} size={78}>
-                <span className="tabular text-[20px] leading-none font-bold">{qolScore(todayCheckin)}</span>
-                <span className="mt-0.5 text-[10px] text-muted">/ 5</span>
-              </Ring>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-medium text-muted">今日のQOLスコア</div>
-                <div className="mt-0.5 text-[13px] leading-relaxed">
-                  気分{todayCheckin.mood}・体調{todayCheckin.energy}・睡眠{todayCheckin.sleep}・ストレス{todayCheckin.stress}
-                </div>
-                <div className="mt-1 text-[12px] font-semibold text-brand">変化を見る・直す</div>
+      <Page className="-mt-12 relative" tight>
+        {/* ===== 今日のチェック（記録ずみなら、いちばん上に小さく） ===== */}
+        {todayCheckin && (
+          <Link href="/life/checkins" className="card press flex items-center gap-3.5 p-3.5 shadow-float">
+            <Ring value={qolScore(todayCheckin)} max={5} size={60}>
+              <span className="tabular text-[17px] leading-none font-bold">{qolScore(todayCheckin)}</span>
+              <span className="text-[10px] text-muted">/ 5</span>
+            </Ring>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium text-muted">今日のQOLスコア</div>
+              <div className="mt-0.5 text-[13px] leading-snug">
+                気分{todayCheckin.mood}・体調{todayCheckin.energy}・睡眠{todayCheckin.sleep}・ストレス{todayCheckin.stress}
               </div>
-              <ChevronRight />
-            </Link>
-          ) : (
-            <>
-              <p className="mb-2 text-[15px] font-semibold">今日の調子は？（10秒）</p>
-              <CheckinForm date={today} />
-            </>
-          )}
-        </div>
+              <div className="mt-0.5 text-[12px] font-semibold text-brand">変化を見る・直す</div>
+            </div>
+            <ChevronRight />
+          </Link>
+        )}
 
-        {nudges.length > 0 && (
-          <Section title="森野からひとこと">
-            <ul className="card divide-y divide-separator">
+        {/* ===== あなたの番（承認 → 質問 → ひとこと） ===== */}
+        <section aria-label="あなたの番" className={`card overflow-hidden ${todayCheckin ? "" : "shadow-float"}`}>
+          <h2 className="px-4 pt-3 pb-1 text-[13px] font-semibold tracking-wide text-muted">
+            {yourTurnCount ? `あなたの番（${yourTurnCount}件）` : "あなたの番"}
+          </h2>
+          {yourTurnCount === 0 ? (
+            <p className="px-4 pb-3.5 text-[14px] text-muted">いまは、あなたの判断が必要なことはありません。</p>
+          ) : (
+            <ul className="divide-y divide-separator">
+              {pending > 0 && (
+                <li>
+                  <Link href="/approvals" className="press flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#c2410c]/12 text-[#c2410c]">
+                      <Icon name="approve" size={20} stroke={2} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-semibold">承認待ち</span>
+                      <span className="block text-[12px] text-muted">あなたの判断が必要です</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-danger px-2.5 py-0.5 text-[14px] font-bold text-white">{pending}件</span>
+                    <ChevronRight />
+                  </Link>
+                </li>
+              )}
+              {lifeQuestions > 0 && (
+                <li>
+                  <Link href="/life" className="press flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#0f766e]/12 text-[#0f766e]">
+                      <Icon name="chat" size={20} stroke={2} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-semibold">森野からの質問</span>
+                      <span className="block text-[12px] text-muted">提案に役立ちます（スキップOK）</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-[#0f766e] px-2.5 py-0.5 text-[14px] font-bold text-white">{lifeQuestions}問</span>
+                    <ChevronRight />
+                  </Link>
+                </li>
+              )}
+              {nudges.length > 0 && (
+                <li className="px-4 pt-2.5 pb-1 text-[12px] font-semibold text-muted">森野からのひとこと（{nudges.length}件）</li>
+              )}
               {nudges.map((n) => (
                 <li key={n.id} className="flex items-start gap-2 py-1 pr-2 pl-4">
                   <Link href={n.url} className="min-w-0 flex-1 py-2">
@@ -134,7 +165,15 @@ export default async function HomePage() {
                 </li>
               ))}
             </ul>
-          </Section>
+          )}
+        </section>
+
+        {/* ===== 今日のチェック（まだなら、あなたの番のあとに） ===== */}
+        {!todayCheckin && (
+          <div className="card p-4">
+            <p className="mb-2 text-[15px] font-semibold">今日の調子は？（10秒）</p>
+            <CheckinForm date={today} />
+          </div>
         )}
 
         <Section
@@ -162,72 +201,10 @@ export default async function HomePage() {
           )}
         </Section>
 
-        {soon.length > 0 && (
-          <Section title="もうすぐ" action={<Link href="/life/events" className="font-medium text-brand">予定</Link>}>
-            <ul className="card divide-y divide-separator">
-              {soon.map((e) => (
-                <li key={e.id}>
-                  <Link href="/life/events" className="flex items-center justify-between gap-2 px-4 py-3">
-                    <span className="min-w-0 truncate text-[15px]">{e.title}</span>
-                    <span className={`shrink-0 text-[13px] font-semibold ${e.remindNow ? "text-accent" : "text-muted"}`}>
-                      {e.daysLeft! < 0 ? `${-e.daysLeft!}日過ぎ` : e.daysLeft === 0 ? "今日" : `あと${e.daysLeft}日`}
-                      {e.amount_jpy != null && `・${yen(e.amount_jpy)}`}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {goals.length > 0 && (
-          <Section title="目標" action={<Link href="/life/goals" className="font-medium text-brand">すべて</Link>}>
-            <div className="card divide-y divide-separator">
-              {goals.slice(0, 3).map((g) => (
-                <Link key={g.id} href={`/life/goals/${g.id}`} className="block px-4 py-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 truncate text-[15px]">{g.title}</span>
-                    <span className={`shrink-0 text-[13px] font-semibold ${g.behind ? "text-accent" : "text-muted"}`}>
-                      {g.pct != null ? `${g.pct}%` : "記録で管理"}
-                    </span>
-                  </div>
-                  <GoalBar pct={g.pct} timePct={g.timePct} />
-                </Link>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {lastReview && (
-          <Link href={`/life/reviews/${lastReview.id}`} className="card press block p-4">
-            <p className="text-[12px] font-semibold text-[#0f766e]">森野の週のふりかえり（{lastReview.week_start}〜）</p>
-            <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed">{lastReview.ai_summary}</p>
-          </Link>
-        )}
-
-        <h2 className="px-1 pt-4 text-[20px] font-bold tracking-tight">あなたの会社の動き</h2>
-
-        <Link href="/finance" className="card press flex items-center gap-4 p-4">
-          <Ring value={spend.monthJpy} max={hardLimit} size={86}>
-            <span className="tabular text-[18px] leading-none font-bold">{usedPct}%</span>
-            <span className="mt-0.5 text-[10px] text-muted">使用</span>
-          </Ring>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium text-muted">今月のAPI利用料</div>
-            <div className="tabular mt-0.5 text-[26px] leading-tight font-bold tracking-tight">{yen(spend.monthJpy)}</div>
-            <div className="mt-1 text-[12px] leading-relaxed text-muted">
-              上限 {yen(hardLimit)} ・ 目標 {yen(budget.monthly_target_jpy)}
-              <br />
-              今日 {yen(spend.todayJpy)} ／ 1日の上限 {yen(budget.daily_limit_jpy)}
-            </div>
-          </div>
-          <ChevronRight />
-        </Link>
-
-        <nav aria-label="よく使う操作" className="grid grid-cols-4 gap-2">
+        <nav aria-label="よく使う操作" className="grid grid-cols-3 gap-2">
           {quick.map((q) => (
             <Link key={q.href} href={q.href} className="press flex flex-col items-center gap-1.5 rounded-[18px] py-2">
-              <span className="relative flex h-14 w-14 items-center justify-center rounded-[18px] text-white shadow-card" style={{ background: q.color }}>
+              <span className="relative flex h-12 w-12 items-center justify-center rounded-[16px] text-white shadow-card" style={{ background: q.color }}>
                 <Icon name={q.icon} size={26} stroke={2} />
                 {q.badge ? (
                   <span className="absolute -top-1 -right-1 min-w-5 rounded-full bg-danger px-1 text-center text-[11px] leading-5 font-bold text-white ring-2 ring-bg">
@@ -239,6 +216,54 @@ export default async function HomePage() {
             </Link>
           ))}
         </nav>
+
+        {(soon.length > 0 || goals.length > 0 || lastReview) && (
+          <Section title="これからのこと" action={<Link href="/life" className="font-medium text-brand">ライフ</Link>}>
+            <ul className="card divide-y divide-separator overflow-hidden">
+              {soon.map((e) => (
+                <li key={e.id}>
+                  <Link href="/life/events" className="press flex min-h-[48px] items-center gap-3 px-4 py-2.5">
+                    <Icon name="clock" size={18} className="shrink-0 text-muted" />
+                    <span className="min-w-0 flex-1 truncate text-[15px]">{e.title}</span>
+                    <span className={`shrink-0 text-[13px] font-semibold ${e.remindNow ? "text-accent" : "text-muted"}`}>
+                      {e.daysLeft! < 0 ? `${-e.daysLeft!}日過ぎ` : e.daysLeft === 0 ? "今日" : `あと${e.daysLeft}日`}
+                      {e.amount_jpy != null && `・${yen(e.amount_jpy)}`}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+              {goals.slice(0, 3).map((g) => (
+                <li key={g.id}>
+                  <Link href={`/life/goals/${g.id}`} className="press flex min-h-[48px] items-center gap-3 px-4 py-2.5">
+                    <Icon name="star" size={18} className="shrink-0 text-muted" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="min-w-0 truncate text-[15px]">{g.title}</span>
+                        <span className={`shrink-0 text-[13px] font-semibold ${g.behind ? "text-accent" : "text-muted"}`}>
+                          {g.pct != null ? `${g.pct}%` : "記録で管理"}
+                        </span>
+                      </span>
+                      <GoalBar pct={g.pct} timePct={g.timePct} />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+              {lastReview && (
+                <li>
+                  <Link href={`/life/reviews/${lastReview.id}`} className="press flex min-h-[48px] items-center gap-3 px-4 py-2.5">
+                    <Icon name="document" size={18} className="shrink-0 text-[#0f766e]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12px] font-semibold text-[#0f766e]">森野の週のふりかえり（{lastReview.week_start}〜）</span>
+                      <span className="block truncate text-[14px]">{lastReview.ai_summary}</span>
+                    </span>
+                  </Link>
+                </li>
+              )}
+            </ul>
+          </Section>
+        )}
+
+        <h2 className="px-1 pt-1 text-[20px] font-bold tracking-tight">あなたの会社の動き</h2>
 
         {notices.length > 0 && (
           <Section title="重要なお知らせ">
@@ -258,25 +283,35 @@ export default async function HomePage() {
           </Section>
         )}
 
-        {lifeQuestions > 0 && (
-          <Link href="/life" className="card press flex items-center gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#0f766e]/12 text-[#0f766e]">
-              <Icon name="chat" size={20} stroke={2} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold">森野から質問が{lifeQuestions}問届いています</span>
-              <span className="block text-[12px] text-muted">答えると、暮らしの改善提案に役立ちます（スキップもOK）</span>
-            </span>
-            <ChevronRight />
-          </Link>
-        )}
-
         <Section title="本日の会社の状況">
-          <div className="grid grid-cols-2 gap-3">
-            <Stat label="稼働中の業務" value={`${counts.active}件`} href="/tasks" icon="tasks" />
-            <Stat label="承認待ち" value={`${pending}件`} href="/approvals" icon="approve" tone={pending > 0 ? "accent" : undefined} />
-            <Stat label="今月完了した業務" value={`${counts.completed_month}件`} sub={`累計 ${counts.completed_total}件`} href="/tasks?view=closed" icon="check" />
-            <Stat label="今月の収益" value={yen(money.month.income)} sub={`出たお金 ${yen(money.month.expense)}`} icon="trend" href="/finance" />
+          <div className="card overflow-hidden">
+          <Link href="/finance" className="press block border-b border-separator px-4 py-2.5">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-[13px] font-medium text-muted">今月のAPI利用料</span>
+              <span className="tabular text-[13px] text-muted">
+                <span className="text-[17px] font-bold text-ink">{yen(spend.monthJpy)}</span> ／ 上限 {yen(hardLimit)}（{usedPct}%）
+              </span>
+            </span>
+            <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+              <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.min(100, usedPct)}%` }} />
+            </span>
+            <span className="mt-1 block text-[11px] text-muted">
+              目標 {yen(budget.monthly_target_jpy)}・今日 {yen(spend.todayJpy)}／1日の上限 {yen(budget.daily_limit_jpy)}
+            </span>
+          </Link>
+          <div className="grid grid-cols-3 divide-x divide-separator text-center">
+            {[
+              { href: "/tasks", label: "稼働中の業務", value: `${counts.active}件`, sub: "" },
+              { href: "/tasks?view=closed", label: "今月完了", value: `${counts.completed_month}件`, sub: `累計 ${counts.completed_total}件` },
+              { href: "/finance", label: "今月の収益", value: yen(money.month.income), sub: `出たお金 ${yen(money.month.expense)}` },
+            ].map((x) => (
+              <Link key={x.label} href={x.href} className="press block px-1.5 py-3">
+                <span className="block text-[12px] font-medium text-muted">{x.label}</span>
+                <span className="tabular mt-0.5 block truncate text-[19px] leading-tight font-bold">{x.value}</span>
+                {x.sub && <span className="block truncate text-[11px] text-muted">{x.sub}</span>}
+              </Link>
+            ))}
+          </div>
           </div>
         </Section>
 
@@ -286,13 +321,13 @@ export default async function HomePage() {
               進行中のチームはありません。社長に仕事を頼むと、チームを編成して自動で進めます。
             </div>
           ) : (
-            <ul className="space-y-2.5">
+            <ul className="card divide-y divide-separator overflow-hidden">
               {teams.map((t) => {
                 const running = t.autopilot && ACTIVE_WORKFLOW_PHASES.includes(t.phase);
                 const waiting = t.phase === "waiting_human";
                 return (
                   <li key={t.task_id}>
-                    <Link href={`/tasks/${t.task_id}/room`} className="card press flex items-center gap-3 p-3.5">
+                    <Link href={`/tasks/${t.task_id}/room`} className="press flex items-center gap-3 px-3.5 py-2.5">
                       <div className="flex shrink-0 -space-x-2">
                         {t.members.slice(0, 3).map((m) => (
                           <span key={m.employee_id} className="rounded-full ring-2 ring-[var(--surface)]">
@@ -328,26 +363,22 @@ export default async function HomePage() {
         </Section>
 
         <Section title="社長からの報告">
+          <div className="card divide-y divide-separator overflow-hidden">
           {president && (
-            <Link href="/employees/president/chat" className="card press block p-4">
+            <Link href="/employees/president/chat" className="press block p-3.5">
               <div className="flex items-center gap-3">
-                <Avatar color={president.avatar_color} styleId={president.avatar_style} size={44} status={president.status} label={president.name} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-semibold">{president.name}</div>
-                  <div className="text-[12px] text-muted">{president.role_title}</div>
+                <Avatar color={president.avatar_color} styleId={president.avatar_style} size={30} status={president.status} label={president.name} />
+                <div className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+                  {president.name}<span className="ml-1.5 text-[12px] font-normal text-muted">{president.role_title}</span>
                 </div>
                 {lastMsg && <span className="text-[12px] text-muted">{relativeTime(lastMsg.created_at)}</span>}
               </div>
-              <p className="mt-3 line-clamp-3 rounded-[14px] bg-surface-2 px-3.5 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-ink/90">
+              <p className="mt-2 line-clamp-2 text-[14px] leading-relaxed whitespace-pre-wrap text-ink/90">
                 {lastMsg ? lastMsg.content : "まだ報告はありません。社長に話しかけて、最初の仕事を依頼してみましょう。"}
               </p>
-              <span className="mt-3 inline-flex items-center gap-1 text-[15px] font-semibold text-brand">
-                <Icon name="chat" size={18} stroke={2} />
-                社長と話す
-              </span>
             </Link>
           )}
-          <Link href="/reports" className="card press mt-3 flex items-center gap-3 p-4">
+          <Link href="/reports" className="press flex items-center gap-3 px-3.5 py-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#7c3aed]/12 text-[#7c3aed]">
               <Icon name="report" size={20} stroke={2} />
             </span>
@@ -368,6 +399,7 @@ export default async function HomePage() {
             </span>
             <ChevronRight />
           </Link>
+          </div>
         </Section>
 
         <Section title="新しい事業の候補" action={<Link href="/business" className="font-medium text-brand">すべて</Link>}>
@@ -405,11 +437,11 @@ export default async function HomePage() {
             <ul className="flex gap-3">
               {employees.map((e) => (
                 <li key={e.id} className="shrink-0">
-                  <Link href={`/employees/${e.id}`} className="card press flex w-[104px] flex-col items-center px-2 py-3 text-center">
-                    <Avatar color={e.avatar_color} styleId={e.avatar_style} size={52} status={e.status} label={e.name} />
-                    <span className="mt-2 w-full truncate text-[13px] font-semibold">{e.name}</span>
+                  <Link href={`/employees/${e.id}`} className="card press flex w-[96px] flex-col items-center px-2 py-2.5 text-center">
+                    <Avatar color={e.avatar_color} styleId={e.avatar_style} size={44} status={e.status} label={e.name} />
+                    <span className="mt-1.5 w-full truncate text-[13px] font-semibold">{e.name}</span>
                     <span className="w-full truncate text-[11px] text-muted">{e.role_title}</span>
-                    <span className="mt-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-muted">担当 {e.active_tasks}件</span>
+                    <span className="mt-0.5 rounded-full bg-surface-2 px-2 text-[11px] text-muted">担当 {e.active_tasks}件</span>
                   </Link>
                 </li>
               ))}
@@ -417,35 +449,12 @@ export default async function HomePage() {
           </div>
         </Section>
 
-        <Section title="進行中の業務" action={<Link href="/tasks" className="font-medium text-brand">すべて</Link>}>
-          {recentTasks.length === 0 ? (
-            <div className="card px-4 py-6 text-center text-[15px] text-muted">
-              進行中の業務はありません。
-              <Link href="/tasks/new" className="mt-2 block font-semibold text-brand">
-                業務を登録する
-              </Link>
-            </div>
-          ) : (
-            <List>
-              {recentTasks.map((t) => (
-                <ListRow
-                  key={t.id}
-                  href={`/tasks/${t.id}`}
-                  title={<span className="font-medium">{t.title}</span>}
-                  subtitle={`担当: ${t.assignee_name ?? "未定"}`}
-                  trailing={<TaskStatusBadge status={t.status} />}
-                />
-              ))}
-            </List>
-          )}
-        </Section>
-
         {activity.length > 0 && (
-          <Section title="最近の動き">
+          <Section title="最近の動き" action={<Link href="/tasks" className="font-medium text-brand">すべて見る</Link>}>
             <ol className="card space-y-0 px-4 py-3">
-              {activity.map((a, i) => (
-                <li key={a.id} className="relative flex gap-3 pb-3 last:pb-0">
-                  {i < activity.length - 1 && <span className="absolute top-8 left-[15px] h-[calc(100%-24px)] w-px bg-separator" aria-hidden />}
+              {recentActivity.map((a, i) => (
+                <li key={a.id} className="relative flex gap-3 pb-2.5 last:pb-0">
+                  {i < recentActivity.length - 1 && <span className="absolute top-8 left-[15px] h-[calc(100%-24px)] w-px bg-separator" aria-hidden />}
                   {a.actor_type === "employee" && a.avatar_color ? (
                     <Avatar color={a.avatar_color} styleId={a.avatar_style ?? "short"} size={30} label={a.actor_name ?? "社員"} />
                   ) : (
@@ -454,7 +463,7 @@ export default async function HomePage() {
                     </span>
                   )}
                   <Link href={`/tasks/${a.task_id}`} className="min-w-0 flex-1 active:opacity-70">
-                    <div className="text-[14px] leading-snug">
+                    <div className="truncate text-[14px] leading-snug">
                       <span className="font-semibold">{a.actor_type === "user" ? "あなた" : a.actor_type === "employee" ? a.actor_name : "システム"}</span>
                       <span className="text-ink/80">：{a.message}</span>
                     </div>
