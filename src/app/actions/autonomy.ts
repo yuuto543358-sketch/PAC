@@ -11,6 +11,7 @@ import { getBusinessProject, linkValidationTask, setBusinessStatus } from "@/lib
 import { createTask } from "@/lib/repo/tasks";
 import { initWorkflow } from "@/lib/workflow/repo";
 import { scheduleTeamRun } from "@/lib/workflow/trigger";
+import { advanceBusiness, markListed, retryStage, setAutoAdvance } from "@/lib/business/pipeline";
 import { kickNotifications } from "@/lib/notify/trigger";
 import type { ActionState } from "@/components/forms";
 
@@ -61,79 +62,15 @@ export async function setBusinessStatusAction(_p: ActionState, fd: FormData): Pr
       throw new Error("状態の指定が正しくありません");
     }
     await setBusinessStatus(sql, id, status, note);
+    // 「採用」にしたら、販売まで自動で進め始める
+    const started = status === "adopted" ? await advanceBusiness(sql, id) : [];
+    if (started.length) scheduleTeamRun(started);
     refresh();
-    return { ok: true, message: "事業の候補の状態を変更しました", ts: Date.now() };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-const WORK_TEMPLATES = {
-  product: {
-    title: (name: string) => `商品づくり：${name}`,
-    assignee: "creative",
-    lines: (name: string) => [
-      `事業「${name}」で売る商品（またはサービスの中身）を作ってください。`,
-      "成果物: お客さんにそのまま渡せる商品の完成版（または第1版）。文章・資料・表など、内容に合う形で。",
-      "あわせて、値段の案と、お客さんが受け取るもの・受け取り方を、短くまとめること。",
-      "売る場所が note なら、形式は note_article（そのまま貼り付けられる形）にする。",
-      "取材・外注はせず、AIの知識とWeb調査だけで作ること。架空の体験談・お客さんの声は書かない。",
-      "注意: 作るだけで、出品・販売・外部への連絡はしないこと（経営者が自分で行う）。",
-    ],
-  },
-  sales: {
-    title: (name: string) => `販売の準備：${name}`,
-    assignee: "bizdev",
-    lines: (name: string) => [
-      `事業「${name}」の商品を売るための準備をしてください。`,
-      "成果物: 次をまとめた資料。",
-      "・商品の紹介文（そのまま販売ページに貼れる文章）",
-      "・値段の案（なぜその値段か）",
-      "・売る場所の比較：方針（無料で始められる・手続きが簡単・手取りが多い）に合う候補を3つまで比べた表（手数料、提案した値段での1件あたりの手取り、手続きの簡単さ、お客さんの集まりやすさ）",
-      "・結論：総合的に判断した、いちばん良い売る場所1つと、その理由",
-      "・SNSで知らせるときの投稿文（2〜3個。お知らせ文ではなく、ネタツイくらいラフに）。それぞれ external_actions に sns_post の承認依頼として出す（destination は X か Bluesky。投稿は承認後に経営者が自分で行う）",
-      "・経営者が自分で行う手順のチェックリスト（選んだ場所での登録・出品・告知など。必要な書類や、表示が必要な情報があれば書く）",
-      "注意: 出品・投稿・登録は経営者が自分で行う。チームは準備だけをすること。",
-    ],
-  },
-} as const;
-
-/** 「商品を作る」「販売の準備をする」：有望・採用の事業について、チームに次の仕事を任せる */
-export async function startBusinessWorkAction(_p: ActionState, fd: FormData): Promise<ActionState> {
-  try {
-    await assertAuth();
-    const id = String(fd.get("id") ?? "");
-    const kind = fd.get("kind") === "sales" ? "sales" : "product";
-    const sql = await getDb();
-    const b = await getBusinessProject(sql, id);
-    if (!b) throw new Error("事業の候補が見つかりません");
-    if (b.status !== "promising" && b.status !== "adopted") {
-      throw new Error("「有望」か「採用」にした事業だけ、商品づくり・販売の準備を始められます");
-    }
-    const t = WORK_TEMPLATES[kind];
-    const r = await createTask(sql, {
-      title: t.title(b.name).slice(0, 200),
-      description: [
-        ...t.lines(b.name),
-        `事業の概要: ${b.summary}`,
-        `お客さん: ${b.target_customer}`,
-        `お客さんの困りごと: ${b.customer_problem}`,
-        b.owner_note ? `経営者のメモ: ${b.owner_note}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      source: "user",
-      priority: "medium",
-      assigneeId: t.assignee,
-      businessProjectId: b.id,
-      createdBy: { type: "user" },
-    });
-    if (!r.created) throw new Error(`似た業務「${r.duplicateOf.title}」がすでにあります`);
-    await initWorkflow(sql, r.task.id, true);
-    await audit(sql, "user", `business_${kind}`, "business_project", b.id, { taskId: r.task.id });
-    scheduleTeamRun([r.task.id]);
-    refresh();
-    return { ok: true, message: kind === "product" ? "チームが商品づくりを始めました" : "チームが販売の準備を始めました", ts: Date.now() };
+    return {
+      ok: true,
+      message: started.length ? "採用しました。チームが商品づくりを始めました（このあと出品の準備まで自動で進みます）" : "事業の候補の状態を変更しました",
+      ts: Date.now(),
+    };
   } catch (e) {
     return fail(e);
   }
@@ -177,6 +114,48 @@ export async function investigateBusinessAction(_p: ActionState, fd: FormData): 
     scheduleTeamRun([r.task.id]);
     refresh();
     return { ok: true, message: "チームが調査を始めました", ts: Date.now() };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** 経営者が出品した（URLを記録して「販売中」にする） */
+export async function markListedAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    await assertAuth();
+    const sql = await getDb();
+    await markListed(sql, String(fd.get("id") ?? ""), String(fd.get("platform") ?? ""), String(fd.get("url") ?? ""));
+    refresh();
+    return { ok: true, message: "販売中にしました。これから毎週、売れ行きを見て改善します", ts: Date.now() };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function retryStageAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    await assertAuth();
+    const sql = await getDb();
+    const ids = await retryStage(sql, String(fd.get("id") ?? ""));
+    if (ids.length) scheduleTeamRun(ids);
+    refresh();
+    return { ok: true, message: "この段階をやり直します", ts: Date.now() };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setAutoAdvanceAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    await assertAuth();
+    const sql = await getDb();
+    const on = fd.get("on") === "1";
+    const id = String(fd.get("id") ?? "");
+    await setAutoAdvance(sql, id, on);
+    const started = on ? await advanceBusiness(sql, id) : [];
+    if (started.length) scheduleTeamRun(started);
+    refresh();
+    return { ok: true, message: on ? "自動で進めるようにしました" : "自動で進めるのを止めました", ts: Date.now() };
   } catch (e) {
     return fail(e);
   }

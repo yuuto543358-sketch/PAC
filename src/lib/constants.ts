@@ -232,6 +232,7 @@ export const DELIVERABLE_FORMATS = [
   { id: "checklist", label: "チェックリスト", ext: "md", mime: "text/markdown" },
   { id: "slide_outline", label: "スライド構成案", ext: "md", mime: "text/markdown" },
   { id: "note_article", label: "note記事（貼り付け用）", ext: "md", mime: "text/markdown" },
+  { id: "listing_package", label: "出品パッケージ（貼り付け用）", ext: "md", mime: "text/markdown" },
 ] as const;
 export type DeliverableFormat = (typeof DELIVERABLE_FORMATS)[number]["id"];
 export const DELIVERABLE_FORMAT_IDS = DELIVERABLE_FORMATS.map((f) => f.id) as [DeliverableFormat, ...DeliverableFormat[]];
@@ -347,3 +348,18 @@ export const LIFE_SUGGESTION_STATUS_LABEL: Record<LifeSuggestionStatus, string> 
 export const LIFE_PRIORITY_LABEL: Record<string, string> = { high: "高", medium: "中", low: "低" };
 /** 生活の改善提案から、同時に進める「業務」の上限（費用を抑えるため） */
 export const MAX_ACTIVE_LIFE_TASKS = 2;
+
+// ===== 販売までの段階 =====
+export const BUSINESS_STAGES = ["idea", "research", "product", "listing", "launch", "selling", "paused"] as const;
+export type BusinessStage = (typeof BUSINESS_STAGES)[number];
+export const BUSINESS_STAGE_LABEL: Record<BusinessStage, string> = {
+  idea: "アイデア",
+  research: "調査",
+  product: "商品づくり",
+  listing: "出品の準備",
+  launch: "出品",
+  selling: "販売中",
+  paused: "止めている",
+};
+/** 画面の段階表示（止めている、は除く） */
+export const BUSINESS_STAGE_STEPS: BusinessStage[] = ["research", "product", "listing", "launch", "selling"];

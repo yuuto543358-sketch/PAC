@@ -260,10 +260,12 @@ await page.waitForTimeout(800);
 check("保存後も選んだ状態が表示される", (await page.locator("select[name=status]").inputValue()) === "promising");
 await shot("19-business-detail");
 
-// 有望にした事業は、チームに「商品を作る」を任せられる（Phase 4）
-await page.getByRole("button", { name: "商品を作る" }).click();
-await page.getByRole("status").filter({ hasText: "チームが商品づくりを始めました" }).waitFor({ timeout: 30_000 });
-check("有望な事業で「商品を作る」を始められる", true);
+// 「採用」にすると、販売まで自動で進み始める（商品づくりのチームが動く）
+await page.locator("select[name=status]").selectOption("adopted");
+await page.getByRole("button", { name: "状態を保存" }).click();
+await page.getByRole("status").filter({ hasText: "採用しました。チームが商品づくりを始めました" }).waitFor({ timeout: 30_000 });
+await page.reload();
+check("採用すると「販売までの道のり」が商品づくりに進む", (await page.getByText("販売までの道のり").count()) === 1 && (await page.getByText(/チームが商品の完成品を作っています/).count()) === 1);
 const businessUrl = page.url();
 
 // お金の記録（Phase 4）

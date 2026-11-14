@@ -6,6 +6,8 @@ import { runDiscovery, type DiscoveryResult } from "./discovery";
 import { generateCompanyReport, type ReportResult } from "./reports";
 import { runSnsPlanning, type SnsPlanResult } from "./sns";
 import { runLifeJobs, type LifeJobsResult } from "@/lib/life/jobs";
+import { advanceAllBusinesses } from "@/lib/business/pipeline";
+import { runOpsReviews } from "@/lib/business/ops";
 
 // 定期実行（1日1回、朝7時半ごろに動く）で行う「自主的な仕事」。
 // 設定の「自動で動く頻度」が「停止」なら何もしません。
@@ -37,7 +39,8 @@ type ClaimColumn =
   | "last_life_review_on"
   | "last_life_nudge_on"
   | "last_life_prep_on"
-  | "last_life_research_on";
+  | "last_life_research_on"
+  | "last_ops_review_on";
 
 /**
  * 「今日この仕事をするのは自分」という権利を取る。すでに今日実行済みなら false。
@@ -69,6 +72,21 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
     if (result.life.researchReportId) result.ran.push("self_research");
     if (result.life.analyses.length) result.ran.push("life_analysis");
     result.taskIds.push(...result.life.taskIds);
+  }
+  {
+    // 採用した事業を、次の段階へ進める（毎回・AIなし）
+    const advanced = await advanceAllBusinesses(sql);
+    if (advanced.length) {
+      result.ran.push("business_advance");
+      result.taskIds.push(...advanced);
+    }
+    // 販売中の事業の運営レポート（金曜）
+    const { date, weekday } = jstDateParts(now);
+    if (weekday === 5 && (await claim(sql, "last_ops_review_on", date))) {
+      const ops = await runOpsReviews(sql, "scheduled");
+      if (ops.reports) result.ran.push("ops_review");
+      result.taskIds.push(...ops.tasks);
+    }
   }
   if (settings.emergency_stop) {
     result.skipped.push("緊急停止中のため");

@@ -29,15 +29,29 @@ export type BusinessProject = {
   validation_task_status: string | null;
   sources: { url: string; title: string }[];
   owner_note: string;
+  stage: import("@/lib/constants").BusinessStage;
+  auto_advance: boolean;
+  stage_task_id: string | null;
+  stage_task_title: string | null;
+  stage_task_status: string | null;
+  launch_approval_id: string | null;
+  launch_approval_status: string | null;
+  platform: string;
+  listing_url: string;
+  launched_at: Date | null;
+  last_improve_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
 
 const SELECT = `
-  select b.*, e.name as discovered_by_name, t.title as validation_task_title, t.status as validation_task_status
+  select b.*, e.name as discovered_by_name, t.title as validation_task_title, t.status as validation_task_status,
+    st.title as stage_task_title, st.status as stage_task_status, ap.status as launch_approval_status
   from business_projects b
   left join employees e on e.id = b.discovered_by
-  left join tasks t on t.id = b.validation_task_id`;
+  left join tasks t on t.id = b.validation_task_id
+  left join tasks st on st.id = b.stage_task_id
+  left join approvals ap on ap.id = b.launch_approval_id`;
 
 export async function listBusinessProjects(
   db: Db,
@@ -103,7 +117,8 @@ export async function insertBusinessProject(db: Db, p: NewBusinessProject): Prom
 
 export async function linkValidationTask(db: Db, id: string, taskId: string) {
   await db`
-    update business_projects set validation_task_id = ${taskId}, status = 'validating', updated_at = now()
+    update business_projects set validation_task_id = ${taskId}, status = 'validating',
+      stage = case when stage = 'idea' then 'research' else stage end, updated_at = now()
     where id = ${id}`;
 }
 

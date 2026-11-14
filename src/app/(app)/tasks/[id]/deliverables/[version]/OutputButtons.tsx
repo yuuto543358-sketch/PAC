@@ -98,3 +98,48 @@ export function NoteCopyButtons({ content }: { content: string }) {
     </div>
   );
 }
+
+/** 「## 見出し」ごとに分ける（出品パッケージなど） */
+export function splitSections(content: string): { heading: string; body: string }[] {
+  const out: { heading: string; body: string }[] = [];
+  const re = /^##\s+(.+)$/gm;
+  const marks = [...content.matchAll(re)];
+  marks.forEach((m, i) => {
+    const start = (m.index ?? 0) + m[0].length;
+    const end = i + 1 < marks.length ? (marks[i + 1].index ?? content.length) : content.length;
+    const body = content.slice(start, end).trim();
+    if (body) out.push({ heading: m[1].trim(), body });
+  });
+  return out;
+}
+
+/** 出品パッケージ：見出しごとに「コピー」ボタン（そのまま売る場所に貼れる） */
+export function SectionCopyButtons({ content }: { content: string }) {
+  const sections = splitSections(content);
+  if (sections.length === 0) return null;
+  return (
+    <div className="space-y-2 rounded-[16px] bg-surface-2/70 p-3">
+      <p className="text-[13px] font-semibold">売る場所に貼る（見出しごとにコピー）</p>
+      <div className="grid grid-cols-2 gap-2">
+        {sections.map((s) => (
+          <button
+            key={s.heading}
+            type="button"
+            className="btn-secondary truncate px-2 text-[13px]"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(s.body);
+                showToast(`「${s.heading}」をコピーしました`);
+              } catch {
+                showToast("コピーできませんでした", "error");
+              }
+            }}
+          >
+            {s.heading}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted">「出品の手順」のとおりに進めて、出品したら事業の画面で「出品しました」を押してください。</p>
+    </div>
+  );
+}

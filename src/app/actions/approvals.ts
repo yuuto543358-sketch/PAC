@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { decideApproval, resubmitApproval } from "@/lib/repo/approvals";
 import { audit } from "@/lib/repo/audit";
 import { scheduleTeamRun } from "@/lib/workflow/trigger";
+import { advanceBusiness } from "@/lib/business/pipeline";
 import type { ActionState } from "@/components/forms";
 
 export async function decideApprovalAction(_p: ActionState, fd: FormData): Promise<ActionState> {
@@ -24,11 +25,23 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
     const ownerPosts = a?.action_type === "sns_post";
     // 成果物を差し戻したら、チームがすぐ修正に取りかかる
     if (decision === "reject" && isDeliverable && a?.task_id) scheduleTeamRun([a.task_id]);
+    // 事業の段階の成果物を受け取ったら、次の段階（出品の準備など）を自動で始める
+    let nextStage = false;
+    if (decision === "approve" && isDeliverable && a?.task_id) {
+      const [t] = await sql<{ business_project_id: string | null }[]>`select business_project_id from tasks where id = ${a.task_id}`;
+      if (t?.business_project_id) {
+        const started = await advanceBusiness(sql, t.business_project_id);
+        if (started.length) scheduleTeamRun(started);
+        nextStage = started.length > 0;
+      }
+    }
     refresh();
     const msg =
       decision === "approve"
         ? isDeliverable
-          ? "承認しました。業務完了です"
+          ? nextStage
+            ? "承認しました。次の段階をチームが始めました"
+            : "承認しました。業務完了です"
           : ownerSends
             ? "承認しました。下のボタンから、ご自身で送ってください"
             : ownerPosts

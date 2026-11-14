@@ -5,7 +5,9 @@ import {
   findWorkNowAction,
   investigateBusinessAction,
   setBusinessStatusAction,
-  startBusinessWorkAction,
+  markListedAction,
+  retryStageAction,
+  setAutoAdvanceAction,
 } from "@/app/actions/autonomy";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { BUSINESS_STATUS_LABEL, OWNER_BUSINESS_STATUSES, type BusinessStatus } from "@/lib/constants";
@@ -57,27 +59,6 @@ export function InvestigateButton({ id }: { id: string }) {
   );
 }
 
-export function BusinessWorkButtons({ id }: { id: string }) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      <ActionForm action={startBusinessWorkAction}>
-        <input type="hidden" name="id" value={id} />
-        <input type="hidden" name="kind" value="product" />
-        <SubmitButton className="btn-tinted w-full" pendingText="編成中…">
-          商品を作る
-        </SubmitButton>
-      </ActionForm>
-      <ActionForm action={startBusinessWorkAction}>
-        <input type="hidden" name="id" value={id} />
-        <input type="hidden" name="kind" value="sales" />
-        <SubmitButton className="btn-tinted w-full" pendingText="編成中…">
-          販売の準備をする
-        </SubmitButton>
-      </ActionForm>
-    </div>
-  );
-}
-
 export function BusinessStatusForm({ id, current }: { id: string; current: BusinessStatus }) {
   return (
     <ActionForm action={setBusinessStatusAction}>
@@ -100,6 +81,42 @@ export function BusinessStatusForm({ id, current }: { id: string; current: Busin
         <textarea name="note" rows={2} maxLength={1000} className="field" placeholder="例：値段をもう少し下げられるか知りたい" />
       </label>
       <SubmitButton className="btn-secondary w-full">状態を保存</SubmitButton>
+    </ActionForm>
+  );
+}
+
+export function MarkListedForm({ id, platform }: { id: string; platform: string }) {
+  return (
+    <ActionForm action={markListedAction}>
+      <input type="hidden" name="id" value={id} />
+      <label className="block">
+        <span className="label">どこに出品しましたか？</span>
+        <input name="platform" maxLength={100} defaultValue={platform} className="field" placeholder="例：note、BOOTH" />
+      </label>
+      <label className="block">
+        <span className="label">商品ページのURL（なくてもOK）</span>
+        <input name="url" type="url" inputMode="url" className="field" placeholder="https://..." />
+      </label>
+      <SubmitButton className="btn-primary w-full">出品しました（販売中にする）</SubmitButton>
+    </ActionForm>
+  );
+}
+
+export function RetryStageButton({ id }: { id: string }) {
+  return (
+    <ActionForm action={retryStageAction}>
+      <input type="hidden" name="id" value={id} />
+      <SubmitButton className="btn-secondary w-full">この段階をやり直す</SubmitButton>
+    </ActionForm>
+  );
+}
+
+export function AutoAdvanceToggle({ id, on }: { id: string; on: boolean }) {
+  return (
+    <ActionForm action={setAutoAdvanceAction}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="on" value={on ? "0" : "1"} />
+      <SubmitButton className="btn-secondary w-full text-[13px]">{on ? "自動で進めるのを止める" : "自動で進めるのを再開する"}</SubmitButton>
     </ActionForm>
   );
 }

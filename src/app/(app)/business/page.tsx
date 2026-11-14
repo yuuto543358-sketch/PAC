@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, BUSINESS_STATUSES } from "@/lib/constants";
+import { BUSINESS_STAGE_LABEL, BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, BUSINESS_STATUSES } from "@/lib/constants";
 import { dateTime, yen } from "@/lib/format";
 import { countBusinessByStatus, listBusinessProjects } from "@/lib/repo/business";
 import { getSettings } from "@/lib/repo/settings";
@@ -80,6 +80,7 @@ export default async function BusinessPage({ searchParams }: { searchParams: Pro
                           <span className={`rounded-full px-2 py-px text-[11px] font-semibold ${BUSINESS_STATUS_TONE[b.status]}`}>
                             {BUSINESS_STATUS_LABEL[b.status]}
                           </span>
+                          {b.status === "adopted" && <span className="text-[11px] font-semibold text-brand">{BUSINESS_STAGE_LABEL[b.stage]}</span>}
                           {b.difficulty && <span className="text-[11px] text-muted">むずかしさ: {b.difficulty}</span>}
                         </div>
                         <p className="mt-1 text-[16px] leading-snug font-semibold">{b.name}</p>

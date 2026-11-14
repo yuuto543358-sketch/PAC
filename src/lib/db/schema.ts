@@ -979,4 +979,26 @@ begin
 end $$;
 `,
   },
+  {
+    version: 11,
+    name: "sales_pipeline",
+    sql: /* sql */ `
+-- ===== 事業を「採用」したら、出品・販売・運営まで自動で進める =====
+-- 段階：idea（アイデア）→ research（調査）→ product（商品づくり）→ listing（出品パッケージ）
+--       → launch（出品の承認・出品待ち）→ selling（販売中）／ paused（止めている）
+alter table business_projects add column if not exists stage text not null default 'idea';
+alter table business_projects drop constraint if exists business_projects_stage_check;
+alter table business_projects add constraint business_projects_stage_check
+  check (stage in ('idea','research','product','listing','launch','selling','paused'));
+update business_projects set stage = 'research' where stage = 'idea' and validation_task_id is not null;
+alter table business_projects add column if not exists auto_advance boolean not null default true;
+alter table business_projects add column if not exists stage_task_id uuid references tasks(id);
+alter table business_projects add column if not exists launch_approval_id uuid references approvals(id);
+alter table business_projects add column if not exists platform text not null default '';
+alter table business_projects add column if not exists listing_url text not null default '';
+alter table business_projects add column if not exists launched_at timestamptz;
+alter table business_projects add column if not exists last_improve_at timestamptz;
+alter table company_settings add column if not exists last_ops_review_on date;
+`,
+  },
 ];

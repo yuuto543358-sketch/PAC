@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, TASK_STATUS_LABEL, type TaskStatus } from "@/lib/constants";
+import { BUSINESS_STAGE_LABEL, BUSINESS_STAGE_STEPS, BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, TASK_STATUS_LABEL, type TaskStatus } from "@/lib/constants";
 import { dateTime, yen } from "@/lib/format";
 import { getBusinessProject } from "@/lib/repo/business";
 import { Page, PageHeader, Section } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { SourceList } from "@/components/SourceList";
-import { BusinessStatusForm, BusinessWorkButtons, InvestigateButton } from "../BusinessActions";
+import { AutoAdvanceToggle, BusinessStatusForm, InvestigateButton, MarkListedForm, RetryStageButton } from "../BusinessActions";
 import { businessMoney } from "@/lib/repo/ledger";
 import { yenPrecise } from "@/lib/format";
 
@@ -33,7 +33,6 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
     sql<{ id: string; title: string; status: TaskStatus }[]>`
       select id, title, status from tasks where business_project_id = ${b.id} order by created_at desc limit 10`,
   ]);
-  const canBuild = b.status === "promising" || b.status === "adopted";
   const taskActive =
     b.validation_task_id && b.validation_task_status && !["completed", "rejected", "failed"].includes(b.validation_task_status);
   return (
@@ -90,19 +89,77 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
           )}
         </Section>
 
-        <Section title="次の一歩">
-          {canBuild ? (
-            <>
-              <BusinessWorkButtons id={b.id} />
-              <p className="mt-1.5 px-1 text-xs text-muted">
-                チームが商品の中身や、販売ページの文章・値段・売る場所の候補を用意します（各 約5〜20円）。出品・投稿・登録は、あなたが自分で行います。
-              </p>
-            </>
-          ) : (
-            <p className="card px-4 py-3 text-[13px] text-muted">
-              下の「あなたの判断」で「有望」か「採用」にすると、チームに「商品を作る」「販売の準備をする」を任せられます。
-            </p>
-          )}
+        <Section title="販売までの道のり">
+          <div className="card p-4">
+            <ol className="grid grid-cols-5 gap-1 text-center text-[11px]">
+              {BUSINESS_STAGE_STEPS.map((st, i) => {
+                const cur = BUSINESS_STAGE_STEPS.indexOf(b.stage);
+                const state = cur > i || b.stage === "selling" ? "done" : cur === i ? "now" : "todo";
+                return (
+                  <li key={st} className="flex flex-col items-center gap-1">
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold ${
+                        state === "done" ? "bg-success text-white" : state === "now" ? "bg-brand text-brand-fg" : "bg-surface-3 text-faint"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className={state === "now" ? "font-semibold text-ink" : "text-muted"}>{BUSINESS_STAGE_LABEL[st]}</span>
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="mt-3 rounded-[12px] bg-surface-2 px-3 py-2.5 text-[13px] leading-relaxed">
+              {b.status !== "adopted" ? (
+                <>下の「あなたの判断」で<b>「採用」</b>にすると、チームが商品づくり → 出品の準備まで自動で進めます。あなたは、できた成果物を確認して承認するだけです。</>
+              ) : !b.auto_advance ? (
+                <>自動で進めるのを止めています。</>
+              ) : b.stage === "product" ? (
+                <>チームが<b>商品の完成品</b>を作っています。できたら「承認」に届くので、内容を確認して承認すると、出品の準備が自動で始まります。</>
+              ) : b.stage === "listing" ? (
+                <>チームが<b>出品パッケージ</b>（そのまま貼れる商品名・説明文・値段・手順など）を作っています。承認すると「出品の承認」が届きます。</>
+              ) : b.stage === "launch" ? (
+                b.launch_approval_status === "approved" ? (
+                  <>出品の承認ずみです。出品パッケージのとおりに<b>出品したら、下で「出品しました」</b>を押してください。</>
+                ) : (
+                  <>
+                    <b>出品の承認</b>があなたに届いています。
+                    {b.launch_approval_id && (
+                      <Link href={`/approvals/${b.launch_approval_id}`} className="ml-1 font-semibold text-brand">
+                        承認センターで確認する
+                      </Link>
+                    )}
+                  </>
+                )
+              ) : b.stage === "selling" ? (
+                <>
+                  <b>販売中</b>です{b.platform && `（${b.platform}）`}。毎週金曜に事業開発担当が売れ行きを見て、必要なら改善の業務を自動で始めます。売れたら「この事業のお金」で記録してください。
+                  {b.listing_url && (
+                    <a href={b.listing_url} target="_blank" rel="noopener noreferrer" className="ml-1 font-semibold text-brand">
+                      販売ページを見る
+                    </a>
+                  )}
+                </>
+              ) : (
+                <>調査が終わったら、「採用」にするかどうかを決めてください。</>
+              )}
+            </div>
+            {b.stage === "launch" && b.launch_approval_status === "approved" && (
+              <div className="mt-3">
+                <MarkListedForm id={b.id} platform={b.platform} />
+              </div>
+            )}
+            {b.stage_task_id && b.stage_task_status && ["rejected", "failed"].includes(b.stage_task_status) && (b.stage === "product" || b.stage === "listing") && (
+              <div className="mt-3">
+                <RetryStageButton id={b.id} />
+              </div>
+            )}
+            {b.status === "adopted" && (
+              <div className="mt-3">
+                <AutoAdvanceToggle id={b.id} on={b.auto_advance} />
+              </div>
+            )}
+          </div>
           {related.length > 0 && (
             <ul className="card mt-2.5 divide-y divide-separator text-sm">
               {related.map((t) => (
@@ -163,7 +220,7 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
             <BusinessStatusForm key={`${b.status}-${b.updated_at.getTime()}`} id={b.id} current={b.status} />
           </div>
           <p className="mt-2 px-1 text-xs text-muted">
-            「採用」にしても、自動で何かが始まることはありません。お金や外部への操作が必要なときは、必ず承認依頼が届きます。
+            「採用」にすると、チームが商品づくり → 出品の準備まで自動で進めます。出品・お金・外部への操作は、必ずあなたの承認のあと、あなたが行います。
           </p>
         </Section>
       </Page>

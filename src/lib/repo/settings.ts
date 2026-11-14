@@ -54,6 +54,7 @@ export type CompanySettings = {
   last_life_prep_on: Date | null;
   last_life_research_on: Date | null;
   last_cron_at: Date | null;
+  last_ops_review_on: Date | null;
   updated_at: Date;
 };
 
