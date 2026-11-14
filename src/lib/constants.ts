@@ -185,6 +185,7 @@ export const WORKFLOW_PHASES = [
   "review",
   "rework",
   "final_report",
+  "media",
   "waiting_human",
   "done",
   "stopped",
@@ -198,13 +199,14 @@ export const WORKFLOW_PHASE_LABEL: Record<WorkflowPhase, string> = {
   review: "監査・品質確認",
   rework: "修正対応",
   final_report: "社長が報告書を作成",
+  media: "動画の絵と声を作成",
   waiting_human: "経営者の確認待ち",
   done: "完了",
   stopped: "停止中",
 };
 
 /** 自動で進める段階（AIが動く段階） */
-export const ACTIVE_WORKFLOW_PHASES: WorkflowPhase[] = ["kickoff", "discussion", "drafting", "review", "rework", "final_report"];
+export const ACTIVE_WORKFLOW_PHASES: WorkflowPhase[] = ["kickoff", "discussion", "drafting", "review", "rework", "media", "final_report"];
 
 /** 進行状況の表示に使う段階の並び */
 export const WORKFLOW_STEPS: { key: WorkflowPhase; label: string }[] = [
@@ -212,6 +214,7 @@ export const WORKFLOW_STEPS: { key: WorkflowPhase; label: string }[] = [
   { key: "discussion", label: "議論" },
   { key: "drafting", label: "作成" },
   { key: "review", label: "監査" },
+  { key: "media", label: "素材" },
   { key: "final_report", label: "報告" },
   { key: "waiting_human", label: "承認" },
 ];

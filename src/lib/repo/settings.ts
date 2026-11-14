@@ -63,6 +63,8 @@ export type Budget = {
   monthly_target_jpy: number;
   emergency_stop_jpy: number;
   per_task_limit_jpy: number;
+  /** 動画1本あたりの上限 */
+  per_video_limit_jpy: number;
   daily_limit_jpy: number;
   max_calls_per_task: number;
   max_calls_per_day: number;

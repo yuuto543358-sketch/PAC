@@ -1,4 +1,6 @@
 import "server-only";
+import { onEpisodeAccepted } from "@/lib/series";
+import { jstDateParts } from "@/lib/format";
 import { checkPostLength, platformOf } from "@/lib/sns/post";
 import { enqueueNotification } from "@/lib/notify";
 import { createHash } from "node:crypto";
@@ -310,6 +312,14 @@ async function onDeliverableDecision(
       await addTaskLog(tx, taskId, { type: "user" }, "approval_approved", "経営者が成果物を承認しました（業務完了）", t.status, "completed");
     }
     await tx`update task_workflows set phase = 'done', waiting_reason = '', updated_at = now() where task_id = ${taskId}`;
+    // 動画・note記事なら、そこで終わりにせず「作り続けるシリーズ」にする（次の回を自動で作り始める）
+    const series = await onEpisodeAccepted(tx, taskId, jstDateParts(new Date()).date);
+    if (series?.active && series.next_run_on) {
+      await tx`insert into task_messages (task_id, author_type, kind, content, meta)
+        values (${taskId}, 'system', 'system',
+          ${`シリーズ「${series.title}」として作り続けます。次の回（第${series.episodes + 1}回）は${series.next_run_on}ごろに作り始めます。間隔の変更や停止は「シリーズ」画面でできます。`},
+          ${tx.json({ tone: "info" })})`;
+    }
     await tx`insert into task_messages (task_id, author_type, kind, content, meta)
       values (${taskId}, 'system', 'system', '経営者が成果物を承認しました。業務完了です。お疲れさまでした。', ${tx.json({ tone: "info" })})`;
     await tx`update employees set experience_points = experience_points + 3

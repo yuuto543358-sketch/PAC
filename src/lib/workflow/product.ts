@@ -22,9 +22,9 @@ const PRODUCTS: { test: RegExp; product: RequestedProduct }[] = [
         "形式は video_script にして、次の見出しをこの順で書く（経営者がそのまま撮影・編集できる完成品にする）：",
         "「# 動画のタイトル」→「## 動画の長さと向き」（例：60秒・縦）→「## 最初の3秒（つかみ）」",
         "→「## 台本」（シーンごとに番号をふり、秒数・画面に映すもの・話す言葉（ナレーション）・画面の文字（テロップ）を書く。表でもよい）",
-        "→「## BGM・効果音・素材」（無料で使えるものの探し方）→「## サムネイルの文字」→「## 投稿するときの説明文」→「## ハッシュタグ」",
-        "→「## 作り方の手順」（無料の編集アプリでの具体的な手順。番号つき）",
-        "- このアプリは動画ファイルそのものは作れない。そのかわり、台本・画面の指示・文字まで全部そろえて、経営者が組み立てるだけの状態にする。",
+        "→「## BGM・効果音のおすすめ」→「## サムネイルの文字」→「## 投稿するときの説明文」→「## ハッシュタグ」",
+        "- この台本をもとに、アプリが場面ごとの絵とナレーションの声を作り、1本の動画につなげる。だから場面は3〜6個にして、場面ごとに「画面に映すもの（絵の説明）」と「話す言葉」をはっきり書く。",
+        "- 実在の人の顔・有名なキャラクター・会社のロゴは絵にしない（権利の問題があるため）。",
       ].join("\n"),
     },
   },
@@ -86,8 +86,19 @@ export function detectRequestedProduct(task: { title: string; description?: stri
  * 経営者が頼んだ業務（事業の自動進行の段階の業務ではないもの）だけが対象です。
  * あとから経営者がグループチャットで「動画にして」などと指示した場合は、新しい指示を優先します。
  */
+/** 形式から成果品を引く */
+export function productByFormat(format: string | null | undefined): RequestedProduct | null {
+  return PRODUCTS.find((p) => p.product.format === format)?.product ?? null;
+}
+
 export function requestedProductFor(
-  task: { title: string; description?: string | null; source?: string | null; business_project_id?: string | null },
+  task: {
+    title: string;
+    description?: string | null;
+    source?: string | null;
+    business_project_id?: string | null;
+    product_format?: string | null;
+  },
   ownerMessages: string[] = [],
 ): RequestedProduct | null {
   if (task.business_project_id) return null; // 事業の段階の業務は、段階ごとの決まった成果物を作る
@@ -97,6 +108,9 @@ export function requestedProductFor(
     const p = detectRequestedProduct({ title: m });
     if (p) return p;
   }
+  // シリーズの回など、アプリが作るものを決めた業務
+  const fixed = productByFormat(task.product_format);
+  if (fixed) return fixed;
   if (task.source && task.source !== "user") return null;
   return detectRequestedProduct(task);
 }

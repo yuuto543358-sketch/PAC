@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import type { z } from "zod";
 import type { Sql } from "@/lib/db";
-import { BudgetBlockedError, failApiCall, finalizeApiCall, reserveApiCall } from "@/lib/budget";
+import { BudgetBlockedError, failApiCall, finalizeApiCall, reserveApiCall, type Reservation } from "@/lib/budget";
 import { getPricing, roughTokenCount, WEB_SEARCH_CALL_USD, type UsageLike } from "@/lib/pricing";
 
 // このファイルは「サーバー専用」です（"server-only"）。
@@ -30,7 +30,7 @@ export function isAiConfigured() {
 }
 
 let client: OpenAI | null = null;
-function getOpenAI(): OpenAI {
+export function getOpenAI(): OpenAI {
   if (!process.env.OPENAI_API_KEY) throw new AiUnavailableError(NO_KEY_MESSAGE);
   if (!client) {
     client = new OpenAI({
@@ -249,35 +249,7 @@ export async function callStructured<T extends z.ZodType>(
         : {}),
     });
   } catch (err) {
-    // APIConnectionError は APIError の一種なので、先に判定する
-    if (err instanceof OpenAI.APIConnectionError) {
-      // 通信切断・タイムアウトは課金されたか分からないため、見積額で記録（安全側）
-      await failApiCall(sql, reservation, `通信エラー: ${err.message}`, true);
-      throw new AiUnavailableError("AIとの通信に失敗しました。時間をおいてもう一度お試しください。");
-    }
-    if (err instanceof OpenAI.APIError) {
-      await failApiCall(sql, reservation, `APIエラー ${err.status}: ${err.message}`, false);
-      if (err instanceof OpenAI.AuthenticationError) {
-        throw new AiUnavailableError("OpenAI の APIキーが正しくありません。設定を確認してください。");
-      }
-      if (err instanceof OpenAI.PermissionDeniedError || err instanceof OpenAI.NotFoundError) {
-        throw new AiUnavailableError(
-          `モデル「${input.model}」を使う権限がないか、モデルが見つかりません。設定画面でモデルを変えてください。`,
-        );
-      }
-      if (err instanceof OpenAI.RateLimitError) {
-        throw new AiUnavailableError(
-          "OpenAI の利用制限に達しました（残高不足または混雑）。OpenAI の Billing 画面で残高を確認するか、少し待ってからお試しください。",
-        );
-      }
-      if (err instanceof OpenAI.BadRequestError) {
-        throw new AiUnavailableError(`AIへのリクエストが受け付けられませんでした（${err.message}）`);
-      }
-      throw new AiUnavailableError(`AIでエラーが発生しました（コード ${err.status ?? "不明"}）`);
-    }
-    // 応答の形式チェックの失敗など、応答自体は受け取った（課金された）可能性がある場合
-    await failApiCall(sql, reservation, `不明なエラー: ${String(err)}`, true);
-    throw new AiUnavailableError("AIの応答を処理できませんでした。もう一度お試しください。");
+    return handleApiError(sql, reservation, input.model, err);
   }
 
   const web = extractWebSearch(response);
@@ -308,6 +280,40 @@ export async function callStructured<T extends z.ZodType>(
     sources: web.sources,
     searchCalls: web.calls,
   };
+}
+
+
+/** OpenAI の呼び出しが失敗したときの記録と、経営者に見せるエラーへの変換（必ず例外を投げる） */
+export async function handleApiError(sql: Sql, reservation: Reservation, model: string, err: unknown): Promise<never> {
+    // APIConnectionError は APIError の一種なので、先に判定する
+    if (err instanceof OpenAI.APIConnectionError) {
+      // 通信切断・タイムアウトは課金されたか分からないため、見積額で記録（安全側）
+      await failApiCall(sql, reservation, `通信エラー: ${err.message}`, true);
+      throw new AiUnavailableError("AIとの通信に失敗しました。時間をおいてもう一度お試しください。");
+    }
+    if (err instanceof OpenAI.APIError) {
+      await failApiCall(sql, reservation, `APIエラー ${err.status}: ${err.message}`, false);
+      if (err instanceof OpenAI.AuthenticationError) {
+        throw new AiUnavailableError("OpenAI の APIキーが正しくありません。設定を確認してください。");
+      }
+      if (err instanceof OpenAI.PermissionDeniedError || err instanceof OpenAI.NotFoundError) {
+        throw new AiUnavailableError(
+          `モデル「${model}」を使う権限がないか、モデルが見つかりません。設定画面でモデルを変えてください。`,
+        );
+      }
+      if (err instanceof OpenAI.RateLimitError) {
+        throw new AiUnavailableError(
+          "OpenAI の利用制限に達しました（残高不足または混雑）。OpenAI の Billing 画面で残高を確認するか、少し待ってからお試しください。",
+        );
+      }
+      if (err instanceof OpenAI.BadRequestError) {
+        throw new AiUnavailableError(`AIへのリクエストが受け付けられませんでした（${err.message}）`);
+      }
+      throw new AiUnavailableError(`AIでエラーが発生しました（コード ${err.status ?? "不明"}）`);
+    }
+    // 応答の形式チェックの失敗など、応答自体は受け取った（課金された）可能性がある場合
+    await failApiCall(sql, reservation, `不明なエラー: ${String(err)}`, true);
+    throw new AiUnavailableError("AIの応答を処理できませんでした。もう一度お試しください。");
 }
 
 export { BudgetBlockedError };

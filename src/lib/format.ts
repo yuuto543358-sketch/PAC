@@ -71,6 +71,13 @@ export function timeOnly(d: Date | string): string {
   return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }).format(new Date(d));
 }
 
+/** 日付（YYYY-MM-DD）に日数を足す */
+export function addDaysJst(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 /** 日本時間の日付（YYYY-MM-DD）と曜日（0=日曜） */
 export function jstDateParts(now: Date): { date: string; weekday: number } {
   const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(now);

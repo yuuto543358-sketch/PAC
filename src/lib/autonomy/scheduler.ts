@@ -1,4 +1,5 @@
 import "server-only";
+import { runDueSeries } from "@/lib/series";
 import type { Sql } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { getSettings } from "@/lib/repo/settings";
@@ -91,6 +92,14 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   if (settings.emergency_stop) {
     result.skipped.push("緊急停止中のため");
     return result;
+  }
+  {
+    // 作り続けるシリーズ：予定日になったら次の回を作り始める（毎回確認・AIはここでは使わない）
+    const series = await runDueSeries(sql, now);
+    if (series.created.length) {
+      result.ran.push("series");
+      result.taskIds.push(...series.created.map((c) => c.taskId));
+    }
   }
   const { date, weekday } = jstDateParts(now);
   const isMonday = weekday === 1;

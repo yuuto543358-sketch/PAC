@@ -1,5 +1,5 @@
 import "server-only";
-import type { DiscussionOutput, DraftOutput, FinalReportOutput, KickoffOutput, ReviewOutput } from "./schemas";
+import type { DiscussionOutput, DraftOutput, FinalReportOutput, KickoffOutput, MediaPlanOutput, ReviewOutput } from "./schemas";
 import { productOf, type PromptContext } from "./prompts";
 
 // テスト用モックモード（AI_MOCK=1）のときだけ使う、決まった内容の返事。
@@ -55,7 +55,7 @@ export function mockDraft(ctx: PromptContext): DraftOutput {
       : format === "note_article"
         ? `# ${title}\n値段: 300円\n\n## 無料で読める部分\n（テスト用モック・第${v}版）ここは誰でも読める導入です。\n\n## 有料部分\nここからが本文です。\n\n## ハッシュタグ\n#テスト #モック #記事`
         : format === "video_script"
-          ? `# ${title}\n\n## 動画の長さと向き\n60秒・縦（テスト用モック・第${v}版）\n\n## 最初の3秒（つかみ）\n「それ、まだ手でやってるの？」\n\n## 台本\n| 番号 | 秒数 | 画面 | ナレーション | テロップ |\n|---|---|---|---|---|\n| 1 | 0-3 | 手元のアップ | それ、まだ手でやってるの？ | まだ手作業？ |\n\n## BGM・効果音・素材\n無料の音楽素材サイトから選ぶ\n\n## サムネイルの文字\n3分で終わる\n\n## 投稿するときの説明文\nテスト用モックの説明文\n\n## ハッシュタグ\n#テスト #動画\n\n## 作り方の手順\n1. 台本どおりに撮る\n2. 無料の編集アプリでつなげる`
+          ? `# ${title}\n\n## 動画の長さと向き\n60秒・縦（テスト用モック・第${v}版）\n\n## 最初の3秒（つかみ）\n「それ、まだ手でやってるの？」\n\n## 台本\n| 番号 | 秒数 | 画面 | ナレーション | テロップ |\n|---|---|---|---|---|\n| 1 | 0-3 | 手元のアップ | それ、まだ手でやってるの？ | まだ手作業？ |\n\n## BGM・効果音のおすすめ\n明るいアコースティック\n\n## サムネイルの文字\n3分で終わる\n\n## 投稿するときの説明文\nテスト用モックの説明文\n\n## ハッシュタグ\n#テスト #動画`
           : `# ${title}\n\n## 結論\n小さく試して検証します（テスト用モック・第${v}版）。\n\n## 根拠\n- チームの議論の要点\n\n## リスク\n- 需要は未確認（要確認）\n\n## 次の一手\n- 1週間の小規模テスト`;
   const wantsSend = /送信|送って|メール/.test(ctx.task.description);
   return {
@@ -104,5 +104,16 @@ export function mockFinal(ctx: PromptContext): FinalReportOutput {
       .filter((m) => m.role !== "ceo")
       .map((m) => ({ employee_id: m.employee_id, lesson: "根拠となる数字を最初から用意すると手戻りが減る" })),
     next_steps: ["小規模テストを実施する"],
+  };
+}
+
+export function mockMediaPlan(ctx: PromptContext): MediaPlanOutput {
+  return {
+    scenes: [
+      { caption: "まだ手作業？", narration: "それ、まだ手でやってるの？", image_prompt: `${ctx.task.title}の最初の場面` },
+      { caption: "3分で終わる", narration: "実は3分で終わるやり方があるんです。", image_prompt: "やり方を見せる場面" },
+      { caption: "やってみて", narration: "今日からためしてみてね。", image_prompt: "笑顔でしめくくる場面" },
+    ],
+    voice: "明るく、少しゆっくり",
   };
 }

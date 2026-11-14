@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { audit } from "@/lib/repo/audit";
-import { getPricing } from "@/lib/pricing";
+import { isTextModel } from "@/lib/pricing";
 import { AUTORUN_OPTIONS } from "@/lib/constants";
 import type { ActionState } from "@/components/forms";
 
@@ -41,6 +41,7 @@ export async function updateBudgetAction(_p: ActionState, fd: FormData): Promise
     const target = num(fd, "monthly_target_jpy", 0, 100000, "通常利用目標");
     const emergency = num(fd, "emergency_stop_jpy", 0, 100000, "緊急停止ライン");
     const perTask = num(fd, "per_task_limit_jpy", 0, 10000, "1業務あたりの上限");
+    const perVideo = num(fd, "per_video_limit_jpy", 0, 10000, "動画1本あたりの上限");
     const daily = num(fd, "daily_limit_jpy", 0, 100000, "1日あたりの上限");
     const callsTask = num(fd, "max_calls_per_task", 1, 100, "1業務あたりの呼び出し回数");
     const callsDay = num(fd, "max_calls_per_day", 1, 2000, "1日あたりの呼び出し回数");
@@ -50,10 +51,10 @@ export async function updateBudgetAction(_p: ActionState, fd: FormData): Promise
     const sql = await getDb();
     await sql`
       update budgets set monthly_limit_jpy = ${monthly}, monthly_target_jpy = ${target}, emergency_stop_jpy = ${emergency},
-        per_task_limit_jpy = ${perTask}, daily_limit_jpy = ${daily}, max_calls_per_task = ${callsTask},
+        per_task_limit_jpy = ${perTask}, per_video_limit_jpy = ${perVideo}, daily_limit_jpy = ${daily}, max_calls_per_task = ${callsTask},
         max_calls_per_day = ${callsDay}, max_calls_per_minute = ${callsMin}, updated_at = now()
       where id = 1`;
-    await audit(sql, "user", "update_budget", "budgets", "1", { monthly, target, emergency, perTask, daily });
+    await audit(sql, "user", "update_budget", "budgets", "1", { monthly, target, emergency, perTask, perVideo, daily });
     refresh();
     return ok("予算設定を保存しました");
   } catch (e) {
@@ -66,7 +67,7 @@ export async function updateModelsAction(_p: ActionState, fd: FormData): Promise
     await assertAuth();
     const standard = String(fd.get("model_standard") ?? "");
     const advanced = String(fd.get("model_advanced") ?? "");
-    if (!getPricing(standard) || !getPricing(advanced)) throw new Error("選べないモデルが指定されました");
+    if (!isTextModel(standard) || !isTextModel(advanced)) throw new Error("選べないモデルが指定されました");
     const allowAdvanced = fd.get("advanced_model_allowed") === "on";
     const rate = num(fd, "usd_jpy_rate", 50, 500, "為替レート");
     const sql = await getDb();

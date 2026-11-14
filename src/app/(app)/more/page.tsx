@@ -36,6 +36,7 @@ export default async function MorePage() {
             <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="もうけ・お金の記録・AIの利用料" />
             <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="AIが見つけた事業の候補" />
             <ListRow href="/sns" leading={<IconTile name="send" color="#0ea5e9" />} title="SNS運用" subtitle="AIが投稿案を作り、承認すると投稿" />
+            <ListRow href="/series" leading={<IconTile name="history" color="#be185d" />} title="シリーズ" subtitle="動画・記事を作り続ける（次の回を自動で）" />
             <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="日報・週報・業務の完了報告" />
           </List>
         </Section>

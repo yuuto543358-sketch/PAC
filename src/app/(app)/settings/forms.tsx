@@ -57,6 +57,7 @@ type BudgetInit = {
   monthly_target_jpy: number;
   emergency_stop_jpy: number;
   per_task_limit_jpy: number;
+  per_video_limit_jpy: number;
   daily_limit_jpy: number;
   max_calls_per_task: number;
   max_calls_per_day: number;
@@ -81,11 +82,12 @@ export function BudgetForm({ initial }: { initial: BudgetInit }) {
         {f("emergency_stop_jpy", "緊急停止ライン", "円")}
         {f("daily_limit_jpy", "1日あたりの上限", "円")}
         {f("per_task_limit_jpy", "1業務あたりの上限", "円")}
+        {f("per_video_limit_jpy", "動画1本あたりの上限", "円")}
         {f("max_calls_per_task", "1業務の呼び出し回数", "回")}
         {f("max_calls_per_day", "1日の呼び出し回数", "回")}
         {f("max_calls_per_minute", "1分の呼び出し回数", "回")}
       </div>
-      <p className="text-xs text-muted">緊急停止ラインに達すると、その月は新しいAI処理が止まります。1分あたりの回数制限は、無限ループの防止用です。</p>
+      <p className="text-xs text-muted">緊急停止ラインに達すると、その月は新しいAI処理が止まります。1分あたりの回数制限は、無限ループの防止用です。動画は場面の絵と声を作るぶん費用がかかるため、「動画1本あたりの上限」を使います（絵と声の呼び出しは、1業務の呼び出し回数に最大8回まで上乗せされます）。</p>
       <SubmitButton className="btn-secondary w-full">予算設定を保存</SubmitButton>
     </ActionForm>
   );

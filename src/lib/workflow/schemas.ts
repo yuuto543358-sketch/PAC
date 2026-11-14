@@ -63,6 +63,20 @@ export const ReviewSchema = z.object({
 });
 export type ReviewOutput = z.infer<typeof ReviewSchema>;
 
+export const MediaPlanSchema = z.object({
+  scenes: z
+    .array(
+      z.object({
+        caption: z.string().describe("画面に出す文字（テロップ）。20字以内"),
+        narration: z.string().describe("この場面で話す言葉（ナレーション）。台本どおりに"),
+        image_prompt: z.string().describe("この場面の絵の説明（何が・どこで・どんな雰囲気か）。文字・ロゴ・実在の人物は入れない"),
+      }),
+    )
+    .describe("動画の場面（台本の順に3〜6個）"),
+  voice: z.string().describe("ナレーションの読み方の雰囲気（例の言い回しではなく、速さ・明るさ・声のトーンなど）"),
+});
+export type MediaPlanOutput = z.infer<typeof MediaPlanSchema>;
+
 export const FinalReportSchema = z.object({
   report: z.string().describe("経営者への報告（社長として、自分の言葉で自然に。何ができたか・見てほしいこと・気になることが伝わればよい。500字以内。難しい言葉は使わない）"),
   summary: z.string().describe("一行の要約（60字以内）"),

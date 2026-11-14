@@ -295,7 +295,7 @@ describe("頼んだ成果品（note記事・動画など）まで作る", () => 
     const [d] = await listDeliverables(sql, taskId);
     expect(d.format).toBe("video_script");
     expect(d.content).toContain("## 台本");
-    expect(d.content).toContain("## 作り方の手順");
+    expect(d.content).toContain("## サムネイルの文字");
     expect((await getWorkflow(sql, taskId))!.phase).toBe("waiting_human");
   });
 

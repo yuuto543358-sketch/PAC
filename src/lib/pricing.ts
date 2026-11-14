@@ -11,6 +11,8 @@ export type ModelPricing = {
   /** 1回に送る入力の上限トークン数（これを超える呼び出しは拒否する） */
   maxPromptTokens: number;
   tier: "standard" | "advanced";
+  /** 文章のモデル（設定で選べる）か、絵・声を作るモデル（動画づくり専用。設定では選べない） */
+  kind?: "text" | "image" | "speech";
 };
 
 export const PRICING: Record<string, ModelPricing> = {
@@ -38,7 +40,34 @@ export const PRICING: Record<string, ModelPricing> = {
     maxPromptTokens: 100_000,
     tier: "advanced",
   },
+  // ===== 動画づくり用（絵と声）。料金は確認しきれていないため、公表値より高めにしています =====
+  // 絵：gpt-image-1-mini（入力 2.5ドル・画像の出力 8ドル／100万トークン前後とされる → 安全のため高めに）
+  "gpt-image-1-mini": {
+    label: "画像づくり（動画の場面の絵）",
+    inputPerMTok: 5,
+    cachedInputPerMTok: 5,
+    outputPerMTok: 16,
+    maxPromptTokens: 4_000,
+    tier: "standard",
+    kind: "image",
+  },
+  // 声：gpt-4o-mini-tts（1分あたり約0.015ドルとされる。応答に使用量が入らないため、見積額で記録）
+  "gpt-4o-mini-tts": {
+    label: "読み上げ（動画のナレーション）",
+    inputPerMTok: 1.2,
+    cachedInputPerMTok: 1.2,
+    outputPerMTok: 24,
+    maxPromptTokens: 4_000,
+    tier: "standard",
+    kind: "speech",
+  },
 };
+
+/** 設定で選べる「文章のモデル」か */
+export function isTextModel(model: string): boolean {
+  const p = getPricing(model);
+  return Boolean(p) && (p!.kind ?? "text") === "text";
+}
 
 /**
  * キャッシュ書き込みとして報告された入力トークンに上乗せする倍率（安全側の見積もり）。

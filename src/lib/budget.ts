@@ -166,7 +166,9 @@ export async function reserveApiCall(sql: Sql, input: ReserveInput): Promise<Res
           coalesce((select sum(coalesce(u.cost_jpy, u.estimated_cost_jpy)) from api_usage u where u.task_id = t.id), 0)::float8 as spent
         from tasks t where t.id = ${input.taskId} for update`;
       if (!task) throw new BudgetBlockedError("対象の業務が見つかりません。", "task_not_found");
-      if (task.ai_call_count >= budget.max_calls_per_task) {
+      // 動画の絵と声（場面の分け方1回＋絵6枚まで＋声1回）は、回数の上限に最大8回まで上乗せする
+      const extraCalls = input.purpose.startsWith("team:media") ? 8 : 0;
+      if (task.ai_call_count >= budget.max_calls_per_task + extraCalls) {
         throw new BudgetBlockedError(
           `この業務のAI呼び出し回数が上限（${budget.max_calls_per_task}回）に達しました。`,
           "task_calls",

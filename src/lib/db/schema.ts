@@ -1048,4 +1048,70 @@ update employees set speaking_style = 'やわらかくて、そっと寄りそ�
   where id = 'life' and speaking_style = 'やわらかく、友だちのように寄りそう話し方。押しつけず、気づいた変化を一緒によろこんだり心配したりする。経営者には親しみやすい丁寧語。';
 `,
   },
+  {
+    version: 14,
+    name: "video_media_and_series",
+    sql: /* sql */ `
+-- ===== 動画の実物（場面の絵・ナレーションの声）と、作り続けるシリーズ =====
+alter table task_workflows drop constraint if exists task_workflows_phase_check;
+alter table task_workflows add constraint task_workflows_phase_check check (phase in (
+  'kickoff','discussion','drafting','review','rework','final_report','media','waiting_human','done','stopped'));
+
+-- 業務で作る成果品（シリーズの回など、アプリが決めたもの）
+alter table tasks add column if not exists product_format text;
+
+-- AIが作った絵・声（データベースに保存。外部には公開しない）
+create table if not exists media_assets (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks(id),
+  deliverable_version int not null,
+  kind text not null check (kind in ('image','audio')),
+  scene_no int not null default 0,
+  mime text not null,
+  data bytea not null,
+  bytes int not null,
+  prompt text not null default '',
+  api_usage_id uuid,
+  created_at timestamptz not null default now(),
+  unique (task_id, deliverable_version, kind, scene_no)
+);
+create index if not exists media_assets_task_idx on media_assets(task_id, deliverable_version);
+
+-- 作り続けるシリーズ（承認したら、次の回を自動で作り始める）
+create table if not exists content_series (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  theme text not null default '',
+  product_format text not null,
+  source_task_id uuid references tasks(id),
+  episodes int not null default 1,
+  interval_days int not null default 3 check (interval_days between 1 and 30),
+  active boolean not null default true,
+  next_run_on date,
+  last_task_id uuid references tasks(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists content_series_source_idx on content_series(source_task_id);
+alter table tasks add column if not exists series_id uuid references content_series(id);
+alter table tasks add column if not exists series_episode int;
+alter table company_settings add column if not exists last_series_run_on date;
+-- 動画1本あたりの予算（絵と声の分だけ、ふつうの業務より多くかかるため。経営者が設定画面で変えられる）
+alter table budgets add column if not exists per_video_limit_jpy numeric(10,2) not null default 100;
+alter table budgets drop constraint if exists budgets_per_video_limit_check;
+alter table budgets add constraint budgets_per_video_limit_check check (per_video_limit_jpy >= 0);
+
+alter table media_assets enable row level security;
+alter table content_series enable row level security;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on table media_assets from anon; revoke all on table content_series from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on table media_assets from authenticated; revoke all on table content_series from authenticated;
+  end if;
+end $$;
+`,
+  },
 ];

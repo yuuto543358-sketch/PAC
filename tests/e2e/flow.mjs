@@ -205,11 +205,51 @@ await page.getByText("成果物の確認をお願いします").waitFor({ timeou
 await page.goto(`${videoTaskUrl}/deliverables/1`);
 await page.getByText("出力形式：").waitFor();
 check("動画を頼むと、成果物が「動画（台本と制作キット）」になる", (await page.getByText("出力形式：動画（台本と制作キット）").count()) === 1);
-check("動画の制作キットは見出しごとにコピーでき、台本と作り方の手順がある",
-  (await page.getByText("撮影・編集で使う（見出しごとにコピー）").count()) === 1 &&
+check("動画の台本は見出しごとにコピーできる",
+  (await page.getByText("投稿するときに使う（見出しごとにコピー）").count()) === 1 &&
   (await page.getByRole("button", { name: "台本" }).count()) === 1 &&
-  (await page.getByRole("button", { name: "作り方の手順" }).count()) === 1);
+  (await page.getByRole("button", { name: "サムネイルの文字" }).count()) === 1);
+// 動画の実物：AIが作った場面の絵と声を、端末の中で1本の動画につなげる
+check("場面の絵と声ができていて、動画のプレビューが出る", (await page.locator("canvas[aria-label=動画のプレビュー]").count()) === 1);
+check("材料（場面の絵・ナレーションの声）を1つずつ保存できる", (await page.getByText("材料を1つずつ保存する").count()) === 1);
+await page.getByText("材料を1つずつ保存する").click();
+const firstImage = await page.request.get(new URL(await page.getByRole("link", { name: "場面1の絵" }).getAttribute("href"), BASE).toString());
+check("場面の絵はログインした人だけが取り出せる（保存用）", firstImage.status() === 200 && (firstImage.headers()["content-disposition"] ?? "").startsWith("attachment"));
+const anon = await (await browser.newContext()).request.get(new URL(await page.getByRole("link", { name: "場面1の絵" }).getAttribute("href"), BASE).toString(), { maxRedirects: 0 });
+check("ログインしていないと、絵は見られない", anon.status() !== 200, String(anon.status()));
+await page.getByRole("button", { name: "動画を書き出す" }).click();
+await page.getByText("できた動画").waitFor({ timeout: 60000 });
+const videoOk = await page.locator("video[aria-label=できた動画]").evaluate(async (v) => {
+  if (v.readyState < 1) await new Promise((r) => v.addEventListener("loadedmetadata", r, { once: true }));
+  return { ok: v.src.startsWith("blob:"), w: v.videoWidth, h: v.videoHeight };
+});
+check("「動画を書き出す」で縦長の動画ができる", videoOk.ok && videoOk.h > videoOk.w, JSON.stringify(videoOk));
+check("できた動画を保存するボタンがある", (await page.getByRole("button", { name: "保存する（写真アプリなど）" }).count()) === 1);
 await shot("16b-video-deliverable");
+
+// 承認すると、そこで終わらず「シリーズ」として次の回を作り続ける
+await page.goto(`${BASE}/approvals`);
+await page.locator("main ul li a", { hasText: "朝のルーティン紹介のショート動画" }).first().click();
+await page.getByText("確認する成果物").waitFor();
+check("動画の承認画面に「次の回を自動で作り始めます」と書いてある", (await page.getByText(/次の回を自動で作り始めます/).count()) > 0);
+await page.getByRole("button", { name: "承認する" }).click();
+await page.getByText("承認しました。業務完了です").waitFor();
+await page.goto(`${BASE}/series`);
+check("シリーズ画面に、承認した動画のシリーズが出る（3日ごと）",
+  (await page.getByText("朝のルーティン紹介のショート動画を作る", { exact: true }).count()) === 1 && (await page.getByText(/3日ごとに作る・次の回は/).count()) === 1);
+await page.getByRole("button", { name: "次の回を今すぐ作る" }).click();
+await page.getByRole("status").filter({ hasText: "第2回を作り始めました" }).waitFor();
+await page.reload();
+check("「次の回を今すぐ作る」で第2回の業務ができる", (await page.getByText(/第2回：朝のルーティン紹介のショート動画を作る（第2回）/).count()) === 1);
+await shot("16c-series");
+await page.getByRole("button", { name: "止める" }).click();
+await page.getByRole("status").filter({ hasText: "シリーズを止めました" }).waitFor();
+check("シリーズを止められる", (await page.getByText(/止めています・これまで2回/).count()) === 1);
+// 第2回のチームの作業は一時停止しておく（このあとのテストのAI呼び出し回数に影響させない）
+await page.getByRole("link", { name: /第2回：/ }).click();
+await page.getByRole("button", { name: "一時停止する" }).click();
+await page.getByRole("button", { name: "再開する" }).waitFor();
+await page.waitForTimeout(61_000); // 1分あたりの呼び出し回数の上限をリセット
 
 // 絞り込み
 await page.goto(`${BASE}/tasks?view=all&assignee=secretary`);
