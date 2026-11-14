@@ -71,7 +71,7 @@ export function mockDraft(ctx: PromptContext): DraftOutput {
 }
 
 export function mockReview(ctx: PromptContext): ReviewOutput {
-  const revise = tag(ctx, "[mock:revise]") && ctx.workflow.rework_count === 0;
+  const revise = tag(ctx, "[mock:revise-always]") || (tag(ctx, "[mock:revise]") && ctx.workflow.rework_count === 0);
   return revise
     ? {
         message: "【テスト用モック】数字の根拠が不足しています。修正をお願いします。",

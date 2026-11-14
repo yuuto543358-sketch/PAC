@@ -24,7 +24,7 @@ export const KickoffSchema = z.object({
 export type KickoffOutput = z.infer<typeof KickoffSchema>;
 
 export const DiscussionSchema = z.object({
-  message: z.string().describe("グループチャットでの発言（300字以内。専門用語を使わず、やさしい言葉で具体的に）"),
+  message: z.string().describe("グループチャットでの発言（300字以内。同僚に話しかけるような自然な話し言葉で。専門用語を使わず具体的に）"),
   kind: z.enum(["opinion", "proposal", "question", "findings"]).describe("発言の種類"),
   question_to_owner: questionToOwner,
 });
@@ -56,9 +56,9 @@ export const DraftSchema = z.object({
 export type DraftOutput = z.infer<typeof DraftSchema>;
 
 export const ReviewSchema = z.object({
-  message: z.string().describe("監査結果のチームへの発言（200字以内。やさしい言葉で）"),
+  message: z.string().describe("監査結果のチームへの発言（200字以内。チームに話しかけるように、自然でやさしい言葉で）"),
   verdict: z.enum(["approve", "revise"]).describe("合格なら approve、修正が必要なら revise"),
-  points: z.array(z.string()).describe("修正してほしい点（revise のとき。具体的に）"),
+  points: z.array(z.string()).describe("修正してほしい点（revise のとき。本当に大事な点だけ、最大3つ。具体的に）"),
   risks: z.array(z.string()).describe("経営者に伝えるべきリスク・注意点"),
 });
 export type ReviewOutput = z.infer<typeof ReviewSchema>;

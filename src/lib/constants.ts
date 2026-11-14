@@ -241,6 +241,7 @@ export const DELIVERABLE_STATUS_LABEL: Record<string, string> = {
   draft: "下書き",
   in_review: "監査中",
   revise: "修正依頼",
+  revised: "指摘を反映ずみ",
   passed: "監査合格",
   accepted: "経営者が承認",
   rejected: "差し戻し",

@@ -107,16 +107,30 @@ describe("チームでの自動進行", () => {
     expect((await listDeliverables(sql, taskId))[0].status).toBe("accepted");
   });
 
-  it("監査で差し戻されると、リーダーが修正版を作って再監査する", async () => {
+  it("監査の指摘への対応は1回だけ：修正版は再監査せずに社長の報告へ進む", async () => {
     const { sql, taskId } = await newTeamTask("新商品の企画書を作成", "[mock:revise]");
     await runAll(taskId);
     const wf = (await getWorkflow(sql, taskId))!;
     expect(wf.phase).toBe("waiting_human");
     expect(wf.rework_count).toBe(1);
     const dels = await listDeliverables(sql, taskId);
-    expect(dels.map((d) => `${d.version}:${d.status}`)).toEqual(["2:passed", "1:revise"]);
+    expect(dels.map((d) => `${d.version}:${d.status}`)).toEqual(["2:revised", "1:revise"]);
+    const msgs = await listRoomMessages(sql, taskId);
+    // 監査は1回だけ（監査 → 修正 → 監査 … のくり返しが起きない）
+    expect(msgs.filter((m) => m.kind === "review").map((r) => r.meta.verdict)).toEqual(["revise"]);
+    expect(msgs.some((m) => m.author_type === "system" && m.content.includes("再監査はせずに"))).toBe(true);
+    expect(msgs.filter((m) => m.kind === "report")).toHaveLength(1);
+    expect((await pendingApprovals(taskId)).map((a) => a.action_type)).toEqual(["accept_deliverable"]);
+  });
+
+  it("監査役が何度差し戻そうとしても、監査は1回で終わる", async () => {
+    const { sql, taskId } = await newTeamTask("細かい監査のテスト", "[mock:revise-always]");
+    await runAll(taskId);
+    const wf = (await getWorkflow(sql, taskId))!;
+    expect(wf.phase).toBe("waiting_human");
     const reviews = (await listRoomMessages(sql, taskId)).filter((m) => m.kind === "review");
-    expect(reviews.map((r) => r.meta.verdict)).toEqual(["revise", "approve"]);
+    expect(reviews).toHaveLength(1);
+    expect((await listDeliverables(sql, taskId)).length).toBe(2);
   });
 
   it("経営者が差し戻すと、コメントが修正指示になり、修正版で承認依頼が出し直される", async () => {

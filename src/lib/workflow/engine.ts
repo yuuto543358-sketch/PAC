@@ -46,8 +46,8 @@ import { mockDiscussion, mockDraft, mockFinal, mockKickoff, mockReview } from ".
 // ===== 安全のための上限 =====
 /** 1つの業務でAIが成功した作業の最大回数（これを超えたら停止して経営者に知らせる） */
 export const MAX_STEPS_PER_TASK = 30;
-/** 監査による差し戻しの最大回数 */
-export const MAX_REWORK = 2;
+/** 監査による差し戻しの最大回数（指摘への対応は1回だけ。直した版は再監査せずに社長の報告へ進む） */
+export const MAX_REWORK = 1;
 /** 同じ担当が続けて失敗したら担当を変える回数 */
 export const FAILURES_BEFORE_REASSIGN = 2;
 /** 続けて失敗したらチームを停止する回数 */
@@ -362,16 +362,23 @@ async function applyDraft(tx: Tx, wf: Workflow, speaker: EmployeeWithStats, out:
   await addTaskLog(tx, wf.task_id, { type: "employee", employeeId: speaker.id }, "deliverable_updated", `成果物 第${version}版を作成しました`);
   const proposed = out.external_actions.slice(0, 2);
   await updateWorkflow(tx, wf.task_id, { plan: { ...wf.plan, proposed_actions: proposed } as Workflow["plan"] });
+  // 監査の指摘に対応した版は、もう一度監査しない（監査と修正がいつまでも続かないように）
+  const auditFixed = wf.phase === "rework" && wf.rework_count >= MAX_REWORK;
+  if (auditFixed) {
+    await setDeliverableStatus(tx, wf.task_id, version, "revised", "監査の指摘に対応した版です（指摘への対応は1回だけのため、再監査はしていません）");
+    await systemMessage(tx, wf.task_id, "監査の指摘に対応しました。指摘への対応は1回だけの決まりなので、再監査はせずに社長の報告に進みます。");
+  }
+  const next: WorkflowPhase = auditFixed ? "final_report" : "review";
   if (out.question_to_owner) {
-    await askOwner(tx, wf, speaker.id, out.question_to_owner, "review");
+    await askOwner(tx, wf, speaker.id, out.question_to_owner, next);
   } else {
-    await moveTo(tx, wf, "review");
+    await moveTo(tx, wf, next);
   }
 }
 
 async function applyReview(tx: Tx, wf: Workflow, speaker: EmployeeWithStats, out: ReviewOutput, usageId: string, meta: Meta) {
   const latest = await getDeliverable(tx, wf.task_id);
-  const points = out.points.slice(0, 8);
+  const points = out.points.slice(0, 3);
   const risks = out.risks.slice(0, 8);
   await addRoomMessage(tx, {
     taskId: wf.task_id,

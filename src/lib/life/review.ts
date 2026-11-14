@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured } from "@/lib/ai/client";
-import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES, CONVERSATION_STYLE } from "@/lib/ai/prompts";
 import { similarity } from "@/lib/dedupe";
 import { jstDateParts } from "@/lib/format";
 import { createStepLogger } from "@/lib/log";
@@ -88,6 +88,8 @@ ${FIXED_COMPANY_PRINCIPLES}
 - 話し方: ${employee.speaking_style}
 
 ${PLAIN_LANGUAGE_RULES}
+
+${CONVERSATION_STYLE}
 
 【ふりかえりのルール】
 - 数字はプログラムが集計した事実。変えたり、ない数字を作ったりしない。QOLチェックは1〜5（ストレスは5が多い）。

@@ -1001,4 +1001,30 @@ alter table business_projects add column if not exists last_improve_at timestamp
 alter table company_settings add column if not exists last_ops_review_on date;
 `,
   },
+  {
+    version: 12,
+    name: "natural_talk_and_single_review",
+    sql: /* sql */ `
+-- 監査の指摘に対応した版の状態「指摘を反映ずみ」を追加（指摘への対応は1回だけ。再監査はしない）
+alter table deliverables drop constraint if exists deliverables_status_check;
+alter table deliverables add constraint deliverables_status_check
+  check (status in ('draft','in_review','revise','revised','passed','accepted','rejected'));
+
+-- 社員の話し方を、決まり文句の例をなくした自然で親しみやすいものに（経営者が書き換えていない社員だけ）
+update employees set speaking_style = '穏やかで頼れる話し方。要点をさっと伝えつつ、社員には気さくなくだけた口調で声をかける。経営者には、かしこまりすぎない親しみやすい丁寧語で話す。', updated_at = now()
+  where id = 'president' and speaking_style = '落ち着いた丁寧語。「結論から申し上げます」「〜で進めましょう」のように、要点を先に簡潔に伝える。';
+update employees set speaking_style = '明るく前向きで、テンポのいい話し方。わくわくした気持ちがそのまま言葉に出る。社員どうしではくだけた口調、経営者には元気で親しみやすい丁寧語。', updated_at = now()
+  where id = 'bizdev' and speaking_style = '明るい丁寧語。「面白いチャンスを見つけました！」「小さく試してみませんか？」';
+update employees set speaking_style = '落ち着いていて、ていねいだけど堅くない話し方。分かったことと、まだ分からないことを自然に言い分ける。社員どうしではやわらかいくだけた口調。', updated_at = now()
+  where id = 'research' and speaking_style = '落ち着いた丁寧語。「確認できた事実は〜です」「出典は〜」「ここは推測です」';
+update employees set speaking_style = '気さくでノリのいい話し方。思いついたことをすぐ口に出し、人のアイデアにも楽しそうに乗っかる。社員どうしはくだけた口調、経営者には親しみやすい丁寧語。', updated_at = now()
+  where id = 'creative' and speaking_style = 'フレンドリーな丁寧語。「たたき台を作ってみました」「使う人の気持ちで考えると〜」';
+update employees set speaking_style = 'やさしく気配りのある話し方。相手を気づかうひとことを自然にそえる。かしこまった敬語は使わず、親しみやすい丁寧語。社員どうしではくだけた口調。', updated_at = now()
+  where id = 'secretary' and speaking_style = '柔らかく丁寧。「承知しました」「念のためリマインドいたします」';
+update employees set speaking_style = '落ち着いていて率直な話し方。お金やリスクの話も、こわがらせずに分かりやすく伝える。社員どうしではくだけた口調、経営者には親しみやすい丁寧語。', updated_at = now()
+  where id = 'finance' and speaking_style = '簡潔で正確な丁寧語。「費用対効果は〜です」「リスクが一点あります」';
+update employees set speaking_style = 'やわらかく、友だちのように寄りそう話し方。押しつけず、気づいた変化を一緒によろこんだり心配したりする。経営者には親しみやすい丁寧語。', updated_at = now()
+  where id = 'life' and speaking_style = 'やわらかい丁寧語。「よかったら教えてください」「前より〜が増えていますね」のように、押しつけずに伝える。';
+`,
+  },
 ];

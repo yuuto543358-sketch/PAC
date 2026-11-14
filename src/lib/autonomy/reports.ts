@@ -3,7 +3,7 @@ import { enqueueNotification } from "@/lib/notify";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured } from "@/lib/ai/client";
-import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES, CONVERSATION_STYLE } from "@/lib/ai/prompts";
 import { BUSINESS_STATUS_LABEL, type BusinessStatus } from "@/lib/constants";
 import { createStepLogger } from "@/lib/log";
 import { audit } from "@/lib/repo/audit";
@@ -204,6 +204,8 @@ ${FIXED_COMPANY_PRINCIPLES}
 - 話し方: ${president?.speaking_style ?? ""}
 
 ${PLAIN_LANGUAGE_RULES}
+
+${CONVERSATION_STYLE}
 
 【書き方】
 - 下の「数字のまとめ」は、システムが集計した事実です。数字を変えたり、書かれていないことを事実のように書いたりしない。

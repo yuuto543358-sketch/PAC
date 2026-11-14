@@ -1,6 +1,7 @@
 // AIへの指示（プロンプト）に「やさしい言葉で話す」ルールが必ず入っていることを確かめる
 import { describe, expect, it } from "vitest";
-import { buildChatSystemPrompt, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { buildChatSystemPrompt, CONVERSATION_STYLE, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { SEED_EMPLOYEES as EMPLOYEES } from "@/lib/db/seed";
 import { buildStepInstruction, buildTeamContext } from "@/lib/workflow/prompts";
 import { SNS_STYLE_RULES } from "@/lib/sns/style";
 import { buildSalesChannelGuide, netPerSale, SALES_CHANNEL_POLICY, SALES_CHANNELS } from "@/lib/sales-channels";
@@ -56,7 +57,7 @@ describe("やさしい言葉のルール", () => {
     expect(buildStepInstruction("discussion", ctx)).toContain("やさしい言葉");
     expect(buildStepInstruction("drafting", ctx)).toContain("やさしい言葉");
     // 監査役は言葉づかいの添削はしない（内容だけを見る）
-    expect(buildStepInstruction("review", ctx)).toContain("添削はしない");
+    expect(buildStepInstruction("review", ctx)).toContain("言葉づかい・書き方・好みの問題・細かい表現は指摘しない");
     expect(buildStepInstruction("final_report", ctx)).toContain("やさしい言葉");
   });
 
@@ -123,5 +124,44 @@ describe("売る場所の手取りの計算", () => {
       todayJst: "2026-11-14",
     } as never;
     expect(buildStepInstruction("drafting", ctx)).toContain(SNS_STYLE_RULES);
+  });
+});
+
+describe("自然で親しみやすい話し方", () => {
+  const ctx = {
+    settings,
+    task: { title: "テスト業務", description: "", priority: "medium", due_date: null },
+    workflow: { phase: "review", plan: {}, lead_id: "research", rework_count: 0 },
+    speaker: employee,
+    roster: [employee],
+    members: [],
+    messages: [],
+    deliverable: null,
+    knowledge: [],
+    todayJst: "2026-11-14",
+  } as never;
+
+  it("決まり文句をくり返さないルールが、チャットとグループチャットの指示に入っている", () => {
+    expect(CONVERSATION_STYLE).toContain("決まり文句");
+    expect(CONVERSATION_STYLE).toContain("親しみやすい");
+    const chat = buildChatSystemPrompt({ settings: settings as never, employee: employee as never, roster: [employee] as never, openTasks: [], todayJst: "2026-11-14" });
+    expect(chat).toContain(CONVERSATION_STYLE);
+    expect(buildTeamContext(ctx)).toContain(CONVERSATION_STYLE);
+    expect(buildStepInstruction("discussion", ctx)).toContain("自然な話し言葉");
+  });
+
+  it("社員の話し方の説明に、そのまま真似される決まり文句（「」の例）がない", () => {
+    for (const e of EMPLOYEES) {
+      expect(e.speaking_style).not.toMatch(/「/);
+      expect(e.speaking_style).toMatch(/親しみやすい|くだけた/);
+    }
+  });
+
+  it("監査役への指示：差し戻しは1回だけ・大事な点だけ・前の監査コメントは監査しない", () => {
+    const r = buildStepInstruction("review", ctx);
+    expect(r).toContain("1回だけ");
+    expect(r).toContain("最大3つ");
+    expect(r).toContain("前の監査コメントそのものは監査しない");
+    expect(buildStepInstruction("rework", ctx)).toContain("再監査せずに");
   });
 });

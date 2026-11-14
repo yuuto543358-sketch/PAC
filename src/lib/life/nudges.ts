@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { Db, Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured } from "@/lib/ai/client";
-import { PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
+import { PLAIN_LANGUAGE_RULES, CONVERSATION_STYLE } from "@/lib/ai/prompts";
 import { getEmployee } from "@/lib/repo/employees";
 import { getSettings } from "@/lib/repo/settings";
 import { listCheckins, qolScore } from "./checkins";
@@ -81,7 +81,8 @@ export async function runNudges(sql: Sql, today: string): Promise<number> {
         maxTokens: 800,
         system: `あなたはAI社員「${employee.name}」（ライフ担当）です。性格：${employee.personality}／話し方：${employee.speaking_style}
 経営者の記録から気づいたことを、友だちのようにやさしく、短いひとことに書き直してください。責めない・こわがらせない・診断しない。事実（下の文）は変えない。
-${PLAIN_LANGUAGE_RULES}`,
+${PLAIN_LANGUAGE_RULES}
+${CONVERSATION_STYLE}`,
         messages: [{ role: "user", content: JSON.stringify(fresh.map((n, i) => ({ index: i, title: n.title, body: n.body }))) }],
         schema: RewriteSchema,
         schemaName: "life_nudges",
