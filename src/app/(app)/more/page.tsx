@@ -24,7 +24,7 @@ export default async function MorePage() {
 
         <Section title="経営">
           <List>
-            <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="API予算・使用額・利用履歴・運用費" />
+            <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="もうけ・お金の記録・AIの利用料" />
             <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="AIが見つけた事業の候補" />
             <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="日報・週報・業務の完了報告" />
           </List>
@@ -50,7 +50,7 @@ export default async function MorePage() {
             ログアウト
           </button>
         </form>
-        <p className="text-center text-[12px] text-faint">PERSONAL AI COMPANY ・ Phase 3 ・ バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
+        <p className="text-center text-[12px] text-faint">PERSONAL AI COMPANY ・ Phase 4 ・ バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
       </Page>
     </>
   );

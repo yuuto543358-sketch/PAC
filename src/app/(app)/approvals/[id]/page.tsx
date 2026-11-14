@@ -4,11 +4,11 @@ import { getDb } from "@/lib/db";
 import { getApproval, getApprovalEvents } from "@/lib/repo/approvals";
 import { APPROVAL_ACTION_LABEL } from "@/lib/constants";
 import { dateTime, yen } from "@/lib/format";
-import { Alert, ApprovalStatusBadge, IconTile, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
+import { Alert, ApprovalStatusBadge, IconTile, Page, PageHeader, Section } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { APPROVAL_ACTION_STYLE } from "@/lib/approval-style";
 import { DecisionForm, ResubmitForm } from "./forms";
-import { SelfSendPanel } from "./SelfSendPanel";
+import { OwnerDoPanel, SelfSendPanel } from "./SelfSendPanel";
 import { OWNER_SENDS_ACTION_TYPES } from "@/lib/constants";
 import { DocumentView } from "@/components/DocumentView";
 
@@ -171,9 +171,9 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
         )}
 
         {a.status === "approved" && !isDeliverable && !ownerSends && (
-          <PhaseNotice phase="Phase 4">
-            承認は記録されました。実際に外部へ実行する機能はまだありません。実装後も、サーバーが「承認済み」かつ「承認時と内容が同じ」ことを確認した場合だけ実行されます。
-          </PhaseNotice>
+          <Section title="あなたが行う">
+            <OwnerDoPanel body={a.content} />
+          </Section>
         )}
 
         {a.decision_note && (

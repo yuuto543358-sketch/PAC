@@ -5,8 +5,10 @@ import { listEmployees } from "@/lib/repo/employees";
 import { FIXED_COMPANY_PRINCIPLES } from "@/lib/ai/prompts";
 import { isAiConfigured, isMockMode } from "@/lib/ai/client";
 import { Avatar } from "@/components/Avatar";
-import { ChevronRight, Page, PageHeader, PhaseNotice, Section } from "@/components/ui";
-import { AutorunForm, BudgetForm, CompanyForm, EmergencyForm, LogoutAllForm, ModelForm, OpsCostForm } from "./forms";
+import { ChevronRight, Page, PageHeader, Section } from "@/components/ui";
+import { PushSetup } from "./PushSetup";
+import { countPushSubscriptions, isPushConfigured, vapidPublicKey } from "@/lib/notify";
+import { AutorunForm, BudgetForm, NotifyForm, CompanyForm, EmergencyForm, LogoutAllForm, ModelForm, OpsCostForm } from "./forms";
 
 export const metadata = { title: "設定" };
 
@@ -14,6 +16,8 @@ export default async function SettingsPage() {
   const sql = await getDb();
   const [settings, budget, employees] = await Promise.all([getSettings(sql), getBudget(sql), listEmployees(sql)]);
   const cronConfigured = Boolean(process.env.CRON_SECRET);
+  const pushConfigured = isPushConfigured();
+  const deviceCount = await countPushSubscriptions(sql);
   return (
     <>
       <PageHeader title="設定" back="/more" backLabel="メニュー" />
@@ -90,10 +94,10 @@ export default async function SettingsPage() {
             <p>毎日、夜中（午前3時ごろ）に自動で動きます。</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す・社長が日報を書く。月曜は週報も書く。
+                <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す・社長が日報を書く。月曜は週報、毎月1日は月報も書く。
               </li>
               <li>
-                <b className="text-ink">週1回</b>：月曜だけ、仕事を探して週報を書く。
+                <b className="text-ink">週1回</b>：月曜だけ、仕事を探して週報を書く。毎月1日は月報も書く。
               </li>
               <li>
                 <b className="text-ink">停止</b>：自動では何もしません（「事業開発」「報告書」の画面のボタンで、いつでも手動で動かせます）。
@@ -115,8 +119,16 @@ export default async function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="通知設定">
-          <PhaseNotice phase="Phase 4">承認依頼・予算超過のプッシュ通知（iPhoneのホーム画面アプリへの通知）。現在は、ホーム画面の「重要なお知らせ」と承認タブの数字でお知らせします。</PhaseNotice>
+        <Section title="通知（iPhone のプッシュ通知）">
+          <div id="notify" className="card scroll-mt-20 space-y-4 p-4">
+            <PushSetup configured={pushConfigured} publicKey={vapidPublicKey()} deviceCount={deviceCount} />
+            <div className="border-t border-separator pt-4">
+              <NotifyForm initial={{ notify_approvals: settings.notify_approvals, notify_budget: settings.notify_budget }} />
+            </div>
+          </div>
+          <p className="mt-2 px-1 text-xs leading-relaxed text-muted">
+            通知には短いお知らせだけが入ります（詳しい内容はアプリを開いて確認）。通知が届かなくても、ホーム画面の「重要なお知らせ」と承認タブの数字でも確認できます。
+          </p>
         </Section>
 
         <Section title="セキュリティ">

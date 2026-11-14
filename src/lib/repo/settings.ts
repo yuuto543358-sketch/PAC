@@ -23,6 +23,7 @@ export type CompanySettings = {
   last_discovery_on: Date | null;
   last_daily_report_on: Date | null;
   last_weekly_report_on: Date | null;
+  last_monthly_report_on: Date | null;
   updated_at: Date;
 };
 

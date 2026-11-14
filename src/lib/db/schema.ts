@@ -535,4 +535,94 @@ alter table business_projects add constraint business_projects_status_check
 create index if not exists business_projects_created_idx on business_projects(created_at desc);
 `,
   },
+  {
+    version: 5,
+    name: "phase4_revenue_notifications",
+    sql: /* sql */ `
+-- ===== Phase 4: 収益・費用の記録／月報／プッシュ通知 =====
+
+-- 収益・費用の記録（経営者が入力）。記録は変更・削除できない。間違えたときは「取り消し」にする（理由つき）
+create table if not exists ledger_entries (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('income','expense')),
+  amount_jpy numeric(12,0) not null check (amount_jpy > 0 and amount_jpy <= 100000000),
+  occurred_on date not null,
+  category text not null default '',
+  description text not null default '' check (length(description) <= 500),
+  business_project_id uuid references business_projects(id),
+  voided_at timestamptz,
+  void_reason text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists ledger_entries_occurred_idx on ledger_entries(occurred_on desc);
+create index if not exists ledger_entries_business_idx on ledger_entries(business_project_id);
+create or replace function pac_ledger_guard() returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'PAC: 収益・費用の記録は削除できません（取り消しにしてください）';
+  end if;
+  if new.id <> old.id or new.kind <> old.kind or new.amount_jpy <> old.amount_jpy or new.occurred_on <> old.occurred_on
+     or new.category <> old.category or new.description <> old.description or new.created_at <> old.created_at
+     or new.business_project_id is distinct from old.business_project_id then
+    raise exception 'PAC: 収益・費用の記録は変更できません（取り消して、新しく記録してください）';
+  end if;
+  if old.voided_at is not null then
+    raise exception 'PAC: 取り消した記録は元に戻せません';
+  end if;
+  if new.voided_at is null or length(trim(new.void_reason)) = 0 then
+    raise exception 'PAC: 取り消しには理由が必要です';
+  end if;
+  return new;
+end $$;
+drop trigger if exists ledger_guard on ledger_entries;
+create trigger ledger_guard before update or delete on ledger_entries
+  for each row execute function pac_ledger_guard();
+
+-- 月報
+alter table company_settings add column if not exists last_monthly_report_on date;
+
+-- プッシュ通知の受け取り先（iPhone のホーム画面アプリ）
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  device_label text not null default '',
+  created_at timestamptz not null default now(),
+  last_success_at timestamptz,
+  failures int not null default 0
+);
+
+-- 送る通知の順番待ち（同じ通知を二度送らないよう dedupe_key は重複不可）
+create table if not exists notifications (
+  id bigserial primary key,
+  kind text not null,
+  title text not null,
+  body text not null default '',
+  url text not null default '/',
+  dedupe_key text unique,
+  status text not null default 'pending' check (status in ('pending','sent','skipped','failed')),
+  attempts int not null default 0,
+  error text not null default '',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+create index if not exists notifications_pending_idx on notifications(created_at) where status = 'pending';
+
+do $$
+declare t text;
+begin
+  foreach t in array array['ledger_entries','push_subscriptions','notifications'] loop
+    execute format('alter table %I enable row level security', t);
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on table %I from anon', t);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+      execute format('revoke all on table %I from authenticated', t);
+    end if;
+  end loop;
+end $$;
+`,
+  },
 ];

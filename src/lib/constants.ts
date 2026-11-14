@@ -104,6 +104,10 @@ export const OWNER_SENDS_ACTION_TYPES: ApprovalActionType[] = ["send_message"];
 export const OWNER_SENDS_AFTER_EFFECT =
   "承認しても、アプリが自動で送ることはありません。承認後に表示される「コピー」または「メールアプリで開く」を使って、経営者がご自身で送ります。";
 
+/** メール以外の外部への操作。アプリには自動で実行する機能がないため、承認後は経営者が自分で行う */
+export const OWNER_DOES_AFTER_EFFECT =
+  "承認しても、アプリが自動で実行することはありません。必要なら、承認後に表示される「内容をコピー」を使って、経営者がご自身で行います。";
+
 export const APPROVAL_ACTION_LABEL: Record<ApprovalActionType, string> = {
   send_message: "メール・メッセージ（あなたが送る）",
   sns_post: "SNSへの投稿",
@@ -285,4 +289,14 @@ export const BUSINESS_STATUS_TONE: Record<BusinessStatus, string> = {
   adopted: "bg-success text-white",
   rejected: "bg-surface-3 text-muted",
   on_hold: "bg-surface-3 text-muted",
+};
+
+// ===== Phase 4: 収益・費用・通知 =====
+
+export const LEDGER_KINDS = ["income", "expense"] as const;
+export type LedgerKind = (typeof LEDGER_KINDS)[number];
+export const LEDGER_KIND_LABEL: Record<LedgerKind, string> = { income: "収益（入ったお金）", expense: "費用（出たお金）" };
+export const LEDGER_CATEGORIES: Record<LedgerKind, string[]> = {
+  income: ["売上", "その他の収入"],
+  expense: ["材料・仕入れ", "広告", "手数料", "ツール・サービス", "その他の費用"],
 };

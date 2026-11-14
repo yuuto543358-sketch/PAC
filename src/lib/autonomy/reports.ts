@@ -1,4 +1,5 @@
 import "server-only";
+import { enqueueNotification } from "@/lib/notify";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured } from "@/lib/ai/client";
@@ -11,7 +12,9 @@ import { getBudget, getSettings } from "@/lib/repo/settings";
 // 社長（天城 翔）が、会社の状況をまとめた日報・週報を自動で作る仕組み。
 // 数字はシステムがデータベースから集計した「事実」で、AIには文章のまとめだけを任せます。
 
-export type ReportKind = "daily" | "weekly";
+export type ReportKind = "daily" | "weekly" | "monthly";
+const REPORT_DAYS: Record<ReportKind, number> = { daily: 1, weekly: 7, monthly: 30 };
+const REPORT_LABEL: Record<ReportKind, string> = { daily: "日報", weekly: "週報", monthly: "月報" };
 
 export type CompanyStats = {
   periodDays: number;
@@ -31,6 +34,9 @@ export type CompanyStats = {
   candidatesByStatus: Record<string, number>;
   employeeActivity: { name: string; calls: number; cost_jpy: number; messages: number }[];
   webSearchCalls: number;
+  /** 経営者が記録した、この期間の収益・費用（取り消したものは除く） */
+  incomePeriodJpy: number;
+  expensePeriodJpy: number;
 };
 
 const COST = `coalesce(cost_jpy, estimated_cost_jpy)`;
@@ -80,7 +86,18 @@ export async function collectStats(sql: Sql, days: number): Promise<CompanyStats
     { simple: false },
   );
   const budget = await getBudget(sql);
+  const [money] = await sql.unsafe<{ income: number; expense: number }[]>(
+    `select
+      coalesce(sum(amount_jpy) filter (where kind = 'income'), 0)::float8 as income,
+      coalesce(sum(amount_jpy) filter (where kind = 'expense'), 0)::float8 as expense
+    from ledger_entries
+    where voided_at is null and occurred_on > ((${since}) at time zone 'Asia/Tokyo')::date`,
+    [],
+    { simple: false },
+  );
   return {
+    incomePeriodJpy: money.income,
+    expensePeriodJpy: money.expense,
     periodDays: days,
     tasksCreated: tasks.created,
     tasksCompleted: tasks.completed,
@@ -115,6 +132,9 @@ export function formatStats(s: CompanyStats): string {
     `- AIの利用料: この期間 ${yen(s.spendPeriodJpy)} ／ 今月 ${yen(s.spendMonthJpy)}（目標 ${yen(s.monthlyTargetJpy)}・上限 ${yen(s.monthlyLimitJpy)}）`,
   );
   if (s.webSearchCalls > 0) lines.push(`- Web検索: ${s.webSearchCalls}回`);
+  lines.push(
+    `- あなたが記録したお金: 入ったお金 ${yen(s.incomePeriodJpy)} ／ 出たお金 ${yen(s.expensePeriodJpy)} ／ AIの利用料を引いたもうけ ${yen(s.incomePeriodJpy - s.expensePeriodJpy - s.spendPeriodJpy)}`,
+  );
   if (s.waitingTeams.length) {
     lines.push(`- あなたの返事を待っているチーム: ${s.waitingTeams.length}件`);
     for (const t of s.waitingTeams.slice(0, 5)) lines.push(`  - ${t.title}`);
@@ -155,8 +175,8 @@ export type ReportResult = { ok: boolean; reportId: string | null; message: stri
  */
 export async function generateCompanyReport(sql: Sql, kind: ReportKind, trigger: "manual" | "scheduled"): Promise<ReportResult> {
   const log = createStepLogger("report");
-  const days = kind === "daily" ? 1 : 7;
-  const label = kind === "daily" ? "日報" : "週報";
+  const days = REPORT_DAYS[kind];
+  const label = REPORT_LABEL[kind];
   const [settings, stats] = await Promise.all([getSettings(sql), collectStats(sql, days)]);
   const facts = formatStats(stats);
   const [president] = await sql<{ name: string; personality: string; speaking_style: string }[]>`
@@ -189,7 +209,10 @@ ${PLAIN_LANGUAGE_RULES}
 - 下の「数字のまとめ」は、システムが集計した事実です。数字を変えたり、書かれていないことを事実のように書いたりしない。
 - 経営者が1分で読める長さにする。
 - 承認待ちや、返事を待っているチームがあれば、はっきり伝える。
-- 費用が目標を超えそうなら、注意をうながす。`,
+- 費用が目標を超えそうなら、注意をうながす。
+- お金の記録（入ったお金・出たお金）があれば、もうけが出ているかをひとことで伝える。記録がなければ、売上はまだ記録されていないと伝える。${
+          kind === "monthly" ? "\n- 月報なので、この1か月の振り返りと、来月に力を入れることを書く。" : ""
+        }`,
         messages: [{ role: "user", content: `${label}を書いてください。\n\n${facts}` }],
         schema: ReportSchema,
         schemaName: "company_report",
@@ -231,6 +254,9 @@ ${PLAIN_LANGUAGE_RULES}
     values (${kind}, ${title}, ${content}, 'president',
       ((now() - ${`${days} days`}::interval) at time zone 'Asia/Tokyo')::date, (now() at time zone 'Asia/Tokyo')::date)
     returning id`;
+  if (trigger === "scheduled") {
+    await enqueueNotification(sql, { kind: "report", title: `社長から${label}が届きました`, body: title, url: "/reports", dedupeKey: `report:${row.id}` });
+  }
   await audit(sql, trigger === "manual" ? "owner" : "system", "report_generated", "report", row.id, {
     kind,
     trigger,

@@ -1,4 +1,5 @@
 import "server-only";
+import { enqueueNotification } from "@/lib/notify";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured, type WebSource } from "@/lib/ai/client";
@@ -251,6 +252,15 @@ export async function runDiscovery(sql: Sql, trigger: "manual" | "scheduled"): P
       : duplicates.length > 0
         ? "見つけた候補は、すでにある候補と似ていたため保存しませんでした。"
         : "今回は候補が見つかりませんでした。";
+  if (trigger === "scheduled" && created.length > 0) {
+    await enqueueNotification(sql, {
+      kind: "report",
+      title: "新しい事業の候補が見つかりました",
+      body: created.map((c) => c.name).join("、"),
+      url: created.length === 1 ? `/business/${created[0].id}` : "/business",
+      dedupeKey: `discovery:${created[0].id}`,
+    });
+  }
   await audit(sql, trigger === "manual" ? "owner" : "system", "discovery_run", "business_project", created[0]?.id ?? "", {
     trigger,
     created: created.map((c) => c.name),

@@ -7,6 +7,7 @@ import { audit } from "@/lib/repo/audit";
 import { runWorkflowStep, type StepResult } from "@/lib/workflow/engine";
 import { pauseTeam, postInstruction, resumeTeam, startTeam } from "@/lib/workflow/human";
 import { scheduleTeamRun } from "@/lib/workflow/trigger";
+import { kickNotifications } from "@/lib/notify/trigger";
 import type { ActionState } from "@/components/forms";
 
 const fail = (e: unknown): ActionState => ({ ok: false, error: e instanceof Error ? e.message : "処理に失敗しました", ts: Date.now() });
@@ -76,7 +77,9 @@ export async function advanceTeamAction(taskId: string): Promise<StepResult | { 
   try {
     await assertAuth();
     const sql = await getDb();
-    return await runWorkflowStep(sql, taskId, `screen-${Math.random().toString(36).slice(2, 10)}`);
+    const r = await runWorkflowStep(sql, taskId, `screen-${Math.random().toString(36).slice(2, 10)}`);
+    if (r.status === "stepped" || r.status === "transitioned") kickNotifications();
+    return r;
   } catch (e) {
     return { status: "error", message: e instanceof Error ? e.message : "処理に失敗しました" };
   }

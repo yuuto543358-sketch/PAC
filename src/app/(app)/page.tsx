@@ -8,6 +8,7 @@ import { latestPresidentMessage } from "@/lib/repo/conversations";
 import { listEmployees } from "@/lib/repo/employees";
 import { listActiveTeams } from "@/lib/workflow/repo";
 import { listBusinessProjects } from "@/lib/repo/business";
+import { ledgerTotals } from "@/lib/repo/ledger";
 import { ACTIVE_WORKFLOW_PHASES, BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, REPORT_TYPE_LABEL, WORKFLOW_PHASE_LABEL } from "@/lib/constants";
 import { isAiConfigured } from "@/lib/ai/client";
 import { greeting, longDate, relativeTime, yen } from "@/lib/format";
@@ -17,7 +18,7 @@ import { Alert, ChevronRight, List, ListRow, Page, Ring, Section, Stat, TaskStat
 
 export default async function HomePage() {
   const sql = await getDb();
-  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport] = await Promise.all([
+  const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport, money] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -30,8 +31,9 @@ export default async function HomePage() {
     listActiveTeams(sql, 5),
     listBusinessProjects(sql, { limit: 3 }),
     sql<{ id: string; report_type: string; title: string; created_at: Date }[]>`
-      select id, report_type, title, created_at from reports where report_type in ('daily','weekly')
+      select id, report_type, title, created_at from reports where report_type in ('daily','weekly','monthly')
       order by created_at desc limit 1`.then((r) => r[0] ?? null),
+    ledgerTotals(sql),
   ]);
   const president = employees.find((e) => e.id === "president");
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
@@ -128,7 +130,7 @@ export default async function HomePage() {
             <Stat label="稼働中の業務" value={`${counts.active}件`} href="/tasks" icon="tasks" />
             <Stat label="承認待ち" value={`${pending}件`} href="/approvals" icon="approve" tone={pending > 0 ? "accent" : undefined} />
             <Stat label="今月完了した業務" value={`${counts.completed_month}件`} sub={`累計 ${counts.completed_total}件`} href="/tasks?view=closed" icon="check" />
-            <Stat label="今月の収益" value="0円" sub="記録は Phase 4 で実装予定" icon="trend" />
+            <Stat label="今月の収益" value={yen(money.month.income)} sub={`出たお金 ${yen(money.month.expense)}`} icon="trend" href="/finance" />
           </div>
         </Section>
 

@@ -7,7 +7,9 @@ import { getBusinessProject } from "@/lib/repo/business";
 import { Page, PageHeader, Section } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { SourceList } from "@/components/SourceList";
-import { BusinessStatusForm, InvestigateButton } from "../BusinessActions";
+import { BusinessStatusForm, BusinessWorkButtons, InvestigateButton } from "../BusinessActions";
+import { businessMoney } from "@/lib/repo/ledger";
+import { yenPrecise } from "@/lib/format";
 
 export const metadata = { title: "事業の候補" };
 export const maxDuration = 300;
@@ -26,6 +28,12 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
   const sql = await getDb();
   const b = await getBusinessProject(sql, id);
   if (!b) notFound();
+  const [money, related] = await Promise.all([
+    businessMoney(sql, b.id),
+    sql<{ id: string; title: string; status: TaskStatus }[]>`
+      select id, title, status from tasks where business_project_id = ${b.id} order by created_at desc limit 10`,
+  ]);
+  const canBuild = b.status === "promising" || b.status === "adopted";
   const taskActive =
     b.validation_task_id && b.validation_task_status && !["completed", "rejected", "failed"].includes(b.validation_task_status);
   return (
@@ -80,6 +88,55 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
               </p>
             </div>
           )}
+        </Section>
+
+        <Section title="次の一歩">
+          {canBuild ? (
+            <>
+              <BusinessWorkButtons id={b.id} />
+              <p className="mt-1.5 px-1 text-xs text-muted">
+                チームが商品の中身や、販売ページの文章・値段・売る場所の候補を用意します（各 約5〜20円）。出品・投稿・登録は、あなたが自分で行います。
+              </p>
+            </>
+          ) : (
+            <p className="card px-4 py-3 text-[13px] text-muted">
+              下の「あなたの判断」で「有望」か「採用」にすると、チームに「商品を作る」「販売の準備をする」を任せられます。
+            </p>
+          )}
+          {related.length > 0 && (
+            <ul className="card mt-2.5 divide-y divide-separator text-sm">
+              {related.map((t) => (
+                <li key={t.id}>
+                  <Link href={`/tasks/${t.id}`} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                    <span className="truncate text-brand">{t.title}</span>
+                    <span className="shrink-0 text-xs text-muted">{TASK_STATUS_LABEL[t.status] ?? t.status}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <Section
+          title="この事業のお金"
+          action={
+            <Link href={`/finance/ledger?business=${b.id}`} className="font-medium text-brand">
+              記録する
+            </Link>
+          }
+        >
+          <div className="card grid grid-cols-2 gap-y-1.5 p-4 text-[14px]">
+            <span className="text-muted">入ったお金</span>
+            <span className="text-right font-semibold text-success">{yen(money.income)}</span>
+            <span className="text-muted">出たお金</span>
+            <span className="text-right">{yen(money.expense)}</span>
+            <span className="text-muted">AIの利用料</span>
+            <span className="text-right">{yenPrecise(money.api)}</span>
+            <span className="border-t border-line pt-1.5 font-bold">もうけ</span>
+            <span className={`border-t border-line pt-1.5 text-right font-bold ${money.profit < 0 ? "text-danger" : "text-success"}`}>
+              {yen(money.profit)}
+            </span>
+          </div>
         </Section>
 
         <Section title="くわしい内容">

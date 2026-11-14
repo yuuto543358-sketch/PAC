@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { runWorkflows } from "@/lib/workflow/engine";
 import { runScheduledJobs } from "@/lib/autonomy/scheduler";
+import { dispatchNotifications } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -30,7 +31,13 @@ export async function GET(request: Request) {
       log.fail("scheduled jobs", err);
     }
     const r = await runWorkflows(sql, { maxSteps: 30, deadlineMs: Math.max(30_000, 240_000 - (Date.now() - started)) });
-    log.step("finished", { steps: r.steps, stopped: r.stoppedReason, jobs: jobs?.ran });
+    let push = null;
+    try {
+      push = await dispatchNotifications(sql);
+    } catch (err) {
+      log.fail("push", err);
+    }
+    log.step("finished", { steps: r.steps, stopped: r.stoppedReason, jobs: jobs?.ran, push });
     return Response.json({
       ok: true,
       jobs: jobs ? { ran: jobs.ran, skipped: jobs.skipped } : null,

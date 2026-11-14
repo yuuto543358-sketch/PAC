@@ -260,6 +260,40 @@ await page.waitForTimeout(800);
 check("保存後も選んだ状態が表示される", (await page.locator("select[name=status]").inputValue()) === "promising");
 await shot("19-business-detail");
 
+// 有望にした事業は、チームに「商品を作る」を任せられる（Phase 4）
+await page.getByRole("button", { name: "商品を作る" }).click();
+await page.getByRole("status").filter({ hasText: "チームが商品づくりを始めました" }).waitFor({ timeout: 30_000 });
+check("有望な事業で「商品を作る」を始められる", true);
+const businessUrl = page.url();
+
+// お金の記録（Phase 4）
+await page.goto(`${BASE}/finance/ledger?business=${businessUrl.split("/").pop()}`);
+await page.fill("input[name=amount_jpy]", "3000");
+await page.fill("input[name=description]", "テストの売上");
+await page.getByRole("button", { name: "記録する" }).click();
+await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
+await page.reload();
+check("入ったお金を記録できる", (await page.getByText("+3,000円").count()) > 0);
+await page.getByText("出たお金（費用）").click();
+await page.fill("input[name=amount_jpy]", "500");
+await page.getByRole("button", { name: "記録する" }).click();
+await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
+await page.reload();
+check("出たお金を記録できる", (await page.getByText("−500円").count()) > 0);
+await page.getByText("間違えたときは", { exact: true }).first().click();
+await page.fill("input[name=reason]", "テストの取り消し");
+await page.getByRole("button", { name: "この記録を取り消す" }).click();
+await page.getByRole("status").filter({ hasText: "記録を取り消しました" }).waitFor();
+await page.reload();
+check("記録を取り消せる（理由つきで残る）", (await page.getByText("取り消し済み").count()) > 0);
+await shot("21-ledger");
+await page.goto(`${BASE}/finance`);
+check("財務画面に「今月のもうけ」", (await page.getByText("今月のもうけ").count()) > 0);
+check("財務画面に事業ごとのお金", (await page.getByText("事業ごとのお金（これまでの合計）").count()) > 0);
+await shot("22-finance");
+await page.goto(businessUrl);
+check("事業の画面にお金が出る", (await page.getByText("この事業のお金").count()) > 0);
+
 // 報告書：今すぐ日報を作る（Phase 3）
 await page.goto(`${BASE}/reports`);
 check("報告書に社長の完了報告が保存される", (await page.getByText("業務完了報告：").count()) > 0);
@@ -268,6 +302,20 @@ await page.getByRole("status").filter({ hasText: "日報を作りました" }).w
 await page.reload();
 check("日報が保存される（AIが休憩中なら数字だけの日報）", (await page.getByText(/^日報(：|（数字のまとめ）)/).count()) > 0);
 await shot("20-reports");
+await page.getByRole("button", { name: "月報を作る" }).click();
+await page.getByRole("status").filter({ hasText: "月報を作りました" }).waitFor({ timeout: 60_000 });
+check("月報を作れる", true);
+
+// 通知の設定（Phase 4）：鍵が未設定なら、鍵を作る案内が出る
+await page.goto(`${BASE}/settings#notify`);
+check("通知の鍵は最初は表示されない", (await page.getByText("VAPID_PRIVATE_KEY", { exact: false }).count()) === 0);
+await page.getByRole("button", { name: "通知の鍵を作る" }).click();
+await page.getByText("名前（Key）：VAPID_PRIVATE_KEY").waitFor();
+check("通知の鍵を作ると、Vercel に登録する値が出る", true);
+await page.getByRole("button", { name: "通知の設定を保存" }).click();
+await page.getByRole("status").filter({ hasText: "通知の設定を保存しました" }).waitFor();
+check("通知のオン・オフを保存", true);
+await shot("23-notify");
 
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);

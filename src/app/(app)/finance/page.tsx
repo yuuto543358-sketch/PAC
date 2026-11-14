@@ -4,7 +4,10 @@ import { getSpendSummary } from "@/lib/budget";
 import { getBudget, getSettings } from "@/lib/repo/settings";
 import { dailyUsageThisMonth, listUsage, usageByEmployeeThisMonth, usageByTaskThisMonth } from "@/lib/repo/usage";
 import { dateTime, yen, yenPrecise } from "@/lib/format";
-import { Meter, Page, PageHeader, PhaseNotice, Section, Stat } from "@/components/ui";
+import { businessMoneyList, ledgerTotals, monthlyMoney } from "@/lib/repo/ledger";
+import { BUSINESS_STATUS_LABEL, type BusinessStatus } from "@/lib/constants";
+import { Meter, Page, PageHeader, Section, Stat } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 export const metadata = { title: "財務管理" };
 
@@ -12,7 +15,7 @@ const STATUS_LABEL: Record<string, string> = { reserved: "処理中", completed:
 
 export default async function FinancePage() {
   const sql = await getDb();
-  const [settings, budget, spend, byEmp, byTask, daily, history] = await Promise.all([
+  const [settings, budget, spend, byEmp, byTask, daily, history, totals, months, perBusiness] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -20,17 +23,104 @@ export default async function FinancePage() {
     usageByTaskThisMonth(sql),
     dailyUsageThisMonth(sql),
     listUsage(sql, 50),
+    ledgerTotals(sql),
+    monthlyMoney(sql, 6),
+    businessMoneyList(sql),
   ]);
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
   const remaining = Math.max(0, hardLimit - spend.monthJpy);
   const maxEmp = Math.max(0.0001, ...byEmp.map((e) => e.jpy));
   const maxDay = Math.max(0.0001, ...daily.map((d) => d.jpy));
   const ops = settings.hosting_cost_jpy_monthly;
+  const costs = totals.month.expense + spend.monthJpy + ops;
+  const profit = totals.month.income - costs;
 
   return (
     <>
       <PageHeader title="財務管理" subtitle="今月（日本時間）の集計" back="/more" backLabel="メニュー" />
       <Page>
+        <Section title="今月のもうけ">
+          <div className="card p-4 text-[15px]">
+            <div className="flex justify-between">
+              <span className="text-muted">入ったお金（収益）</span>
+              <span className="font-semibold text-success">{yen(totals.month.income)}</span>
+            </div>
+            <div className="mt-1.5 flex justify-between">
+              <span className="text-muted">出たお金（記録した費用）</span>
+              <span>{yen(totals.month.expense)}</span>
+            </div>
+            <div className="mt-1.5 flex justify-between">
+              <span className="text-muted">AIの利用料（自動）</span>
+              <span>{yen(spend.monthJpy)}</span>
+            </div>
+            <div className="mt-1.5 flex justify-between">
+              <span className="text-muted">運用料金（手入力）</span>
+              <span>{yen(ops)}</span>
+            </div>
+            <div className="mt-2.5 flex justify-between border-t border-line pt-2.5 text-[17px] font-bold">
+              <span>もうけ（利益）</span>
+              <span className={profit < 0 ? "text-danger" : "text-success"}>{yen(profit)}</span>
+            </div>
+          </div>
+          <Link href="/finance/ledger" className="btn-primary mt-2.5 w-full">
+            <Icon name="plus" size={18} stroke={2.4} />
+            入ったお金・出たお金を記録する
+          </Link>
+        </Section>
+
+        <Section title="月ごとのお金（直近6か月）">
+          <div className="card overflow-x-auto p-1">
+            <table className="w-full text-right text-[13px] tabular">
+              <thead className="text-[11px] text-muted">
+                <tr>
+                  <th className="px-2 py-2 text-left font-semibold">月</th>
+                  <th className="px-2 py-2 font-semibold">収益</th>
+                  <th className="px-2 py-2 font-semibold">費用</th>
+                  <th className="px-2 py-2 font-semibold">AI</th>
+                  <th className="px-2 py-2 font-semibold">もうけ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {months.map((m) => {
+                  const p = m.income - m.expense - m.api - ops;
+                  return (
+                    <tr key={m.month} className="border-t border-separator">
+                      <td className="px-2 py-2 text-left">{m.month.slice(5).replace(/^0/, "")}月</td>
+                      <td className="px-2 py-2">{yen(m.income)}</td>
+                      <td className="px-2 py-2">{yen(m.expense)}</td>
+                      <td className="px-2 py-2">{yen(m.api)}</td>
+                      <td className={`px-2 py-2 font-semibold ${p < 0 ? "text-danger" : "text-success"}`}>{yen(p)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 px-1 text-xs text-muted">「もうけ」は、運用料金（いまの設定 {yen(ops)}/月）も引いた金額です。</p>
+        </Section>
+
+        <Section title="事業ごとのお金（これまでの合計）">
+          {perBusiness.length === 0 ? (
+            <p className="card px-4 py-4 text-sm text-muted">まだありません。お金を記録するときに「どの事業のお金？」を選ぶと、ここに出ます。</p>
+          ) : (
+            <ul className="card divide-y divide-separator text-sm">
+              {perBusiness.map((b) => (
+                <li key={b.id}>
+                  <Link href={`/business/${b.id}`} className="block px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate font-medium text-brand">{b.name}</span>
+                      <span className={`shrink-0 font-bold ${b.profit < 0 ? "text-danger" : "text-success"}`}>{yen(b.profit)}</span>
+                    </div>
+                    <div className="text-xs text-muted">
+                      {BUSINESS_STATUS_LABEL[b.status as BusinessStatus] ?? b.status}・収益 {yen(b.income)}・費用 {yen(b.expense)}・AI {yenPrecise(b.api)}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
         <Section title="AI API 利用料">
           <div className="card p-4">
             <div className="flex items-baseline justify-between">
@@ -138,26 +228,6 @@ export default async function FinancePage() {
               </Link>
               で金額を入力してください。API利用料とは別に表示しています。
             </p>
-          </div>
-        </Section>
-
-        <Section title="収益・利益">
-          <div className="card p-4 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted">今月の収益</span>
-              <span>0円</span>
-            </div>
-            <div className="mt-1 flex justify-between">
-              <span className="text-muted">費用（API＋運用）</span>
-              <span>{yen(spend.monthJpy + ops)}</span>
-            </div>
-            <div className="mt-2 flex justify-between border-t border-line pt-2 font-bold">
-              <span>利益</span>
-              <span>{yen(-(spend.monthJpy + ops))}</span>
-            </div>
-          </div>
-          <div className="mt-2">
-            <PhaseNotice phase="Phase 4">事業別の収益・費用の記録</PhaseNotice>
           </div>
         </Section>
 

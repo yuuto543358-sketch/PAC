@@ -2,6 +2,7 @@ import "server-only";
 import { begin, type Db, type Sql } from "@/lib/db";
 import { actualCostUsd, ESTIMATE_SAFETY_FACTOR, estimateCostJpy, getPricing, type UsageLike } from "@/lib/pricing";
 import { getBudget, getSettings } from "@/lib/repo/settings";
+import { enqueueNotification } from "@/lib/notify";
 
 /** 予算などの理由でAI呼び出しを止めたときのエラー（利用者に表示してよい内容） */
 export class BudgetBlockedError extends Error {
@@ -214,7 +215,50 @@ export async function finalizeApiCall(
       web_search_calls = ${usage.web_search_calls ?? 0},
       cost_usd = ${usd}, cost_jpy = ${jpy}, completed_at = now(), request_id = ${requestId ?? null}
     where id = ${reservation.usageId} and status = 'reserved'`;
+  await notifyBudgetIfNeeded(db);
   return { costJpy: jpy, known: true };
+}
+
+/**
+ * 予算のお知らせ（プッシュ通知）。今月の目標・緊急停止ラインの9割・1日の上限に達したら、それぞれ1回だけ通知する。
+ * 通知の失敗でAIの結果を捨てないよう、ここでのエラーは記録だけして無視する。
+ */
+export async function notifyBudgetIfNeeded(db: Db) {
+  try {
+    const [spend, budget] = await Promise.all([getSpendSummary(db), getBudget(db)]);
+    const month = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date()).slice(0, 7);
+    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
+    const hard = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
+    const yen = (n: number) => `${Math.round(n).toLocaleString("ja-JP")}円`;
+    if (spend.monthJpy >= hard * 0.9) {
+      await enqueueNotification(db, {
+        kind: "budget",
+        title: "AIの利用料が上限に近づいています",
+        body: `今月 ${yen(spend.monthJpy)}（緊急停止ライン ${yen(hard)}）。上限に達すると自動で止まります。`,
+        url: "/finance",
+        dedupeKey: `budget:hard:${month}`,
+      });
+    } else if (spend.monthJpy >= budget.monthly_target_jpy) {
+      await enqueueNotification(db, {
+        kind: "budget",
+        title: "AIの利用料が今月の目標を超えました",
+        body: `今月 ${yen(spend.monthJpy)}（目標 ${yen(budget.monthly_target_jpy)}）`,
+        url: "/finance",
+        dedupeKey: `budget:target:${month}`,
+      });
+    }
+    if (spend.todayJpy >= budget.daily_limit_jpy * 0.9) {
+      await enqueueNotification(db, {
+        kind: "budget",
+        title: "今日のAI利用料が1日の上限に近づいています",
+        body: `今日 ${yen(spend.todayJpy)}（1日の上限 ${yen(budget.daily_limit_jpy)}）`,
+        url: "/finance",
+        dedupeKey: `budget:daily:${day}`,
+      });
+    }
+  } catch (err) {
+    console.error("[pac][budget] FAILED budget notice", err);
+  }
 }
 
 /**

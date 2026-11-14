@@ -21,7 +21,11 @@ export default async function ReportsPage() {
     getSettings(sql),
   ]);
   const autoLabel =
-    settings.autorun_frequency === "daily" ? "毎日（月曜は週報も）" : settings.autorun_frequency === "weekly" ? "毎週月曜" : "停止中";
+    settings.autorun_frequency === "daily"
+      ? "毎日（月曜は週報、毎月1日は月報も）"
+      : settings.autorun_frequency === "weekly"
+        ? "毎週月曜（毎月1日は月報も）"
+        : "停止中";
   return (
     <>
       <PageHeader title="報告書" subtitle={`${reports.length}件`} back="/more" backLabel="メニュー" />

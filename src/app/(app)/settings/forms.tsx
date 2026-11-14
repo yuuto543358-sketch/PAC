@@ -9,6 +9,7 @@ import {
   updateOpsCostAction,
 } from "@/app/actions/settings";
 import { logoutAllDevices } from "@/app/actions/auth";
+import { updateNotifySettingsAction } from "@/app/actions/notify";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { AUTORUN_OPTIONS, MODEL_OPTIONS } from "@/lib/constants";
 
@@ -169,6 +170,28 @@ export function AutorunForm({
         </span>
       </label>
       <SubmitButton className="btn-secondary w-full">自動で動く設定を保存</SubmitButton>
+    </ActionForm>
+  );
+}
+
+export function NotifyForm({ initial }: { initial: { notify_approvals: boolean; notify_budget: boolean } }) {
+  return (
+    <ActionForm action={updateNotifySettingsAction}>
+      <label className="flex items-start gap-2.5 text-sm">
+        <input type="checkbox" name="notify_approvals" defaultChecked={initial.notify_approvals} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" />
+        <span>
+          承認のお願い・チームからの質問・自動の報告
+          <span className="block text-xs text-muted">あなたの返事が必要なときや、日報・週報・月報、新しい事業の候補が届いたとき</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2.5 text-sm">
+        <input type="checkbox" name="notify_budget" defaultChecked={initial.notify_budget} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" />
+        <span>
+          予算のお知らせ
+          <span className="block text-xs text-muted">AIの利用料が今月の目標や上限に近づいたとき（それぞれ月1回まで）</span>
+        </span>
+      </label>
+      <SubmitButton className="btn-secondary w-full">通知の設定を保存</SubmitButton>
     </ActionForm>
   );
 }

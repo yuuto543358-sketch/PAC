@@ -55,3 +55,30 @@ export function SelfSendPanel({ subject, body, destination }: { subject: string;
     </div>
   );
 }
+
+/** メール以外の外部への操作（SNS投稿など）。アプリは実行しないので、内容をコピーして経営者が自分で行う */
+export function OwnerDoPanel({ body }: { body: string }) {
+  return (
+    <div className="card space-y-3 p-4">
+      <p className="text-[14px] leading-relaxed">
+        <b>このアプリには、外部で自動的に実行する機能はありません。</b>
+        必要なら、下のボタンで内容をコピーして、あなたが行ってください（SNSへの投稿、サービスへの登録など）。
+      </p>
+      <button
+        type="button"
+        className="btn-tinted w-full"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(body);
+            showToast("内容をコピーしました");
+          } catch {
+            showToast("コピーできませんでした", "error");
+          }
+        }}
+      >
+        <Icon name="document" size={18} stroke={2} />
+        内容をコピー
+      </button>
+    </div>
+  );
+}

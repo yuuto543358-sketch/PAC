@@ -1,6 +1,12 @@
 "use client";
 
-import { createReportNowAction, findWorkNowAction, investigateBusinessAction, setBusinessStatusAction } from "@/app/actions/autonomy";
+import {
+  createReportNowAction,
+  findWorkNowAction,
+  investigateBusinessAction,
+  setBusinessStatusAction,
+  startBusinessWorkAction,
+} from "@/app/actions/autonomy";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { BUSINESS_STATUS_LABEL, OWNER_BUSINESS_STATUSES, type BusinessStatus } from "@/lib/constants";
 
@@ -17,7 +23,7 @@ export function FindWorkButton({ disabled }: { disabled?: boolean }) {
 
 export function ReportNowButtons() {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       <ActionForm action={createReportNowAction}>
         <input type="hidden" name="kind" value="daily" />
         <SubmitButton className="btn-secondary w-full" pendingText="作成中…">
@@ -28,6 +34,12 @@ export function ReportNowButtons() {
         <input type="hidden" name="kind" value="weekly" />
         <SubmitButton className="btn-secondary w-full" pendingText="作成中…">
           週報を作る
+        </SubmitButton>
+      </ActionForm>
+      <ActionForm action={createReportNowAction}>
+        <input type="hidden" name="kind" value="monthly" />
+        <SubmitButton className="btn-secondary w-full" pendingText="作成中…">
+          月報を作る
         </SubmitButton>
       </ActionForm>
     </div>
@@ -42,6 +54,27 @@ export function InvestigateButton({ id }: { id: string }) {
         チームで調べる
       </SubmitButton>
     </ActionForm>
+  );
+}
+
+export function BusinessWorkButtons({ id }: { id: string }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <ActionForm action={startBusinessWorkAction}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="kind" value="product" />
+        <SubmitButton className="btn-tinted w-full" pendingText="編成中…">
+          商品を作る
+        </SubmitButton>
+      </ActionForm>
+      <ActionForm action={startBusinessWorkAction}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="kind" value="sales" />
+        <SubmitButton className="btn-tinted w-full" pendingText="編成中…">
+          販売の準備をする
+        </SubmitButton>
+      </ActionForm>
+    </div>
   );
 }
 

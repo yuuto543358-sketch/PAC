@@ -27,7 +27,7 @@ export function jstDateParts(now: Date): { date: string; weekday: number } {
   return { date, weekday };
 }
 
-type ClaimColumn = "last_discovery_on" | "last_daily_report_on" | "last_weekly_report_on";
+type ClaimColumn = "last_discovery_on" | "last_daily_report_on" | "last_weekly_report_on" | "last_monthly_report_on";
 
 /**
  * 「今日この仕事をするのは自分」という権利を取る。すでに今日実行済みなら false。
@@ -88,6 +88,15 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
       result.ran.push("weekly_report");
     } else {
       result.skipped.push("週報は今日すでに作成済み");
+    }
+  }
+  // 月報: 毎月1日（daily・weekly どちらでも）
+  if (date.endsWith("-01")) {
+    if (await claim(sql, "last_monthly_report_on", date)) {
+      result.reports.push(await generateCompanyReport(sql, "monthly", "scheduled"));
+      result.ran.push("monthly_report");
+    } else {
+      result.skipped.push("月報は今日すでに作成済み");
     }
   }
   log.step("done", { freq, ran: result.ran, skipped: result.skipped.length });

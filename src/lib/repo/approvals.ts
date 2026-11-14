@@ -1,4 +1,5 @@
 import "server-only";
+import { enqueueNotification } from "@/lib/notify";
 import { createHash } from "node:crypto";
 import type postgres from "postgres";
 type JSONValue = postgres.JSONValue;
@@ -6,6 +7,7 @@ import { begin, type Db, type Sql, type Tx } from "@/lib/db";
 import {
   APPROVAL_ACTION_TYPES,
   OWNER_SENDS_ACTION_TYPES,
+  OWNER_DOES_AFTER_EFFECT,
   OWNER_SENDS_AFTER_EFFECT,
   type ApprovalActionType,
   type ApprovalStatus,
@@ -169,10 +171,17 @@ function validateInput(input: CreateApprovalInput): ApprovalContent {
 }
 
 export async function createApprovalTx(tx: Tx, rawInput: CreateApprovalInput, actorType = "employee") {
-  // メール・メッセージは経営者が自分で送る。AIが何と書いても「承認後に何が起こるか」は固定の説明にする
-  const input = (OWNER_SENDS_ACTION_TYPES as string[]).includes(rawInput.actionType)
-    ? { ...rawInput, afterEffect: OWNER_SENDS_AFTER_EFFECT }
-    : rawInput;
+  // アプリには外部で自動実行する機能がない（メールは経営者の方針で自分で送る）。
+  // AIが何と書いても「承認後に何が起こるか」は、事実どおりの固定の説明にする
+  const input =
+    rawInput.actionType === "accept_deliverable"
+      ? rawInput
+      : {
+          ...rawInput,
+          afterEffect: (OWNER_SENDS_ACTION_TYPES as string[]).includes(rawInput.actionType)
+            ? OWNER_SENDS_AFTER_EFFECT
+            : OWNER_DOES_AFTER_EFFECT,
+        };
   const c = validateInput(input);
   const hash = computeContentHash(c);
   const [row] = await tx<{ id: string }[]>`
@@ -184,6 +193,16 @@ export async function createApprovalTx(tx: Tx, rawInput: CreateApprovalInput, ac
       ${hash}, ${input.supersedesId ?? null})
     returning id`;
   await insertEvent(tx, row.id, input.supersedesId ? "resubmitted" : "created", null, "pending", "", actorType);
+  // 経営者が自分で出した（修正して再提出した）ものは、通知しない
+  if (actorType !== "user") {
+    await enqueueNotification(tx, {
+      kind: "approval",
+      title: c.action_type === "accept_deliverable" ? "成果物の確認をお願いします" : "承認のお願いが届きました",
+      body: c.title,
+      url: `/approvals/${row.id}`,
+      dedupeKey: `approval:${row.id}`,
+    });
+  }
   if (input.taskId) {
     const [t] = await tx<{ status: string }[]>`select status from tasks where id = ${input.taskId} for update`;
     if (t && t.status !== "awaiting_approval") {

@@ -1,4 +1,5 @@
 import "server-only";
+import { enqueueNotification } from "@/lib/notify";
 import type { z } from "zod";
 import type { Sql, Tx } from "@/lib/db";
 import { begin } from "@/lib/db";
@@ -276,6 +277,12 @@ export function shouldUseWebSearch(phase: WorkflowPhase, speaker: { role_key: st
 async function askOwner(tx: Tx, wf: Workflow, speakerId: string, question: string, resume: WorkflowPhase) {
   await addRoomMessage(tx, { taskId: wf.task_id, authorType: "employee", employeeId: speakerId, kind: "question_to_owner", content: question });
   await updateWorkflow(tx, wf.task_id, { phase: "waiting_human", waiting_reason: "question", resume_phase: resume });
+  await enqueueNotification(tx, {
+    kind: "question",
+    title: "チームから質問が届きました",
+    body: question.slice(0, 120),
+    url: `/tasks/${wf.task_id}/room`,
+  });
 }
 
 async function applyKickoff(
