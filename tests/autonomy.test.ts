@@ -18,7 +18,7 @@ async function resetState() {
   await sql`update company_settings set emergency_stop = false, web_research_enabled = true, discovery_auto_start = true,
     autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
-  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31'`;
+  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31'`;
   // これまでのテストで作られた候補と名前が重ならないようにする（テスト用DBでのみ行う操作）
   await sql`update business_projects set name = name || '（過去のテスト ' || id::text || '）' where name not like '%（過去のテスト %'`;
   // 「AIが見つけた業務」の同時進行の上限（2件）に掛からないよう、過去のテストの業務を終わらせる

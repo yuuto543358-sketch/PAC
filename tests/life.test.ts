@@ -338,7 +338,7 @@ describe("Phase 5：サーバーの定期実行（アプリを開いていなく
     const r1 = await runScheduledJobs(sql, day);
     expect(r1.ran).toContain("life_questions");
     expect((await openQuestions(sql)).length).toBe(3);
-    expect(await sql`select 1 from notifications where dedupe_key = 'life-q:2030-03-05'`).toHaveLength(1);
+    expect(await sql`select 1 from notifications where dedupe_key = 'morning:2030-03-05'`).toHaveLength(1);
     await sql`update life_questions set status = 'skipped'`;
     const r2 = await runScheduledJobs(sql, day);
     expect(r2.ran).not.toContain("life_questions");

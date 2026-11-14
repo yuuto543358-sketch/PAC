@@ -9,6 +9,13 @@ import { listEmployees } from "@/lib/repo/employees";
 import { listActiveTeams } from "@/lib/workflow/repo";
 import { listBusinessProjects } from "@/lib/repo/business";
 import { ledgerTotals } from "@/lib/repo/ledger";
+import { getCheckin, qolScore } from "@/lib/life/checkins";
+import { habitProgressList } from "@/lib/life/habits";
+import { listEvents } from "@/lib/life/events";
+import { listGoals } from "@/lib/life/goals";
+import { jstDateParts } from "@/lib/format";
+import { CheckinForm, HabitCheck } from "./life/QolForms";
+import { GoalBar } from "@/components/GoalBar";
 import { ACTIVE_WORKFLOW_PHASES, BUSINESS_STATUS_LABEL, BUSINESS_STATUS_TONE, REPORT_TYPE_LABEL, WORKFLOW_PHASE_LABEL } from "@/lib/constants";
 import { isAiConfigured } from "@/lib/ai/client";
 import { greeting, longDate, relativeTime, yen } from "@/lib/format";
@@ -18,6 +25,16 @@ import { Alert, ChevronRight, List, ListRow, Page, Ring, Section, Stat, TaskStat
 
 export default async function HomePage() {
   const sql = await getDb();
+  const { date: today } = jstDateParts(new Date());
+  const [todayCheckin, habits, events, goals, [lastReview]] = await Promise.all([
+    getCheckin(sql, today),
+    habitProgressList(sql, today),
+    listEvents(sql, today),
+    listGoals(sql, today),
+    sql<{ id: string; ai_summary: string; week_start: string }[]>`
+      select id, ai_summary, to_char(week_start, 'YYYY-MM-DD') as week_start from life_reviews where ai_used order by created_at desc limit 1`,
+  ]);
+  const soon = events.filter((e) => e.daysLeft != null && (e.remindNow || e.daysLeft <= 14)).slice(0, 3);
   const [settings, budget, spend, counts, pending, lastMsg, employees, recentTasks, activity, teams, candidates, latestReport, money, lifeQuestions] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
@@ -53,9 +70,9 @@ export default async function HomePage() {
 
   const quick: { href: string; label: string; icon: IconName; color: string; badge?: number }[] = [
     { href: "/employees/president/chat", label: "社長に相談", icon: "chat", color: "#2348b8" },
-    { href: "/tasks/new", label: "業務を登録", icon: "plus", color: "#0f766e" },
+    { href: "/employees/life/chat", label: "森野に相談", icon: "sparkles", color: "#0f766e" },
     { href: "/approvals", label: "承認する", icon: "approve", color: "#c2410c", badge: pending },
-    { href: "/finance", label: "財務を見る", icon: "wallet", color: "#15803d" },
+    { href: "/tasks/new", label: "業務を登録", icon: "plus", color: "#475569" },
   ];
 
   return (
@@ -70,14 +87,109 @@ export default async function HomePage() {
               <Icon name="settings" size={20} />
             </Link>
           </div>
-          <p className="mt-3 text-[15px] text-white/85">{greeting()}、社長からの報告をお届けします。</p>
+          <p className="mt-3 text-[15px] text-white/85">{greeting()}。あなた専属の会社が、今日の暮らしをサポートします。</p>
           <h1 className="mt-1 text-[28px] leading-tight font-bold tracking-tight">{settings.company_name}</h1>
           <p className="mt-1 text-[13px] text-white/70">{settings.philosophy}</p>
         </div>
       </header>
 
       <Page className="-mt-14 relative">
-        <Link href="/finance" className="card press flex items-center gap-4 p-4 shadow-float">
+        {/* ===== 今日のあなた ===== */}
+        <div className="card p-4 shadow-float">
+          {todayCheckin ? (
+            <Link href="/life/checkins" className="press flex items-center gap-4">
+              <Ring value={qolScore(todayCheckin)} max={5} size={78}>
+                <span className="tabular text-[20px] leading-none font-bold">{qolScore(todayCheckin)}</span>
+                <span className="mt-0.5 text-[10px] text-muted">/ 5</span>
+              </Ring>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium text-muted">今日のQOLスコア</div>
+                <div className="mt-0.5 text-[13px] leading-relaxed">
+                  気分{todayCheckin.mood}・体調{todayCheckin.energy}・睡眠{todayCheckin.sleep}・ストレス{todayCheckin.stress}
+                </div>
+                <div className="mt-1 text-[12px] font-semibold text-brand">変化を見る・直す</div>
+              </div>
+              <ChevronRight />
+            </Link>
+          ) : (
+            <>
+              <p className="mb-2 text-[15px] font-semibold">今日の調子は？（10秒）</p>
+              <CheckinForm date={today} />
+            </>
+          )}
+        </div>
+
+        <Section
+          title={habits.length ? `今日の習慣（${habits.filter((h) => h.doneToday).length}/${habits.length}）` : "今日の習慣"}
+          action={<Link href="/life/habits" className="font-medium text-brand">{habits.length ? "すべて" : "始める"}</Link>}
+        >
+          {habits.length === 0 ? (
+            <Link href="/life/habits" className="card press block p-4 text-[14px] text-muted">
+              小さな習慣を1つ始めてみませんか？（例：寝る前にスマホを置く）
+            </Link>
+          ) : (
+            <ul className="card divide-y divide-separator">
+              {habits.map((h) => (
+                <li key={h.id}>
+                  <HabitCheck
+                    id={h.id}
+                    date={today}
+                    done={h.doneToday}
+                    title={h.title}
+                    meta={h.frequency === "daily" ? `${h.streak}日続いています` : `今週 ${h.thisWeek} / ${h.target_per_week}回`}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        {soon.length > 0 && (
+          <Section title="もうすぐ" action={<Link href="/life/events" className="font-medium text-brand">予定</Link>}>
+            <ul className="card divide-y divide-separator">
+              {soon.map((e) => (
+                <li key={e.id}>
+                  <Link href="/life/events" className="flex items-center justify-between gap-2 px-4 py-3">
+                    <span className="min-w-0 truncate text-[15px]">{e.title}</span>
+                    <span className={`shrink-0 text-[13px] font-semibold ${e.remindNow ? "text-accent" : "text-muted"}`}>
+                      {e.daysLeft! < 0 ? `${-e.daysLeft!}日過ぎ` : e.daysLeft === 0 ? "今日" : `あと${e.daysLeft}日`}
+                      {e.amount_jpy != null && `・${yen(e.amount_jpy)}`}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {goals.length > 0 && (
+          <Section title="目標" action={<Link href="/life/goals" className="font-medium text-brand">すべて</Link>}>
+            <div className="card divide-y divide-separator">
+              {goals.slice(0, 3).map((g) => (
+                <Link key={g.id} href={`/life/goals/${g.id}`} className="block px-4 py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-[15px]">{g.title}</span>
+                    <span className={`shrink-0 text-[13px] font-semibold ${g.behind ? "text-accent" : "text-muted"}`}>
+                      {g.pct != null ? `${g.pct}%` : "記録で管理"}
+                    </span>
+                  </div>
+                  <GoalBar pct={g.pct} timePct={g.timePct} />
+                </Link>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {lastReview && (
+          <Link href={`/life/reviews/${lastReview.id}`} className="card press block p-4">
+            <p className="text-[12px] font-semibold text-[#0f766e]">森野の週のふりかえり（{lastReview.week_start}〜）</p>
+            <p className="mt-1 line-clamp-2 text-[14px] leading-relaxed">{lastReview.ai_summary}</p>
+          </Link>
+        )}
+
+        <h2 className="px-1 pt-4 text-[20px] font-bold tracking-tight">あなたの会社の動き</h2>
+
+        <Link href="/finance" className="card press flex items-center gap-4 p-4">
           <Ring value={spend.monthJpy} max={hardLimit} size={86}>
             <span className="tabular text-[18px] leading-none font-bold">{usedPct}%</span>
             <span className="mt-0.5 text-[10px] text-muted">使用</span>

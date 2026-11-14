@@ -22,6 +22,15 @@ export default async function MorePage() {
           </div>
         </div>
 
+        <Section title="暮らし（いちばん大事な仕事）">
+          <List>
+            <ListRow href="/life" leading={<IconTile name="sparkles" color="#0f766e" />} title="ライフ" subtitle="今日の暮らし・質問・分析・改善提案" />
+            <ListRow href="/life/habits" leading={<IconTile name="check" color="#16a34a" />} title="小さな習慣" subtitle="続けたいことにチェック" />
+            <ListRow href="/life/events" leading={<IconTile name="clock" color="#c2410c" />} title="これから起きること" subtitle="車検・更新・税金・誕生日など" />
+            <ListRow href="/life/goals" leading={<IconTile name="star" color="#7c3aed" />} title="目標" subtitle="進み具合とふりかえり" />
+          </List>
+        </Section>
+
         <Section title="経営">
           <List>
             <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="もうけ・お金の記録・AIの利用料" />
@@ -31,11 +40,7 @@ export default async function MorePage() {
           </List>
         </Section>
 
-        <Section title="暮らし">
-          <List>
-            <ListRow href="/life" leading={<IconTile name="sparkles" color="#0f766e" />} title="ライフ" subtitle="生活情報・質問・分析・改善提案" />
-          </List>
-        </Section>
+
 
         <Section title="会社">
           <List>

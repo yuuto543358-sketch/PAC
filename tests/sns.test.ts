@@ -20,7 +20,7 @@ beforeEach(async () => {
   await sql`update company_settings set emergency_stop = false, sns_plan_frequency = 'off', sns_posts_per_plan = 2,
     sns_platforms = '{x}', last_sns_plan_on = null, autorun_frequency = 'off'`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
-  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31'`;
+  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31'`;
   await sql.begin(async (tx) => {
     await tx`alter table api_usage disable trigger api_usage_guard`;
     await tx`update api_usage set created_at = created_at - interval '2 minutes' where created_at > now() - interval '2 minutes'`;

@@ -11,6 +11,7 @@ import { getEmployee } from "@/lib/repo/employees";
 import { getSettings } from "@/lib/repo/settings";
 import { latestRecords, listCategories, listFields, recordsSince } from "./repo";
 import { computeStats, monthsAgo, statsForAi, type LifeStats } from "./stats";
+import { isEmptySnapshot, qolForAi, qolSnapshot } from "./qolsnapshot";
 import { LIFE_EMPLOYEE_ID } from "./questions";
 
 // ライフ担当（森野 結）が、集計した数字を読んで、コメントと改善提案を作る。
@@ -110,6 +111,7 @@ export async function runLifeAnalysis(
   ]);
   const records = await recordsSince(sql, monthsAgo(date, 12));
   const stats = computeStats({ fields, categories, records, latest, months, today: date, now });
+  stats.qolExtra = await qolSnapshot(sql, date, months * 30);
 
   const save = async (summary: string, aiUsed: boolean) => {
     const [row] = await sql<{ id: string }[]>`
@@ -121,7 +123,7 @@ export async function runLifeAnalysis(
   };
 
   // 情報がなければ、AIは呼ばない（費用0円）
-  if (stats.recordCount === 0 && stats.fixedCosts.items.length === 0) {
+  if (stats.recordCount === 0 && stats.fixedCosts.items.length === 0 && isEmptySnapshot(stats.qolExtra)) {
     const id = await save("この期間の記録がまだないため、分析できません。森野からの質問に答えると、分析できるようになります。", false);
     return { ok: true, message: "記録がまだないため、数字だけのレポートを作りました（AIは使っていません）", reportId: id, suggestionIds: [], aiUsed: false, costJpy: 0 };
   }
@@ -130,7 +132,7 @@ export async function runLifeAnalysis(
     return { ok: true, message: "緊急停止中のため、数字だけのレポートを作りました", reportId: id, suggestionIds: [], aiUsed: false, costJpy: 0 };
   }
 
-  const aiStats = statsForAi(stats, categories);
+  const aiStats = { ...statsForAi(stats, categories), qolExtra: qolForAi(stats.qolExtra, categories) };
   const allowedCats = categories.filter((c) => c.ai_allowed && c.is_active);
   const openSuggestions = await sql<{ title: string }[]>`
     select title from life_suggestions where status in ('new','considering','adopted') order by created_at desc limit 20`;
@@ -156,6 +158,7 @@ ${FIXED_COMPANY_PRINCIPLES}
 ${PLAIN_LANGUAGE_RULES}
 
 【分析のルール】
+- qolExtra は、毎日のQOLチェック（1〜5。ストレスは5が多い）・習慣の達成・目標の進み具合・これから起きる予定と出費。生活の質（QOL）を上げることを、いちばん大事にする。
 - もらった数字は、プログラムが計算した事実。数字を変えたり、もらっていない数字を作ったりしない。
 - 情報が足りないところは、推測で埋めない。「この情報が足りないため分からない」と書く。必要なら follow_up_questions で質問する。
 - 相場などの一般的な知識を使うときは「推測」と書き、is_estimate を true にする。

@@ -33,7 +33,8 @@ type ClaimColumn =
   | "last_monthly_report_on"
   | "last_sns_plan_on"
   | "last_life_question_on"
-  | "last_life_analysis_on";
+  | "last_life_analysis_on"
+  | "last_life_review_on";
 
 /**
  * 「今日この仕事をするのは自分」という権利を取る。すでに今日実行済みなら false。
@@ -56,9 +57,10 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   const result: ScheduledJobsResult = { frequency: freq, ran: [], skipped: [], reports: [], taskIds: [] };
   {
     // ライフインテリジェンス：質問づくりはAIを使わないので、緊急停止中でも行う（分析は中で緊急停止を確認する）
-    const { date } = jstDateParts(now);
-    result.life = await runLifeJobs(sql, date, now, (col) => claim(sql, col, date));
+    const { date, weekday } = jstDateParts(now);
+    result.life = await runLifeJobs(sql, date, weekday, now, (col) => claim(sql, col, date));
     if (result.life.questions?.created) result.ran.push("life_questions");
+    if (result.life.review) result.ran.push("life_review");
     if (result.life.analyses.length) result.ran.push("life_analysis");
     result.taskIds.push(...result.life.taskIds);
   }

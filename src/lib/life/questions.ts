@@ -2,7 +2,6 @@ import "server-only";
 import { begin, type Db, type Sql } from "@/lib/db";
 import { audit } from "@/lib/repo/audit";
 import { getSettings } from "@/lib/repo/settings";
-import { enqueueNotification } from "@/lib/notify";
 import { jstDateParts } from "@/lib/format";
 import { addRecord, latestRecords, listCategories, listFields } from "./repo";
 import { isQuestionDay, nextQuestionDay, planQuestions, type Candidate, type LastQuestion } from "./planner";
@@ -127,15 +126,6 @@ export async function createQuestionBatch(sql: Sql, trigger: "manual" | "schedul
         values (${c.field.id}, ${c.text}, ${c.reason}, 'rule', ${LIFE_EMPLOYEE_ID}, ${date}::date, ${c.periodStart}, ${c.periodEnd})
         returning id`;
       ids.push(row.id);
-    }
-    if (ids.length > 0 && trigger === "scheduled") {
-      await enqueueNotification(tx, {
-        kind: "question",
-        title: `森野から質問が届きました（${ids.length}問）`,
-        body: picks[0].text.slice(0, 80),
-        url: "/life",
-        dedupeKey: `life-q:${date}`,
-      });
     }
     return {
       created: ids.length,

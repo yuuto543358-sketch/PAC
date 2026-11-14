@@ -54,6 +54,21 @@ export default async function LifeSuggestionPage({ params }: { params: Promise<{
           </Link>
         )}
 
+        <Section title="小さく始める">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href={`/life/habits?title=${encodeURIComponent(s.title.slice(0, 40))}&why=${encodeURIComponent(s.benefit.slice(0, 120))}&suggestion=${s.id}`}
+              className="btn-tinted"
+            >
+              習慣にする
+            </Link>
+            <Link href={`/life/goals?title=${encodeURIComponent(s.title.slice(0, 40))}&why=${encodeURIComponent(s.benefit.slice(0, 120))}`} className="btn-secondary">
+              目標にする
+            </Link>
+          </div>
+          <p className="mt-1.5 px-1 text-xs text-muted">名前は、あとで自分に合うように直せます。</p>
+        </Section>
+
         <Section title="チームで検討する">
           {s.task_id ? (
             <Link href={`/tasks/${s.task_id}/room`} className="card press flex items-center gap-3 p-4">

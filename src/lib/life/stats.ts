@@ -27,6 +27,8 @@ export type LifeStats = {
   exercise: { weeks: number; counts: Record<string, number>; lowShare: number | null } | null;
   texts: { fieldId: string; label: string; categoryId: string; items: { date: string; text: string }[] }[];
   gaps: string[];
+  /** QOLの記録（毎日のチェック・習慣・目標・これから起きること）。分析のときに足す */
+  qolExtra?: import("./qolsnapshot").QolSnapshot;
 };
 
 /** 固定費として合計する項目（車・ペットは持っている人だけ） */

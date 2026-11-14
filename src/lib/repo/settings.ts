@@ -41,6 +41,9 @@ export type CompanySettings = {
   life_auto_task: boolean;
   last_life_question_on: Date | null;
   last_life_analysis_on: Date | null;
+  last_life_review_on: Date | null;
+  /** 週のふりかえり（月曜の朝）を作るか */
+  life_review_enabled: boolean;
   updated_at: Date;
 };
 

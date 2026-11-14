@@ -16,6 +16,7 @@ export const maxDuration = 300;
 
 const SUGGESTIONS: Record<string, string[]> = {
   president: [
+    "最近の暮らしで、改善できそうなことはありますか？",
     "低コストで始められる副業のアイデアを調べる業務をお願いします",
     "今の会社の状況を教えてください",
     "今週、優先してやるべきことは何ですか？",

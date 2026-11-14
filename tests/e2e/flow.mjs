@@ -153,7 +153,7 @@ await page.getByText("承認しました。業務完了です").waitFor();
 check("成果物を承認すると業務が完了する", true);
 
 // --- 業務 ---
-await page.click("nav >> text=業務");
+await page.goto(`${BASE}/tasks`); // 「業務」はタブからメニューへ移動
 await page.getByRole("heading", { name: "業務管理" }).waitFor();
 await shot("08-tasks");
 await page.goto(`${BASE}/tasks?view=closed`);
@@ -345,7 +345,7 @@ check("「文章をコピー」ボタンもある", (await page.getByRole("butto
 
 // ===== ライフインテリジェンス =====
 await page.goto(`${BASE}/more`);
-await page.getByText("生活情報・質問・分析・改善提案").click();
+await page.getByText("今日の暮らし・質問・分析・改善提案").click();
 await page.waitForURL(/\/life$/);
 await page.getByText("情報の集まり具合").waitFor();
 check("メニューからライフを開ける", true);
@@ -427,6 +427,73 @@ await page.getByRole("status").filter({ hasText: "ライフの設定を保存し
 check("質問の頻度を変えられる", true);
 await page.goto(`${BASE}/`);
 check("ホームに質問のお知らせ（回答待ちがあるとき）", true);
+
+// ===== QOL：毎日のチェック・習慣・これから起きること・目標・ふりかえり =====
+await page.goto(`${BASE}/`);
+check("タブに「ライフ」がある", (await page.locator("nav[aria-label=メインメニュー] a[href='/life']").count()) === 1);
+await page.getByText("今日の調子は？（10秒）").waitFor();
+for (const [name, v] of [["mood", 4], ["energy", 3], ["sleep", 2], ["stress", 3]]) {
+  await page.locator(`label:has(input[name=${name}][value="${v}"])`).first().click();
+}
+await page.getByRole("button", { name: "今日のチェックを記録する" }).click();
+await page.getByRole("status").filter({ hasText: "今日のチェックを記録しました" }).waitFor();
+await page.reload();
+check("ホームで毎日のQOLチェックができ、スコアが出る", (await page.getByText("今日のQOLスコア").count()) === 1);
+await shot("29-home-today");
+
+await page.goto(`${BASE}/life/habits`);
+await page.fill("input[name=title]", "寝る前にスマホを置く");
+await page.getByRole("button", { name: "習慣を始める" }).click();
+await page.getByRole("status").filter({ hasText: "習慣を始めました" }).waitFor();
+await page.goto(`${BASE}/`);
+await page.getByRole("button", { name: "寝る前にスマホを置くをできたにする" }).click();
+await page.getByRole("status").filter({ hasText: "できた！" }).waitFor();
+await page.reload();
+check("ホームで今日の習慣にチェックできる（1日続いています）", (await page.getByText("1日続いています").count()) > 0);
+
+await page.goto(`${BASE}/life/events`);
+await page.fill("input[name=title]", "車検");
+const in3 = new Date(Date.now() + 3 * 86400000 + 9 * 3600000).toISOString().slice(0, 10);
+await page.fill("input[name=date]", in3);
+await page.fill("input[name=amount]", "80000");
+await page.getByRole("button", { name: "予定を登録する" }).click();
+await page.getByRole("status").filter({ hasText: "予定を登録しました" }).waitFor();
+await page.reload();
+check("これから起きることを登録すると、残り日数と出費が出る", (await page.getByText("あと3日").count()) > 0 && (await page.getByText("80,000円").count()) > 0);
+await page.goto(`${BASE}/`);
+check("ホームの「もうすぐ」に予定が出る", (await page.getByText("あと3日・80,000円").count()) > 0);
+
+await page.goto(`${BASE}/life/goals`);
+await page.fill("input[name=title]", "体重を3kg減らす");
+await page.fill("input[name=start]", "70");
+await page.fill("input[name=target]", "67");
+await page.fill("input[name=unit]", "kg");
+await page.getByRole("button", { name: "目標を登録する" }).click();
+await page.getByRole("status").filter({ hasText: "目標を登録しました" }).waitFor();
+await page.reload();
+await page.locator("main a[href^='/life/goals/']").first().click();
+await page.locator("input[name=value]").fill("69");
+await page.getByRole("button", { name: "進み具合を記録する" }).click();
+await page.getByRole("status").filter({ hasText: "進み具合を記録しました" }).waitFor();
+await page.reload();
+check("目標の進み具合（%）が出る", (await page.getByText("33%").count()) > 0);
+await shot("30-goal");
+
+await page.goto(`${BASE}/life/reviews`);
+for (let attempt = 0; attempt < 3; attempt++) {
+  await page.getByRole("button", { name: "この1週間をふりかえる（約1円）" }).click();
+  const res = page.getByText(/ふりかえりを作りました|1分ほど待ってください/).first();
+  await res.waitFor({ timeout: 60_000 });
+  if (/ふりかえりを作りました/.test(await res.innerText())) break;
+  await page.waitForTimeout(61_000);
+  await page.reload();
+}
+await page.reload();
+await page.locator("main a[href^='/life/reviews/']").first().click();
+check("週のふりかえりに「来週の一歩」がある", (await page.getByText(/来週の一歩/).count()) > 0);
+await page.goto(`${BASE}/life/habits`);
+check("ふりかえりから、おすすめの習慣が届く（始めるかは自分で選ぶ）", (await page.getByRole("button", { name: "始める" }).count()) > 0);
+await shot("31-habits");
 
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);

@@ -22,15 +22,29 @@ export default async function LifePage() {
       select id, title, priority from life_suggestions where status = 'new' order by created_at desc limit 3`,
   ]);
   const links: { href: string; label: string; icon: IconName }[] = [
+    { href: "/life/checkins", label: "毎日のチェック", icon: "trend" },
+    { href: "/life/habits", label: "小さな習慣", icon: "check" },
+    { href: "/life/events", label: "これから起きること", icon: "clock" },
+    { href: "/life/goals", label: "目標", icon: "star" },
+    { href: "/life/reviews", label: "週のふりかえり", icon: "history" },
+    { href: "/life/suggestions", label: "改善提案", icon: "sparkles" },
+    { href: "/life/reports", label: "分析レポート", icon: "report" },
     { href: "/life/records", label: "生活情報", icon: "document" },
     { href: "/life/questions", label: "質問一覧", icon: "chat" },
-    { href: "/life/reports", label: "分析レポート", icon: "report" },
-    { href: "/life/suggestions", label: "改善提案", icon: "sparkles" },
   ];
   return (
     <>
-      <PageHeader title="ライフ" subtitle="ライフ担当 森野 結" back="/more" backLabel="メニュー" />
+      <PageHeader title="ライフ" subtitle="あなたの暮らしを良くするのが、この会社のいちばんの仕事です" />
       <Page>
+        <div className="grid grid-cols-2 gap-2.5">
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} className="card press flex items-center gap-2.5 p-3.5">
+              <Icon name={l.icon} size={20} stroke={2} className="text-brand" />
+              <span className="text-[14px] font-semibold">{l.label}</span>
+            </Link>
+          ))}
+        </div>
+
         <Section title={questions.length ? `森野からの質問（${questions.length}問）` : "森野からの質問"}>
           {questions.length === 0 ? (
             <div className="card space-y-3 p-4">
@@ -47,14 +61,7 @@ export default async function LifePage() {
           <p className="mt-2 px-1 text-xs text-muted">答えたくない質問は「スキップ」でOKです。答えた内容は「生活情報」でいつでも直したり、消したりできます。</p>
         </Section>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} className="card press flex items-center gap-2.5 p-3.5">
-              <Icon name={l.icon} size={20} stroke={2} className="text-brand" />
-              <span className="text-[14px] font-semibold">{l.label}</span>
-            </Link>
-          ))}
-        </div>
+
 
         <Section title="情報の集まり具合">
           <div className="grid grid-cols-2 gap-2.5">

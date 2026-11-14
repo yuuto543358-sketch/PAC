@@ -822,4 +822,119 @@ begin
 end $$;
 `,
   },
+  {
+    version: 9,
+    name: "qol",
+    sql: /* sql */ `
+-- ===== QOL（生活の質）：毎日のチェック・習慣・これから起きること・目標・週のふりかえり =====
+
+-- 毎日のQOLチェック（1日1件。その日のうちは直せる）。数字は1〜5（ストレスは1=少ない、5=多い）
+create table if not exists life_checkins (
+  id uuid primary key default gen_random_uuid(),
+  check_date date not null unique,
+  mood int not null check (mood between 1 and 5),
+  energy int not null check (energy between 1 and 5),
+  sleep int not null check (sleep between 1 and 5),
+  stress int not null check (stress between 1 and 5),
+  note text not null default '' check (length(note) <= 500),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 小さな習慣
+create table if not exists life_habits (
+  id uuid primary key default gen_random_uuid(),
+  title text not null check (length(title) between 1 and 80),
+  why text not null default '',
+  -- daily: 毎日 / weekly: 週に target_per_week 回
+  frequency text not null default 'daily' check (frequency in ('daily','weekly')),
+  target_per_week int not null default 7 check (target_per_week between 1 and 7),
+  category_id text references life_categories(id),
+  -- proposed: AI社員の提案（まだ始めていない）
+  status text not null default 'active' check (status in ('proposed','active','paused','done','archived')),
+  source text not null default 'owner' check (source in ('owner','suggestion','ai')),
+  suggestion_id uuid references life_suggestions(id) on delete set null,
+  start_date date not null default ((now() at time zone 'Asia/Tokyo')::date),
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists life_habit_logs (
+  habit_id uuid not null references life_habits(id) on delete cascade,
+  log_date date not null,
+  created_at timestamptz not null default now(),
+  primary key (habit_id, log_date)
+);
+
+-- これから起きること（車検・更新・税金・誕生日など）
+create table if not exists life_events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null check (length(title) between 1 and 80),
+  event_date date not null,
+  repeat text not null default 'none' check (repeat in ('none','monthly','yearly')),
+  amount_jpy numeric(12,0) check (amount_jpy is null or amount_jpy >= 0),
+  remind_days int not null default 7 check (remind_days between 0 and 90),
+  category_id text references life_categories(id),
+  note text not null default '' check (length(note) <= 500),
+  -- 最後に「済んだ」にした回の日付（くり返す予定は、その次の回が「次の予定」になる）
+  last_done_date date,
+  status text not null default 'active' check (status in ('active','archived')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 目標
+create table if not exists life_goals (
+  id uuid primary key default gen_random_uuid(),
+  title text not null check (length(title) between 1 and 80),
+  why text not null default '',
+  category_id text references life_categories(id),
+  unit text not null default '',
+  start_value numeric(14,2),
+  target_value numeric(14,2),
+  due_date date,
+  status text not null default 'active' check (status in ('active','achieved','paused','dropped')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists life_goal_progress (
+  id bigserial primary key,
+  goal_id uuid not null references life_goals(id) on delete cascade,
+  value numeric(14,2),
+  note text not null default '' check (length(note) <= 500),
+  recorded_at timestamptz not null default now()
+);
+create index if not exists life_goal_progress_goal_idx on life_goal_progress(goal_id, recorded_at desc);
+
+-- 週のふりかえり（月曜の朝に、先週の分を森野が書く）
+create table if not exists life_reviews (
+  id uuid primary key default gen_random_uuid(),
+  week_start date not null,
+  week_end date not null,
+  stats jsonb not null default '{}'::jsonb,
+  ai_summary text not null default '',
+  ai_used boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists life_reviews_created_idx on life_reviews(created_at desc);
+
+alter table company_settings add column if not exists last_life_review_on date;
+alter table company_settings add column if not exists life_review_enabled boolean not null default true;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['life_checkins','life_habits','life_habit_logs','life_events','life_goals',
+    'life_goal_progress','life_reviews'] loop
+    execute format('alter table %I enable row level security', t);
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on table %I from anon', t);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+      execute format('revoke all on table %I from authenticated', t);
+    end if;
+  end loop;
+end $$;
+`,
+  },
 ];
