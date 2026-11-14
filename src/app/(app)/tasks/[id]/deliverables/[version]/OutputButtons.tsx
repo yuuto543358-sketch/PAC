@@ -113,13 +113,13 @@ export function splitSections(content: string): { heading: string; body: string 
   return out;
 }
 
-/** 出品パッケージ：見出しごとに「コピー」ボタン（そのまま売る場所に貼れる） */
-export function SectionCopyButtons({ content }: { content: string }) {
+/** 出品パッケージ・動画の制作キット：見出しごとに「コピー」ボタン */
+export function SectionCopyButtons({ content, label = "売る場所に貼る（見出しごとにコピー）" }: { content: string; label?: string }) {
   const sections = splitSections(content);
   if (sections.length === 0) return null;
   return (
     <div className="space-y-2 rounded-[16px] bg-surface-2/70 p-3">
-      <p className="text-[13px] font-semibold">売る場所に貼る（見出しごとにコピー）</p>
+      <p className="text-[13px] font-semibold">{label}</p>
       <div className="grid grid-cols-2 gap-2">
         {sections.map((s) => (
           <button

@@ -7,6 +7,16 @@ import type { Task } from "@/lib/repo/tasks";
 import type { Deliverable, Member, RoomMessage, Workflow } from "./repo";
 import { buildSalesChannelGuide, isSalesRelated } from "@/lib/sales-channels";
 import { SNS_STYLE_RULES } from "@/lib/sns/style";
+import { requestedProductFor, type RequestedProduct } from "./product";
+
+/** この業務で作る成果品（経営者の依頼から、プログラムが決める） */
+export function productOf(ctx: Pick<PromptContext, "task" | "messages">): RequestedProduct | null {
+  if (!ctx.task) return null;
+  return requestedProductFor(
+    ctx.task,
+    (ctx.messages ?? []).filter((m) => m.author_type === "owner").map((m) => m.content),
+  );
+}
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 900;
@@ -83,7 +93,7 @@ ${PLAIN_LANGUAGE_RULES}
 - 成果物・監査の指摘・社長の報告も、このルールで書く（経営者がそのまま読んで行動できるように）。
 
 ${CONVERSATION_STYLE}
-- グループチャットの発言（message）は、この話し方で。ここは経営者も読む、チームの雑談に近い打ち合わせの場。
+- グループチャットの発言（message）は、この話し方で。
 
 【できること・できないこと】
 - できる: チーム内での議論、文章・資料・計画・表などの作成、品質やリスクの確認${
@@ -106,7 +116,16 @@ ${team}
 【計画】
 ${plan}
 
-${isSalesRelated(task) ? `${buildSalesChannelGuide({ webSearch: ctx.webSearch })}\n\n` : ""}【経営者からの指示（最優先で反映すること）】
+${(() => {
+    const p = productOf(ctx);
+    return p
+      ? `【この業務で作る成果品（いちばん大事）】
+経営者が頼んでいるのは「${p.label}」そのものです。調べることや話し合いは、そのための下準備です。
+調査結果のまとめや企画書だけで終わらせず、最後は「${p.label}」の完成品（形式: ${p.format}）を作ります。
+
+`
+      : "";
+  })()}${isSalesRelated(task) ? `${buildSalesChannelGuide({ webSearch: ctx.webSearch })}\n\n` : ""}【経営者からの指示（最優先で反映すること）】
 ${ownerInstructions.length ? ownerInstructions.map((m) => `- ${m.content}`).join("\n") : "（なし）"}
 
 【グループチャットの直近の発言】
@@ -132,23 +151,31 @@ export function buildStepInstruction(phase: WorkflowPhase, ctx: PromptContext): 
 ${candidates}
 - リーダーは業務の中心となる専門の社員を1人。メンバーは必要な人だけ（0〜2人）。費用を抑えるため、人数は最小限に。
 - 財務・監査担当は、品質と採算の確認役として自動的にチームに加わります（メンバーに入れる必要はありません）。
-- 成果物の形式は次から選ぶ: ${formatList}
+- 成果物の形式は次から選ぶ: ${formatList}${
+        productOf(ctx)
+          ? `\n- この業務の成果物は「${productOf(ctx)!.label}」の完成品（形式: ${productOf(ctx)!.format}）に決まっている。調査だけの業務にしない。進め方の最後は「${productOf(ctx)!.label}を完成させる」にする。`
+          : "\n- 経営者が何かを作ること（記事・動画・資料など）を頼んでいるなら、成果物はその完成品にする。調査のまとめだけで終わらせない。"
+      }
 - 経営者に確認しないと進められない重要な不明点がある場合だけ question_to_owner に書く。`;
     }
     case "discussion":
-      return `グループチャットで、あなたの得意な分野の立場から、意見・提案・調べたことを1つ発言してください。
-- 打ち合わせで同僚に話しかけるように、自然な話し言葉で（話し方のルールを守る）。前の人の発言があれば、それに反応してからつなげる。
-- 専門用語は使わず、やさしい言葉で（言葉づかいのルールを守る）。
-- 他の人の発言と重複しない、具体的で役に立つ内容に。
-- リーダーが最初に発言する場合は、進め方とたたき台の方針を気軽に示す。
-- 300字以内。${
+      return `グループチャットで、今の話の流れを見て、あなたが言いたいことを自由に話してください。
+- 何を話すかは自由。ほかの人と同じことをくり返さなければよい。
+- 長くても300字くらいまで。${
         ctx.webSearch
           ? "\n- Web検索で、この業務に必要な最新の情報（相場・事例・ルールなど）を調べ、分かったことを kind=findings で報告する。調べた内容は事実と推測を分けて書く。"
           : ""
       }`;
-    case "drafting":
+    case "drafting": {
+      const product = productOf(ctx);
       return `あなたはリーダーです。これまでの議論と計画をもとに、成果物を完成させてください。
-- 形式は計画の形式（${workflow.plan?.output_format ?? "markdown_report"}）を基本に、内容に最も合う形式を選ぶ: ${formatList}
+${
+  product
+    ? `- 作るのは「${product.label}」の完成品。調査結果のまとめや企画書ではなく、そのまま使える本物を作る。
+${product.guide}`
+    : `- 形式は計画の形式（${workflow.plan?.output_format ?? "markdown_report"}）を基本に、内容に最も合う形式を選ぶ: ${formatList}
+- 経営者が何かを作ること（記事・動画・資料など）を頼んでいるなら、調査のまとめではなく、その完成品を作る。`
+}
 - そのまま経営者に渡せる完成品にする（見出し・箇条書きを使って読みやすく）。
 - 結論や提案だけで終わらせない。経営者がすぐ使える・すぐ実行できる形（そのまま貼れる文章、番号つきの手順、チェックリスト、表）まで作る。専門用語は使わず、やさしい言葉で書く。表（csv_table）の場合は1行目を見出しにしたCSVにする。
 - 外部への操作が必要なら external_actions に承認依頼の案を書く（実行はしない）。
@@ -159,22 +186,33 @@ ${SNS_STYLE_RULES}
 - グループチャットで Web検索の「参照したページ」がある場合は、成果物の最後に「参考にしたページ」として題名とURLを載せる。
 - note で売る記事を作るときは、形式を note_article にして、次の見出しの順に書く（経営者がそのまま貼り付けられるように）：
   「# 記事のタイトル」→「値段: ○○円」→「## 無料で読める部分」→「## 有料部分」→「## ハッシュタグ」（#から始まる言葉を3〜5個）`;
-    case "rework":
+    }
+    case "rework": {
+      const product = productOf(ctx);
       return `あなたはリーダーです。監査コメントと経営者の指示を反映して、成果物を修正した新しい版を作ってください。
-- 指摘された点をすべて反映し、message で「何をどう直したか」を、チームに話すように短く伝える。
+- 指摘された点をすべて反映する。何を直したかは message で伝える（言い方は自由）。
 - 本文は修正後の完成品をすべて書く（差分ではなく全文）。
-- 監査の指摘に対応するのは1回だけの決まり。この版は再監査せずに、社長の報告に回る。だから、指摘はここで漏れなく反映する。`;
-    case "review":
-      return `あなたは監査役です。最新の成果物を確認してください。
+- 監査の指摘に対応するのは1回だけの決まり。この版は再監査せずに、社長の報告に回る。だから、指摘はここで漏れなく反映する。${
+        product ? `\n- 作るのは「${product.label}」の完成品（形式: ${product.format}）。\n${product.guide}` : ""
+      }`;
+    }
+    case "review": {
+      const product = productOf(ctx);
+      return `あなたは監査役です。最新の成果物を確認してください。${
+        product
+          ? `\n- いちばん大事な確認：経営者が頼んだ「${product.label}」の完成品になっているか。調査のまとめや企画書だけなら、必ず revise にする。`
+          : "\n- いちばん大事な確認：経営者が何かを作ること（記事・動画・資料など）を頼んでいるなら、その完成品になっているか。調査のまとめだけなら revise にする。"
+      }
 - 確認の観点: 業務のゴールと完成の条件を満たしているか／事実と推測が区別されているか／費用・法律・評判などのリスク／架空の取材・架空の人の声・根拠のない数字がないか
 - 差し戻し（revise）できるのは、この業務で1回だけ。直した版は再監査せずに社長の報告に進む。だから、本当に直さないと困る大事な点だけを、1回でまとめて伝える（最大3つ）。
 - 言葉づかい・書き方・好みの問題・細かい表現は指摘しない（内容の問題だけを見る）。
 - グループチャットや前の監査コメントそのものは監査しない。見るのは最新の成果物だけ。
 - 大きな問題がなければ approve。小さな心配は、差し戻さずに risks に書いて経営者に伝える。
-- message は、チームに話しかけるように自然に。よかった点にもひとことふれる。`;
+`;
+    }
     case "final_report":
-      return `あなたは社長です。チームの成果を確認し、経営者への完了報告を書いてください。
-- 結論、成果物の要点、監査で指摘された心配なこと、経営者に決めてほしいことを、やさしい言葉で簡潔に。
+      return `あなたは社長です。チームの成果を確認し、経営者にできたものを伝えてください。
+- 書き方は自由。何ができたか、見てほしいところ、気になることが伝われば十分。
 - lessons には、チームの各社員（id）が次の仕事に活かすべき学びを書く。
 - next_steps には、この成果物を使って次に何をすれば実際の成果（販売・生活の改善など）につながるかを書く。`;
     default:

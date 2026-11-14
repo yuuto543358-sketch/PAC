@@ -21,8 +21,10 @@ export const ChatOutputSchema = z.object({
   proposed_tasks: z
     .array(
       z.object({
-        title: z.string().describe("業務名（40字以内）"),
-        description: z.string().describe("業務の内容・目的・完了条件"),
+        title: z.string().describe("業務名（40字以内）。経営者が何かを作ることを頼んだら、作るもの（例：note記事・動画）を業務名に入れる"),
+        description: z
+          .string()
+          .describe("業務の内容・目的・完了条件。経営者が作ってほしいもの（note記事・動画など）があれば、調査で終わらせず「○○を完成させる」ことを完了条件に書く"),
         assignee_id: z.string().describe("担当社員の id"),
         priority: z.enum(["high", "medium", "low"]),
         due_date: z.string().nullable().describe("期限 YYYY-MM-DD または null"),

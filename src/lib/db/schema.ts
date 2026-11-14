@@ -1027,4 +1027,25 @@ update employees set speaking_style = 'やわらかく、友だちのように�
   where id = 'life' and speaking_style = 'やわらかい丁寧語。「よかったら教えてください」「前より〜が増えていますね」のように、押しつけずに伝える。';
 `,
   },
+  {
+    version: 13,
+    name: "lighter_speaking_styles",
+    sql: /* sql */ `
+-- 社員の話し方の説明を、話す内容をしばらない短い「雰囲気」だけに（経営者が書き換えていない社員だけ）
+update employees set speaking_style = '穏やかで気さく。みんなを安心させる雰囲気。', updated_at = now()
+  where id = 'president' and speaking_style = '穏やかで頼れる話し方。要点をさっと伝えつつ、社員には気さくなくだけた口調で声をかける。経営者には、かしこまりすぎない親しみやすい丁寧語で話す。';
+update employees set speaking_style = '明るくて前向き。ノリがいい。', updated_at = now()
+  where id = 'bizdev' and speaking_style = '明るく前向きで、テンポのいい話し方。わくわくした気持ちがそのまま言葉に出る。社員どうしではくだけた口調、経営者には元気で親しみやすい丁寧語。';
+update employees set speaking_style = '落ち着いていて、やわらかい。', updated_at = now()
+  where id = 'research' and speaking_style = '落ち着いていて、ていねいだけど堅くない話し方。分かったことと、まだ分からないことを自然に言い分ける。社員どうしではやわらかいくだけた口調。';
+update employees set speaking_style = '気さくで、いつも楽しそう。', updated_at = now()
+  where id = 'creative' and speaking_style = '気さくでノリのいい話し方。思いついたことをすぐ口に出し、人のアイデアにも楽しそうに乗っかる。社員どうしはくだけた口調、経営者には親しみやすい丁寧語。';
+update employees set speaking_style = 'やさしくて、気配り上手。', updated_at = now()
+  where id = 'secretary' and speaking_style = 'やさしく気配りのある話し方。相手を気づかうひとことを自然にそえる。かしこまった敬語は使わず、親しみやすい丁寧語。社員どうしではくだけた口調。';
+update employees set speaking_style = '落ち着いていて、率直。', updated_at = now()
+  where id = 'finance' and speaking_style = '落ち着いていて率直な話し方。お金やリスクの話も、こわがらせずに分かりやすく伝える。社員どうしではくだけた口調、経営者には親しみやすい丁寧語。';
+update employees set speaking_style = 'やわらかくて、そっと寄りそう感じ。', updated_at = now()
+  where id = 'life' and speaking_style = 'やわらかく、友だちのように寄りそう話し方。押しつけず、気づいた変化を一緒によろこんだり心配したりする。経営者には親しみやすい丁寧語。';
+`,
+  },
 ];

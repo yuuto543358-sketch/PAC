@@ -233,6 +233,7 @@ export const DELIVERABLE_FORMATS = [
   { id: "slide_outline", label: "スライド構成案", ext: "md", mime: "text/markdown" },
   { id: "note_article", label: "note記事（貼り付け用）", ext: "md", mime: "text/markdown" },
   { id: "listing_package", label: "出品パッケージ（貼り付け用）", ext: "md", mime: "text/markdown" },
+  { id: "video_script", label: "動画（台本と制作キット）", ext: "md", mime: "text/markdown" },
 ] as const;
 export type DeliverableFormat = (typeof DELIVERABLE_FORMATS)[number]["id"];
 export const DELIVERABLE_FORMAT_IDS = DELIVERABLE_FORMATS.map((f) => f.id) as [DeliverableFormat, ...DeliverableFormat[]];

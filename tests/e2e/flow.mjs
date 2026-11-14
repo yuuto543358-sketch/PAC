@@ -187,6 +187,30 @@ await page.getByRole("button", { name: "業務を登録する" }).click();
 await page.getByText("重複のため登録しませんでした").waitFor();
 check("手動登録でも重複を検出", true);
 
+// 成果品を頼むと、調査で終わらずに成果品そのもの（ここでは動画の台本と制作キット）ができる
+await page.goto(`${BASE}/tasks/new`);
+await page.fill("input[name=title]", "朝のルーティン紹介のショート動画を作る");
+await page.getByRole("button", { name: "業務を登録する" }).click();
+await page.waitForURL(/\/tasks\/[0-9a-f-]{36}\/room/);
+const videoTaskUrl = page.url().replace(/\/room.*$/, "");
+// 短時間に呼び出しが集中すると、安全装置でチームが一時停止する。そのときは少し待って画面を開き直す（開くと続きから進む）
+for (let i = 0; i < 8; i++) {
+  const done = await page.getByText("成果物の確認をお願いします").waitFor({ timeout: 20000 }).then(() => true, () => false);
+  if (done) break;
+  await page.waitForTimeout(10_000);
+  await page.reload();
+}
+await page.reload();
+await page.getByText("成果物の確認をお願いします").waitFor({ timeout: 30000 });
+await page.goto(`${videoTaskUrl}/deliverables/1`);
+await page.getByText("出力形式：").waitFor();
+check("動画を頼むと、成果物が「動画（台本と制作キット）」になる", (await page.getByText("出力形式：動画（台本と制作キット）").count()) === 1);
+check("動画の制作キットは見出しごとにコピーでき、台本と作り方の手順がある",
+  (await page.getByText("撮影・編集で使う（見出しごとにコピー）").count()) === 1 &&
+  (await page.getByRole("button", { name: "台本" }).count()) === 1 &&
+  (await page.getByRole("button", { name: "作り方の手順" }).count()) === 1);
+await shot("16b-video-deliverable");
+
 // 絞り込み
 await page.goto(`${BASE}/tasks?view=all&assignee=secretary`);
 check("担当社員で絞り込み", (await page.locator("main ul li").count()) === 1);

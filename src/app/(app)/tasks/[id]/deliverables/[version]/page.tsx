@@ -52,6 +52,14 @@ export default async function DeliverablePage({ params }: { params: Promise<{ id
                 <SectionCopyButtons content={d.content} />
               </div>
             )}
+            {d.format === "video_script" && (
+              <div className="mt-2.5">
+                <SectionCopyButtons content={d.content} label="撮影・編集で使う（見出しごとにコピー）" />
+                <p className="mt-2 px-1 text-[12px] leading-relaxed text-muted">
+                  動画ファイルそのものは、このアプリでは作れません。台本・画面の指示・文字をもとに、無料の編集アプリで組み立ててください（手順は「作り方の手順」にあります）。
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

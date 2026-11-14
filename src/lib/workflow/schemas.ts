@@ -9,7 +9,7 @@ const questionToOwner = z
   .describe("経営者に確認しないと進められないことがある場合だけ、その質問。なければ null");
 
 export const KickoffSchema = z.object({
-  message: z.string().describe("チームへの最初の指示（社長として。目的・役割分担・進め方を簡潔に）"),
+  message: z.string().describe("チームへの声かけ（社長として。自分の言葉で自由に）"),
   lead_id: z.string().describe("リーダーにする社員の id（社長以外）"),
   member_ids: z.array(z.string()).describe("リーダー以外のメンバーの id（0〜2人。必要な人だけ）"),
   plan: z.object({
@@ -24,7 +24,7 @@ export const KickoffSchema = z.object({
 export type KickoffOutput = z.infer<typeof KickoffSchema>;
 
 export const DiscussionSchema = z.object({
-  message: z.string().describe("グループチャットでの発言（300字以内。同僚に話しかけるような自然な話し言葉で。専門用語を使わず具体的に）"),
+  message: z.string().describe("グループチャットでの発言（自分の言葉で自由に。300字くらいまで）"),
   kind: z.enum(["opinion", "proposal", "question", "findings"]).describe("発言の種類"),
   question_to_owner: questionToOwner,
 });
@@ -42,7 +42,7 @@ const externalAction = z.object({
 });
 
 export const DraftSchema = z.object({
-  message: z.string().describe("チームへの報告（成果物の要点と、議論をどう反映したか。200字以内。やさしい言葉で）"),
+  message: z.string().describe("チームへのひとこと（自由に。200字くらいまで）"),
   deliverable: z.object({
     title: z.string(),
     format: z.enum(DELIVERABLE_FORMAT_IDS).describe("出力形式。チームで決めた形式に合わせる"),
@@ -56,7 +56,7 @@ export const DraftSchema = z.object({
 export type DraftOutput = z.infer<typeof DraftSchema>;
 
 export const ReviewSchema = z.object({
-  message: z.string().describe("監査結果のチームへの発言（200字以内。チームに話しかけるように、自然でやさしい言葉で）"),
+  message: z.string().describe("監査を終えてのチームへのひとこと（自由に。200字くらいまで）"),
   verdict: z.enum(["approve", "revise"]).describe("合格なら approve、修正が必要なら revise"),
   points: z.array(z.string()).describe("修正してほしい点（revise のとき。本当に大事な点だけ、最大3つ。具体的に）"),
   risks: z.array(z.string()).describe("経営者に伝えるべきリスク・注意点"),
@@ -64,7 +64,7 @@ export const ReviewSchema = z.object({
 export type ReviewOutput = z.infer<typeof ReviewSchema>;
 
 export const FinalReportSchema = z.object({
-  report: z.string().describe("経営者への完了報告（社長として。結論・成果物の要点・心配なこと・決めてほしいこと。500字以内。専門用語を使わず、やさしい言葉で）"),
+  report: z.string().describe("経営者への報告（社長として、自分の言葉で自然に。何ができたか・見てほしいこと・気になることが伝わればよい。500字以内。難しい言葉は使わない）"),
   summary: z.string().describe("一行の要約（60字以内）"),
   lessons: z
     .array(z.object({ employee_id: z.string(), lesson: z.string().describe("この業務から学んだこと（次に活かす注意点）") }))

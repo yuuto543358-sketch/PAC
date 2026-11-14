@@ -28,7 +28,8 @@ import {
   type Member,
   type Workflow,
 } from "./repo";
-import { buildStepInstruction, buildTeamContext, type PromptContext } from "./prompts";
+import { buildStepInstruction, buildTeamContext, productOf, type PromptContext } from "./prompts";
+import { matchesRequestedProduct, type RequestedProduct } from "./product";
 import {
   DiscussionSchema,
   DraftSchema,
@@ -208,6 +209,8 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
   };
   const phase = wf.phase as keyof typeof CONFIG;
   const cfg = CONFIG[phase];
+  // 経営者が頼んだ成果品（note記事・動画など）。AIではなくプログラムが決める
+  const product = productOf(ctx);
   log.step("call", { task: wf.task_id, phase, speaker: speaker.id });
 
   await sql`update employees set status = 'working' where id = ${speaker.id}`;
@@ -241,17 +244,17 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
   await begin(sql, async (tx) => {
     switch (wf.phase) {
       case "kickoff":
-        await applyKickoff(tx, wf, roster, task.assignee_id, result.data as KickoffOutput, result.usageId, meta);
+        await applyKickoff(tx, wf, roster, task.assignee_id, result.data as KickoffOutput, result.usageId, meta, product);
         break;
       case "discussion":
         await applyDiscussion(tx, wf, speaker, result.data as DiscussionOutput, result.usageId, meta);
         break;
       case "drafting":
       case "rework":
-        await applyDraft(tx, wf, speaker, result.data as DraftOutput, result.usageId, meta);
+        await applyDraft(tx, wf, speaker, result.data as DraftOutput, result.usageId, meta, product);
         break;
       case "review":
-        await applyReview(tx, wf, speaker, result.data as ReviewOutput, result.usageId, meta);
+        await applyReview(tx, wf, speaker, result.data as ReviewOutput, result.usageId, meta, product);
         break;
       case "final_report":
         await applyFinal(tx, wf, task.title, roster, members, result.data as FinalReportOutput, result.usageId, meta);
@@ -293,6 +296,7 @@ async function applyKickoff(
   out: KickoffOutput,
   usageId: string,
   meta: Meta,
+  product: RequestedProduct | null = null,
 ) {
   const valid = new Set(roster.filter((e) => e.role_key !== "president").map((e) => e.id));
   const lead = valid.has(out.lead_id)
@@ -311,13 +315,14 @@ async function applyKickoff(
   const name = (id: string) => roster.find((e) => e.id === id)?.name ?? id;
   await addTaskLog(tx, wf.task_id, { type: "employee", employeeId: "president" }, "assigned", `チーム編成：リーダー ${name(lead)}`);
 
-  const format = DELIVERABLE_FORMAT_IDS.includes(out.plan.output_format) ? out.plan.output_format : "markdown_report";
+  // 経営者が成果品を頼んでいるときは、成果物の形式をその成果品に決める（調査だけで終わらせない）
+  const format = product ? product.format : DELIVERABLE_FORMAT_IDS.includes(out.plan.output_format) ? out.plan.output_format : "markdown_report";
   const plan = {
     goal: out.plan.goal.slice(0, 500),
     steps: out.plan.steps.slice(0, 6).map((s) => s.slice(0, 200)),
     output_format: format,
     deliverable_title: out.plan.deliverable_title.slice(0, 200),
-    done_criteria: out.plan.done_criteria.slice(0, 500),
+    done_criteria: `${out.plan.done_criteria.slice(0, 500)}${product ? `\n「${product.label}」の完成品が、そのまま使える形でできていること（調査のまとめだけでは完成としない）。` : ""}`,
   };
   await addRoomMessage(tx, { taskId: wf.task_id, authorType: "employee", employeeId: "president", kind: "plan", content: out.message, meta, apiUsageId: usageId });
   await systemMessage(
@@ -340,7 +345,15 @@ async function applyDiscussion(tx: Tx, wf: Workflow, speaker: EmployeeWithStats,
   if (out.question_to_owner) await askOwner(tx, wf, speaker.id, out.question_to_owner, "discussion");
 }
 
-async function applyDraft(tx: Tx, wf: Workflow, speaker: EmployeeWithStats, out: DraftOutput, usageId: string, meta: Meta) {
+async function applyDraft(
+  tx: Tx,
+  wf: Workflow,
+  speaker: EmployeeWithStats,
+  out: DraftOutput,
+  usageId: string,
+  meta: Meta,
+  product: RequestedProduct | null = null,
+) {
   const format = DELIVERABLE_FORMAT_IDS.includes(out.deliverable.format) ? out.deliverable.format : "markdown_report";
   const version = await addDeliverable(tx, {
     taskId: wf.task_id,
@@ -364,11 +377,28 @@ async function applyDraft(tx: Tx, wf: Workflow, speaker: EmployeeWithStats, out:
   await updateWorkflow(tx, wf.task_id, { plan: { ...wf.plan, proposed_actions: proposed } as Workflow["plan"] });
   // 監査の指摘に対応した版は、もう一度監査しない（監査と修正がいつまでも続かないように）
   const auditFixed = wf.phase === "rework" && wf.rework_count >= MAX_REWORK;
+  let next: WorkflowPhase = auditFixed ? "final_report" : "review";
   if (auditFixed) {
-    await setDeliverableStatus(tx, wf.task_id, version, "revised", "監査の指摘に対応した版です（指摘への対応は1回だけのため、再監査はしていません）");
-    await systemMessage(tx, wf.task_id, "監査の指摘に対応しました。指摘への対応は1回だけの決まりなので、再監査はせずに社長の報告に進みます。");
+    const plan = wf.plan as Workflow["plan"] & { product_retry?: boolean; review_risks?: string[] };
+    if (!matchesRequestedProduct(product, format) && product) {
+      if (!plan.product_retry) {
+        // 頼まれた成果品になっていないときだけは、もう1回だけ作り直す（細かい指摘のやり直しとは別）
+        await setDeliverableStatus(tx, wf.task_id, version, "revise", `経営者が頼んだのは「${product.label}」の完成品です。`);
+        await systemMessage(tx, wf.task_id, `まだ「${product.label}」の完成品になっていないので、もう1回だけ作り直します。`, "warn");
+        await updateWorkflow(tx, wf.task_id, { plan: { ...plan, proposed_actions: proposed, product_retry: true } as Workflow["plan"] });
+        await moveTo(tx, wf, "rework");
+        return;
+      }
+      await updateWorkflow(tx, wf.task_id, {
+        plan: { ...plan, proposed_actions: proposed, review_risks: [...(plan.review_risks ?? []), `頼まれた「${product.label}」の形になっていません。差し戻して、作り直しを指示してください。`] } as Workflow["plan"],
+      });
+      await systemMessage(tx, wf.task_id, `「${product.label}」の形にできませんでした。社長の報告で、そのことを伝えます。`, "warn");
+    } else {
+      await setDeliverableStatus(tx, wf.task_id, version, "revised", "監査の指摘に対応した版です（指摘への対応は1回だけのため、再監査はしていません）");
+      await systemMessage(tx, wf.task_id, "監査の指摘に対応しました。指摘への対応は1回だけの決まりなので、再監査はせずに社長の報告に進みます。");
+    }
+    next = "final_report";
   }
-  const next: WorkflowPhase = auditFixed ? "final_report" : "review";
   if (out.question_to_owner) {
     await askOwner(tx, wf, speaker.id, out.question_to_owner, next);
   } else {
@@ -376,9 +406,23 @@ async function applyDraft(tx: Tx, wf: Workflow, speaker: EmployeeWithStats, out:
   }
 }
 
-async function applyReview(tx: Tx, wf: Workflow, speaker: EmployeeWithStats, out: ReviewOutput, usageId: string, meta: Meta) {
+async function applyReview(
+  tx: Tx,
+  wf: Workflow,
+  speaker: EmployeeWithStats,
+  out: ReviewOutput,
+  usageId: string,
+  meta: Meta,
+  product: RequestedProduct | null = null,
+) {
   const latest = await getDeliverable(tx, wf.task_id);
   const points = out.points.slice(0, 3);
+  // 頼まれた成果品（note記事・動画など）になっていなければ、監査役の判断にかかわらず作り直してもらう（サーバー側の確認）
+  if (product && latest && !matchesRequestedProduct(product, latest.format)) {
+    out = { ...out, verdict: "revise" };
+    points.unshift(`経営者が頼んだのは「${product.label}」の完成品です。調査のまとめではなく、${product.label}そのものを作ってください（形式: ${product.format}）。`);
+    points.splice(3);
+  }
   const risks = out.risks.slice(0, 8);
   await addRoomMessage(tx, {
     taskId: wf.task_id,

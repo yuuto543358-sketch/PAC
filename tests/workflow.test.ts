@@ -7,6 +7,7 @@ import { mockHooks } from "@/lib/ai/client";
 import { acquireLease, getWorkflow, initWorkflow, listDeliverables, listMembers, listRoomMessages, releaseLease } from "@/lib/workflow/repo";
 import { runWorkflowStep, runWorkflows } from "@/lib/workflow/engine";
 import { postInstruction, resumeTeam } from "@/lib/workflow/human";
+import { detectRequestedProduct, requestedProductFor } from "@/lib/workflow/product";
 
 async function newTeamTask(title: string, description = "") {
   const sql = await getDb();
@@ -260,5 +261,53 @@ describe("チームでの自動進行", () => {
     await expect(sql`delete from task_messages where task_id = ${taskId}`).rejects.toThrow();
     await expect(sql`update deliverables set content = 'x' where task_id = ${taskId}`).rejects.toThrow(/変更できません/);
     await expect(sql`delete from deliverables where task_id = ${taskId}`).rejects.toThrow();
+  });
+});
+
+describe("頼んだ成果品（note記事・動画など）まで作る", () => {
+  it("業務の文章から、作るものを見分ける", () => {
+    expect(detectRequestedProduct({ title: "副業の始め方をnote記事にする" })?.format).toBe("note_article");
+    expect(detectRequestedProduct({ title: "節約術の紹介", description: "YouTubeショート動画を作成" })?.format).toBe("video_script");
+    expect(detectRequestedProduct({ title: "BOOTHに出品する商品ページ" })?.format).toBe("listing_package");
+    expect(detectRequestedProduct({ title: "家計の見直し" })).toBeNull();
+    // 事業の自動進行の段階の業務や、AIが自分で見つけた業務には使わない
+    expect(requestedProductFor({ title: "note記事の商品づくり", source: "user", business_project_id: "x" })).toBeNull();
+    expect(requestedProductFor({ title: "note記事を書く", source: "ai_discovered" })).toBeNull();
+    // 経営者があとから「動画にして」と頼んだら、それを優先する
+    expect(requestedProductFor({ title: "note記事を書く", source: "user" }, ["やっぱり動画にして"])?.format).toBe("video_script");
+    expect(requestedProductFor({ title: "note記事を書く", source: "user" }, ["動画も見てみたい"])?.format).toBe("note_article");
+  });
+
+  it("note記事を頼むと、成果物は調査のまとめではなく note記事そのものになる", async () => {
+    const { sql, taskId } = await newTeamTask("節約のコツを調べてnote記事にする");
+    await runAll(taskId);
+    const wf = (await getWorkflow(sql, taskId))!;
+    expect(wf.plan.output_format).toBe("note_article");
+    expect(wf.plan.done_criteria).toContain("note記事");
+    const [d] = await listDeliverables(sql, taskId);
+    expect(d.format).toBe("note_article");
+    expect(d.content).toContain("## 有料部分");
+  });
+
+  it("動画を頼むと、台本と制作キット（video_script）ができる", async () => {
+    const { sql, taskId } = await newTeamTask("朝のルーティン紹介のショート動画を作る");
+    await runAll(taskId);
+    const [d] = await listDeliverables(sql, taskId);
+    expect(d.format).toBe("video_script");
+    expect(d.content).toContain("## 台本");
+    expect(d.content).toContain("## 作り方の手順");
+    expect((await getWorkflow(sql, taskId))!.phase).toBe("waiting_human");
+  });
+
+  it("チームが調査のまとめしか作らなかったら、監査役が合格にしても作り直させる（サーバー側の確認）", async () => {
+    const { sql, taskId } = await newTeamTask("在宅ワークのコツをnote記事にする", "[mock:wrong-format]");
+    await runAll(taskId);
+    const dels = await listDeliverables(sql, taskId);
+    expect(dels.map((d) => `${d.version}:${d.format}:${d.status}`)).toEqual(["2:note_article:revised", "1:markdown_report:revise"]);
+    const review = (await listRoomMessages(sql, taskId)).find((m) => m.kind === "review")!;
+    expect(review.meta.verdict).toBe("revise");
+    expect(review.content).toContain("note記事");
+    const approvals = await pendingApprovals(taskId);
+    expect(approvals.map((a) => a.action_type)).toEqual(["accept_deliverable"]);
   });
 });

@@ -54,11 +54,12 @@ describe("やさしい言葉のルール", () => {
       todayJst: "2026-11-14",
     } as never;
     expect(buildTeamContext(ctx)).toContain(PLAIN_LANGUAGE_RULES);
-    expect(buildStepInstruction("discussion", ctx)).toContain("やさしい言葉");
+    // 議論・報告は話す内容をしばらない（やさしい言葉のルールはチーム共通の前提に入っている）
+    expect(buildStepInstruction("discussion", ctx)).toContain("自由");
     expect(buildStepInstruction("drafting", ctx)).toContain("やさしい言葉");
     // 監査役は言葉づかいの添削はしない（内容だけを見る）
     expect(buildStepInstruction("review", ctx)).toContain("言葉づかい・書き方・好みの問題・細かい表現は指摘しない");
-    expect(buildStepInstruction("final_report", ctx)).toContain("やさしい言葉");
+    expect(buildStepInstruction("final_report", ctx)).toContain("書き方は自由");
   });
 
   it("事業・販売に関係する業務だけ、売る場所の選び方（経営者の方針）が入る", () => {
@@ -143,17 +144,19 @@ describe("自然で親しみやすい話し方", () => {
 
   it("決まり文句をくり返さないルールが、チャットとグループチャットの指示に入っている", () => {
     expect(CONVERSATION_STYLE).toContain("決まり文句");
-    expect(CONVERSATION_STYLE).toContain("親しみやすい");
+    expect(CONVERSATION_STYLE).toContain("親しみやすく");
+    // 話し方のルール自体に、そのまま真似される言い回しの例を書かない
+    expect(CONVERSATION_STYLE).not.toMatch(/「[^」]*(だね|ね」|しましょう|いいね)/);
     const chat = buildChatSystemPrompt({ settings: settings as never, employee: employee as never, roster: [employee] as never, openTasks: [], todayJst: "2026-11-14" });
     expect(chat).toContain(CONVERSATION_STYLE);
     expect(buildTeamContext(ctx)).toContain(CONVERSATION_STYLE);
-    expect(buildStepInstruction("discussion", ctx)).toContain("自然な話し言葉");
+    expect(buildStepInstruction("discussion", ctx)).toContain("自由に話して");
   });
 
   it("社員の話し方の説明に、そのまま真似される決まり文句（「」の例）がない", () => {
     for (const e of EMPLOYEES) {
       expect(e.speaking_style).not.toMatch(/「/);
-      expect(e.speaking_style).toMatch(/親しみやすい|くだけた/);
+      expect(e.speaking_style.length).toBeLessThanOrEqual(30);
     }
   });
 
