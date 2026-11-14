@@ -12,11 +12,13 @@ import { audit } from "@/lib/repo/audit";
 import { getEmployee } from "@/lib/repo/employees";
 import { getSettings } from "@/lib/repo/settings";
 import { checkPostLength } from "@/lib/sns/post";
+import { SNS_STYLE_RULES } from "@/lib/sns/style";
 
 // SNS担当（企画制作の春野 創太）が、会社のSNSの投稿案を作る仕組み。
 // 投稿案は1件ずつ「承認依頼」になります。投稿は、承認したあと経営者が自分で行います（アプリは投稿しません）。
 
 const SNS_MANAGER_ID = "creative";
+
 
 export function buildSnsSchema(platforms: [SnsPlatform, ...SnsPlatform[]]) {
   return z.object({
@@ -25,7 +27,7 @@ export function buildSnsSchema(platforms: [SnsPlatform, ...SnsPlatform[]]) {
       .array(
         z.object({
           platform: z.enum(platforms).describe("投稿するSNS"),
-          text: z.string().describe("投稿する文章そのもの（Xなら日本語130文字以内、Blueskyなら280文字以内）"),
+          text: z.string().describe("投稿する文章そのもの。ネタツイくらいラフな口語で（Xなら日本語130文字以内、Blueskyなら280文字以内）"),
           purpose: z.string().describe("この投稿のねらい（30字以内）"),
           timing: z.string().describe("投稿におすすめの時間帯（例：平日の夜8時ごろ）"),
         }),
@@ -77,14 +79,17 @@ ${OWNER_POLICIES}
 
 【あなた】
 - 性格: ${employee.personality}
-- 話し方: ${employee.speaking_style}
+- 話し方: SNSでは、ふだんの話し方ではなく、下の「SNSの書き方」を必ず優先する
 
 ${PLAIN_LANGUAGE_RULES}
+（ただしSNSの投稿文は、下の「SNSの書き方」に従ってラフに書く）
+
+${SNS_STYLE_RULES}
 
 【投稿の決まり】
 - 投稿先: ${platforms.map((p) => SNS_PLATFORM_LABEL[p]).join("、")}
 - X は日本語で130文字以内。Bluesky は280文字以内。
-- 宣伝ばかりにしない。役に立つ情報・考え方・作っている様子などを中心に、宣伝は全体の3分の1まで。
+- 宣伝ばかりにしない。ネタ・あるある・作っている様子のつぶやきを中心に、宣伝は全体の3分の1まで。
 - うそ・大げさな表現・架空のお客さんの声・根拠のない数字は書かない。
 - ハッシュタグは2つまで。人を傷つける話題、政治や宗教の話題、ほかの人やお店の悪口は書かない。
 - これまでの投稿と同じ内容・よく似た内容は書かない。
@@ -117,7 +122,7 @@ ${recent.length ? recent.slice(0, 20).map((r) => `- ${r.content.replace(/\s+/g, 
         message: "【テスト用モック】春野です。投稿案を作りました。",
         posts: Array.from({ length: count }, (_, i) => ({
           platform: platforms[i % platforms.length],
-          text: `【テスト用モック】小さく始める仕事のコツ その${i + 1}（${crypto.randomUUID().slice(0, 8)}）`,
+          text: `【テスト用モック】${["「あとでやる」のあとで、来たことない", "AIに褒められて一日がんばれた", "作業前の準備だけで満足するやつ"][i % 3]}（${crypto.randomUUID()}${crypto.randomUUID()}）`,
           purpose: "役に立つ情報で知ってもらう",
           timing: "平日の夜8時ごろ",
         })),

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { buildChatSystemPrompt, PLAIN_LANGUAGE_RULES } from "@/lib/ai/prompts";
 import { buildStepInstruction, buildTeamContext } from "@/lib/workflow/prompts";
+import { SNS_STYLE_RULES } from "@/lib/sns/style";
 import { buildSalesChannelGuide, netPerSale, SALES_CHANNEL_POLICY, SALES_CHANNELS } from "@/lib/sales-channels";
 
 const settings = { company_name: "テスト会社", philosophy: "理念", custom_rules: "" };
@@ -103,5 +104,24 @@ describe("売る場所の手取りの計算", () => {
     for (const p of SALES_CHANNEL_POLICY) expect(g).toContain(p);
     expect(g).toContain("公式ページで確かめ");
     expect(buildSalesChannelGuide()).toContain("要確認");
+  });
+
+  it("SNSの投稿文はネタツイくらいラフに書く指示が入る（チームの成果物づくりにも）", () => {
+    expect(SNS_STYLE_RULES).toContain("ネタツイくらいラフ");
+    expect(SNS_STYLE_RULES).toContain("「です・ます」は使わない");
+    expect(SNS_STYLE_RULES).toContain("うそ・架空の体験談");
+    const ctx = {
+      settings,
+      task: { title: "販売の準備", description: "", priority: "medium", due_date: null },
+      workflow: { phase: "drafting", plan: { output_format: "markdown_report" }, lead_id: "bizdev", rework_count: 0 },
+      speaker: employee,
+      roster: [employee],
+      members: [],
+      messages: [],
+      deliverable: null,
+      knowledge: [],
+      todayJst: "2026-11-14",
+    } as never;
+    expect(buildStepInstruction("drafting", ctx)).toContain(SNS_STYLE_RULES);
   });
 });

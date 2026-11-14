@@ -6,6 +6,7 @@ import type { CompanySettings } from "@/lib/repo/settings";
 import type { Task } from "@/lib/repo/tasks";
 import type { Deliverable, Member, RoomMessage, Workflow } from "./repo";
 import { buildSalesChannelGuide, isSalesRelated } from "@/lib/sales-channels";
+import { SNS_STYLE_RULES } from "@/lib/sns/style";
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 900;
@@ -146,6 +147,8 @@ ${candidates}
 - 形式は計画の形式（${workflow.plan?.output_format ?? "markdown_report"}）を基本に、内容に最も合う形式を選ぶ: ${formatList}
 - そのまま経営者に渡せる完成品にする（見出し・箇条書きを使って読みやすく）。専門用語は使わず、やさしい言葉で書く。表（csv_table）の場合は1行目を見出しにしたCSVにする。
 - 外部への操作が必要なら external_actions に承認依頼の案を書く（実行はしない）。
+- SNSの投稿文（sns_post や、成果物の中の投稿案）は、次の「SNSの書き方」で書く（ふだんの言葉づかいのルールより優先）：
+${SNS_STYLE_RULES}
 - 外部への操作（メール・SNS投稿・出品・登録など）は、承認のあと経営者が自分で行う。チームは、そのまま使える内容を用意する。
 - メール・メッセージは経営者が自分で送る。send_message の content には、そのまま送れる本文の全文を書き、destination には送り先（分かればメールアドレス）を書く。
 - グループチャットで Web検索の「参照したページ」がある場合は、成果物の最後に「参考にしたページ」として題名とURLを載せる。
