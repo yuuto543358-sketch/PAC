@@ -74,10 +74,10 @@ export default async function LifePage() {
           {overview.missing.length > 0 && (
             <div className="card mt-2.5 p-4">
               <p className="text-[13px] font-semibold">まだ分からない大事な情報</p>
-              <ul className="mt-1.5 space-y-1 text-[14px]">
+              <ul className="mt-1 text-[14px]">
                 {overview.missing.slice(0, 5).map((c) => (
                   <li key={c.field.id}>
-                    <Link href={`/life/records/${c.field.id}`} className="text-brand">
+                    <Link href={`/life/records/${c.field.id}`} className="flex min-h-11 items-center text-brand">
                       {c.field.label}
                     </Link>
                   </li>
@@ -89,10 +89,10 @@ export default async function LifePage() {
           {overview.stale.length > 0 && (
             <div className="card mt-2.5 p-4">
               <p className="text-[13px] font-semibold">更新が必要な情報</p>
-              <ul className="mt-1.5 space-y-1 text-[14px]">
+              <ul className="mt-1 text-[14px]">
                 {overview.stale.slice(0, 5).map((c) => (
                   <li key={c.field.id}>
-                    <Link href={`/life/records/${c.field.id}`} className="text-brand">
+                    <Link href={`/life/records/${c.field.id}`} className="flex min-h-11 items-center text-brand">
                       {c.field.label}
                     </Link>
                   </li>
@@ -151,7 +151,7 @@ export default async function LifePage() {
           </div>
         </Section>
 
-        <Link href="/life/settings" className="block text-center text-[14px] font-semibold text-brand">
+        <Link href="/life/settings" className="flex min-h-11 items-center justify-center text-[14px] font-semibold text-brand">
           質問の頻度・カテゴリの設定
         </Link>
       </Page>

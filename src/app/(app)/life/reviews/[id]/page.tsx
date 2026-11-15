@@ -23,7 +23,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
         <Section title={r.ai_used ? "森野から" : "まとめ"}>
           <div className="card p-4 text-[15px] leading-relaxed whitespace-pre-wrap">{r.ai_summary}</div>
           {r.ai_used && (
-            <Link href="/life/habits" className="mt-2 block px-1 text-[13px] font-semibold text-brand">
+            <Link href="/life/habits" className="mt-1 flex min-h-11 items-center px-1 text-[13px] font-semibold text-brand">
               おすすめの習慣を見る
             </Link>
           )}

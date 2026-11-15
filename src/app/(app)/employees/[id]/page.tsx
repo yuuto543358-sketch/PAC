@@ -52,7 +52,7 @@ export default async function EmployeeDetailPage({
               </span>
               <Link
                 href={`/settings/employees/${e.id}`}
-                className="press mb-1 inline-flex items-center gap-1 rounded-full bg-surface-2 px-3 py-1.5 text-[13px] font-medium text-muted"
+                className="tap press mb-1 inline-flex items-center gap-1 rounded-full bg-surface-2 px-3 py-1.5 text-[13px] font-medium text-muted"
               >
                 <Icon name="edit" size={15} stroke={2} />
                 編集

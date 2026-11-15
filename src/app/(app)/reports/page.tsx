@@ -37,7 +37,7 @@ export default async function ReportsPage() {
           <ReportNowButtons />
           <p className="text-xs text-muted">
             1回 約1円。自動の報告：<b className="text-ink">{autoLabel}</b>
-            <Link href="/settings#autorun" className="ml-1 font-semibold text-brand">
+            <Link href="/settings#autorun" className="tap ml-1 font-semibold text-brand">
               設定を変える
             </Link>
           </p>
@@ -63,7 +63,7 @@ export default async function ReportsPage() {
                   <div className="border-t border-separator px-4 py-3.5">
                     <DocumentView content={r.content} format="markdown_report" />
                     {r.task_id && (
-                      <Link href={`/tasks/${r.task_id}`} className="mt-3 inline-flex items-center gap-1 text-[14px] font-semibold text-brand">
+                      <Link href={`/tasks/${r.task_id}`} className="mt-1 inline-flex min-h-11 items-center gap-1 text-[14px] font-semibold text-brand">
                         業務と成果物を見る
                         <Icon name="chevronRight" size={14} stroke={2.4} />
                       </Link>

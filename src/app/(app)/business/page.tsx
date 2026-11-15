@@ -35,17 +35,17 @@ export default async function BusinessPage({ searchParams }: { searchParams: Pro
           <FindWorkButton disabled={settings.emergency_stop} />
           <p className="text-xs text-muted">
             1回 約3〜10円。外部への連絡・登録・購入はしません（必要なときは承認依頼が届きます）。
-            <Link href="/settings#autorun" className="ml-1 font-semibold text-brand">
+            <Link href="/settings#autorun" className="tap ml-1 font-semibold text-brand">
               自動で探す設定
             </Link>
           </p>
         </div>
 
-        <div className="-mx-4 overflow-x-auto px-4">
+        <div className="-mx-4 -my-1.5 overflow-x-auto px-4 py-1.5">
           <div className="flex gap-1.5">
             <Link
               href="/business"
-              className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${!status ? "bg-brand text-brand-fg" : "bg-surface-3 text-muted"}`}
+              className={`tap shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${!status ? "bg-brand text-brand-fg" : "bg-surface-3 text-muted"}`}
             >
               すべて {total}
             </Link>
@@ -53,7 +53,7 @@ export default async function BusinessPage({ searchParams }: { searchParams: Pro
               <Link
                 key={s}
                 href={`/business?status=${s}`}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${status === s ? "bg-brand text-brand-fg" : "bg-surface-3 text-muted"}`}
+                className={`tap shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${status === s ? "bg-brand text-brand-fg" : "bg-surface-3 text-muted"}`}
               >
                 {BUSINESS_STATUS_LABEL[s]} {counts[s] ?? 0}
               </Link>

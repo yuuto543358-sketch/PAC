@@ -84,7 +84,7 @@ export function ChatComposer({
       {!pending && !disabledReason && suggestions.length > 0 && !text && (
         <div className="mx-auto max-w-2xl px-3 pb-2">
           <p className="mb-1.5 px-1 text-[11px] font-semibold text-faint">話しかけてみましょう</p>
-          <div className="flex flex-col items-start gap-1.5">
+          <div className="flex flex-col items-start gap-2.5">
             {suggestions.map((s) => (
               <button
                 key={s}
@@ -93,7 +93,7 @@ export function ChatComposer({
                   setText(s);
                   inputRef.current?.focus();
                 }}
-                className="press max-w-full rounded-[16px] bg-surface px-3.5 py-2 text-left text-[14px] leading-snug font-medium text-brand shadow-card ring-1 ring-line"
+                className="tap press max-w-full rounded-[16px] bg-surface px-3.5 py-2 text-left text-[14px] leading-snug font-medium text-brand shadow-card ring-1 ring-line"
               >
                 {s}
               </button>

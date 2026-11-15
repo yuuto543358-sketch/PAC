@@ -43,7 +43,7 @@ export default async function SeriesPage() {
                     <ul className="divide-y divide-separator rounded-[14px] bg-surface-2/60">
                       {list.slice(0, 8).map((e) => (
                         <li key={e.id}>
-                          <Link href={`/tasks/${e.id}`} className="flex items-center justify-between gap-2 px-3 py-2.5 text-[14px]">
+                          <Link href={`/tasks/${e.id}`} className="flex min-h-11 items-center justify-between gap-2 px-3 py-2.5 text-[14px]">
                             <span className="min-w-0 truncate">第{e.series_episode ?? "?"}回：{e.title}</span>
                             <span className="shrink-0 text-[12px] text-muted">
                               {e.status === "completed" ? "完了" : e.phase === "waiting_human" ? "承認待ち" : "作成中"}

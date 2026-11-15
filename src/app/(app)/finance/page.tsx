@@ -150,7 +150,7 @@ export default async function FinancePage() {
           </div>
           <p className="mt-2 px-1 text-xs text-muted">
             料金は「実際の使用量 × 公式料金 × 為替レート（{settings.usd_jpy_rate}円/ドル）」で計算しています。使用量が分からない呼び出しは、安全のため見積額（多めの金額）で数えます。上限に達すると新しいAI処理は自動で止まります。
-            <Link href="/settings#budget" className="ml-1 text-brand underline">
+            <Link href="/settings#budget" className="tap ml-1 text-brand underline">
               予算を変更
             </Link>
           </p>
@@ -200,13 +200,13 @@ export default async function FinancePage() {
           ) : (
             <ul className="card divide-y divide-separator text-sm">
               {byTask.map((t) => (
-                <li key={t.task_id ?? "none"} className="flex justify-between gap-3 px-4 py-2.5">
+                <li key={t.task_id ?? "none"} className="flex items-center justify-between gap-3 px-4">
                   {t.task_id ? (
-                    <Link href={`/tasks/${t.task_id}`} className="truncate text-brand">
+                    <Link href={`/tasks/${t.task_id}`} className="min-w-0 truncate py-3 text-brand">
                       {t.title}
                     </Link>
                   ) : (
-                    <span className="truncate text-muted">業務に紐づかない利用（会話など）</span>
+                    <span className="truncate py-2.5 text-muted">業務に紐づかない利用（会話など）</span>
                   )}
                   <span className="shrink-0 font-medium">{yenPrecise(t.jpy)}</span>
                 </li>
@@ -223,7 +223,7 @@ export default async function FinancePage() {
             </div>
             <p className="mt-2 text-xs text-muted">
               Vercel・Supabase を無料プランで使う場合は0円です。有料プランにした場合は
-              <Link href="/settings#ops" className="mx-1 text-brand underline">
+              <Link href="/settings#ops" className="tap mx-1 text-brand underline">
                 設定
               </Link>
               で金額を入力してください。API利用料とは別に表示しています。

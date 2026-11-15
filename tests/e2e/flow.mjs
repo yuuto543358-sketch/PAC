@@ -620,6 +620,48 @@ await page.goto(`${BASE}/employees/president/chat`);
 await shot("14-chat-dark");
 await page.emulateMedia({ colorScheme: "light" });
 
+// タップしやすさ：主要な画面で、押せる場所がすべて縦横44px以上あるか（実際に押したときに届くかで確かめる）
+async function smallTapTargets() {
+  return page.evaluate(async () => {
+    document.querySelectorAll("details").forEach((d) => (d.open = true));
+    const SEL = "a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab]";
+    const visible = (el) => {
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden" || el.closest("[aria-hidden=true], [inert]")) return false;
+      const rc = el.getBoundingClientRect();
+      return rc.width > 0 && rc.height > 0;
+    };
+    const targets = new Set();
+    for (const el of document.querySelectorAll(SEL)) {
+      if (el.matches("input[type=radio], input[type=checkbox]")) {
+        const lab = el.closest("label");
+        if (lab && visible(lab)) { targets.add(lab); continue; }
+      }
+      if (!visible(el) || (el.parentElement?.closest(SEL) && !el.matches("input, select, textarea"))) continue;
+      targets.add(el);
+    }
+    const bad = [];
+    for (const el of targets) {
+      el.scrollIntoView({ block: "center", inline: "center" });
+      await new Promise((r) => requestAnimationFrame(() => r()));
+      const rc = el.getBoundingClientRect();
+      const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+      const ok = [[cx, cy], [cx - 21, cy], [cx + 21, cy], [cx, cy - 21], [cx, cy + 21]].every(([x, y]) => {
+        const hit = document.elementFromPoint(x, y);
+        return hit && (hit === el || el.contains(hit));
+      });
+      if (!ok) bad.push(`${(el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 20)} ${Math.round(rc.width)}×${Math.round(rc.height)}`);
+    }
+    return bad;
+  });
+}
+for (const path of ["/", "/life", "/employees", "/approvals", "/more"]) {
+  await page.goto(`${BASE}${path}`);
+  await page.waitForLoadState("networkidle");
+  const bad = await smallTapTargets();
+  check(`「${path}」の押せる場所はすべて44px以上`, bad.length === 0, bad.slice(0, 3).join(" / "));
+}
+
 // ログアウト
 await page.goto(`${BASE}/more`);
 await page.getByRole("button", { name: "ログアウト" }).click();

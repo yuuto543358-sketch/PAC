@@ -39,7 +39,7 @@ export function EmployeeEditForm({ e, department, roleKey }: { e: E; department:
         <div className="flex-1 space-y-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted">色</span>
-            <input type="color" name="avatar_color" value={color} onChange={(ev) => setColor(ev.target.value)} className="h-9 w-14 rounded" />
+            <input type="color" name="avatar_color" value={color} onChange={(ev) => setColor(ev.target.value)} className="h-11 w-14 rounded" />
           </label>
           <select name="avatar_style" value={style} onChange={(ev) => setStyle(ev.target.value)} className="field">
             {AVATAR_STYLES.map((s) => (

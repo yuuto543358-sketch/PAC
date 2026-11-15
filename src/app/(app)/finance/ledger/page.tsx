@@ -63,7 +63,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                     </p>
                   ) : (
                     <details className="mt-1">
-                      <summary className="cursor-pointer text-[12px] text-faint">間違えたときは</summary>
+                      <summary className="cursor-pointer py-3.5 text-[12px] text-faint">間違えたときは</summary>
                       <VoidLedgerForm id={e.id} />
                     </details>
                   )}

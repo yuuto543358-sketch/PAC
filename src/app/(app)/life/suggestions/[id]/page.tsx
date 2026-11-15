@@ -49,7 +49,7 @@ export default async function LifeSuggestionPage({ params }: { params: Promise<{
           ))}
         </dl>
         {s.report_id && (
-          <Link href={`/life/reports/${s.report_id}`} className="block px-1 text-[13px] font-semibold text-brand">
+          <Link href={`/life/reports/${s.report_id}`} className="flex min-h-11 items-center px-1 text-[13px] font-semibold text-brand">
             根拠になった分析レポートを見る
           </Link>
         )}

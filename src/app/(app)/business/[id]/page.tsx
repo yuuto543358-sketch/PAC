@@ -125,7 +125,7 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
                   <>
                     <b>出品の承認</b>があなたに届いています。
                     {b.launch_approval_id && (
-                      <Link href={`/approvals/${b.launch_approval_id}`} className="ml-1 font-semibold text-brand">
+                      <Link href={`/approvals/${b.launch_approval_id}`} className="tap ml-1 font-semibold text-brand">
                         承認センターで確認する
                       </Link>
                     )}
@@ -164,7 +164,7 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
             <ul className="card mt-2.5 divide-y divide-separator text-sm">
               {related.map((t) => (
                 <li key={t.id}>
-                  <Link href={`/tasks/${t.id}`} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                  <Link href={`/tasks/${t.id}`} className="flex min-h-11 items-center justify-between gap-2 px-4 py-2.5">
                     <span className="truncate text-brand">{t.title}</span>
                     <span className="shrink-0 text-xs text-muted">{TASK_STATUS_LABEL[t.status] ?? t.status}</span>
                   </Link>
@@ -177,7 +177,7 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
         <Section
           title="この事業のお金"
           action={
-            <Link href={`/finance/ledger?business=${b.id}`} className="font-medium text-brand">
+            <Link href={`/finance/ledger?business=${b.id}`} className="tap font-medium text-brand">
               記録する
             </Link>
           }

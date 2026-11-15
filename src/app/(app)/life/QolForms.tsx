@@ -53,7 +53,7 @@ export function CheckinForm({ date, initial }: { date: string; initial?: Checkin
             {[1, 2, 3, 4, 5].map((n) => (
               <label
                 key={n}
-                className={`flex h-10 cursor-pointer items-center justify-center rounded-[12px] text-[15px] font-bold ring-1 transition-colors ${
+                className={`tap flex h-10 cursor-pointer items-center justify-center rounded-[12px] text-[15px] font-bold ring-1 transition-colors ${
                   v[m.key] === n ? "bg-brand text-brand-fg ring-brand" : "bg-surface text-ink ring-line"
                 }`}
               >
@@ -314,7 +314,7 @@ export function DismissNudgeButton({ id }: { id: string }) {
   return (
     <ActionForm action={dismissNudgeAction} className="contents">
       <input type="hidden" name="id" value={id} />
-      <button type="submit" className="press flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-faint" aria-label="このひとことを閉じる">
+      <button type="submit" className="tap press flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-faint" aria-label="このひとことを閉じる">
         <Icon name="close" size={16} stroke={2.4} />
       </button>
     </ActionForm>

@@ -125,7 +125,7 @@ export function RecordActions({
 }) {
   return (
     <details className="mt-1.5">
-      <summary className="cursor-pointer text-[12px] text-brand">直す・削除する</summary>
+      <summary className="cursor-pointer py-3.5 text-[12px] text-brand">直す・削除する</summary>
       <div className="mt-2 space-y-3">
         {canConfirm && (
           <ActionForm action={confirmLifeRecordAction}>

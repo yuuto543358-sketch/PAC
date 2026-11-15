@@ -21,7 +21,7 @@ export function LedgerEntryForm({
         {(["income", "expense"] as const).map((k) => (
           <label
             key={k}
-            className={`cursor-pointer rounded-[9px] py-2 text-center text-[14px] font-semibold ${kind === k ? "bg-surface text-ink shadow-card" : "text-muted"}`}
+            className={`tap cursor-pointer rounded-[9px] py-2 text-center text-[14px] font-semibold ${kind === k ? "bg-surface text-ink shadow-card" : "text-muted"}`}
           >
             <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="sr-only" />
             {k === "income" ? "入ったお金（収益）" : "出たお金（費用）"}

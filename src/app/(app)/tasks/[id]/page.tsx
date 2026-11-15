@@ -58,7 +58,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <div>
               <dt className="text-[11px] font-semibold text-muted">担当</dt>
               <dd className="font-medium">
-                {task.assignee_id ? <Link href={`/employees/${task.assignee_id}`} className="text-brand">{task.assignee_name}</Link> : "未定"}
+                {task.assignee_id ? <Link href={`/employees/${task.assignee_id}`} className="tap text-brand">{task.assignee_name}</Link> : "未定"}
               </dd>
             </div>
             <div>
@@ -118,12 +118,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                 <WorkflowStepper phase={wf.phase} resumePhase={wf.resume_phase} />
               </div>
               {members.length > 0 && (
-                <ul className="mt-4 flex flex-wrap gap-2">
+                <ul className="mt-4 flex flex-wrap gap-x-2 gap-y-2.5">
                   {members.map((m) => (
                     <li key={m.employee_id}>
                       <Link
                         href={`/employees/${m.employee_id}`}
-                        className="press inline-flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 text-[13px]"
+                        className="tap press inline-flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 text-[13px]"
                       >
                         <Avatar color={m.avatar_color} styleId={m.avatar_style} size={26} label={m.name} />
                         <span className="font-medium">{m.name}</span>

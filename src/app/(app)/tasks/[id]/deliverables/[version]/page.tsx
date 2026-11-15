@@ -49,7 +49,7 @@ export default async function DeliverablePage({ params }: { params: Promise<{ id
           <h2 className="mt-2 text-[22px] leading-snug font-bold tracking-tight">{d.title}</h2>
           <p className="mt-1 text-[13px] text-muted">
             作成：{d.author_name ?? "—"} ・ {dateTime(d.created_at)} ・ 業務：
-            <Link href={`/tasks/${id}`} className="text-brand">
+            <Link href={`/tasks/${id}`} className="tap inline-block text-brand">
               {task.title}
             </Link>
           </p>
@@ -83,8 +83,8 @@ export default async function DeliverablePage({ params }: { params: Promise<{ id
                     AIが作った場面の絵・ナレーションの声・テロップを、この端末の中で1本の縦長動画につなげます（どこにも送信しません）。
                     「動画を書き出す」は動画と同じ長さの時間がかかります。BGMを付けたいときは、保存した動画を編集アプリで開いて足してください。
                   </p>
-                  <details className="mt-3">
-                    <summary className="cursor-pointer text-[14px] font-semibold text-brand">材料を1つずつ保存する</summary>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer py-3 text-[14px] font-semibold text-brand">材料を1つずつ保存する</summary>
                     <ul className="mt-2 grid grid-cols-2 gap-2">
                       {media!.scenes.map((s) => (
                         <li key={s.no}>

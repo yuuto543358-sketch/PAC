@@ -16,13 +16,13 @@ export default async function LifeSuggestionsPage({ searchParams }: { searchPara
     <>
       <PageHeader title="改善提案" back="/life" backLabel="ライフ" />
       <Page>
-        <div className="-mx-4 overflow-x-auto px-4">
+        <div className="-mx-4 -my-1.5 overflow-x-auto px-4 py-1.5">
           <div className="flex gap-1.5">
             {LIFE_SUGGESTION_STATUSES.map((s) => (
               <Link
                 key={s}
                 href={`/life/suggestions?status=${s}`}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${status === s ? "bg-brand text-brand-fg" : "bg-surface-3 text-muted"}`}
+                className={`tap shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold ${status === s ? "bg-brand text-brand-fg" : "bg-surface-3 text-muted"}`}
               >
                 {LIFE_SUGGESTION_STATUS_LABEL[s]} {counts[s] ?? 0}
               </Link>

@@ -9,7 +9,7 @@ export function SourceList({ sources, className = "" }: { sources: { url: string
         <Icon name="search" size={13} stroke={2.2} />
         Webで調べたページ（{sources.length}件）
       </p>
-      <ul className="space-y-1">
+      <ul>
         {sources.slice(0, 8).map((s) => {
           let host = "";
           try {
@@ -23,7 +23,7 @@ export function SourceList({ sources, className = "" }: { sources: { url: string
                 href={s.url}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="block truncate text-[12px] text-brand underline-offset-2 hover:underline"
+                className="block truncate py-3.5 text-[12px] leading-4 text-brand underline-offset-2 hover:underline"
               >
                 {s.title || host}
                 {s.title && <span className="ml-1 text-faint">（{host}）</span>}

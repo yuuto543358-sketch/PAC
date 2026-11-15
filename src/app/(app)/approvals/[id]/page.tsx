@@ -79,7 +79,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
             </div>
           </div>
           {a.task_id && (
-            <Link href={`/tasks/${a.task_id}`} className="press mt-3 flex items-center gap-2 rounded-[12px] bg-brand-soft px-3 py-2.5 text-[14px] font-medium text-brand">
+            <Link href={`/tasks/${a.task_id}`} className="press mt-3 flex min-h-11 items-center gap-2 rounded-[12px] bg-brand-soft px-3 py-2.5 text-[14px] font-medium text-brand">
               <Icon name="tasks" size={18} stroke={2} />
               <span className="min-w-0 flex-1 truncate">関連業務：{a.task_title}</span>
               <Icon name="chevronRight" size={16} stroke={2.4} />
@@ -103,7 +103,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
             title="確認する成果物"
             action={
               a.task_id && deliverableVersion ? (
-                <Link href={`/tasks/${a.task_id}/deliverables/${deliverableVersion}`} className="font-medium text-brand">
+                <Link href={`/tasks/${a.task_id}/deliverables/${deliverableVersion}`} className="tap font-medium text-brand">
                   全画面で見る
                 </Link>
               ) : undefined

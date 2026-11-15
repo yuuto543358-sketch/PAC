@@ -84,7 +84,7 @@ export default async function HomePage() {
         <div className="relative mx-auto max-w-2xl px-5 pt-4 pb-16">
           <div className="flex items-center justify-between">
             <p className="text-[13px] font-medium text-white/75">{longDate()}</p>
-            <Link href="/settings" className="press flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-white/90" aria-label="設定">
+            <Link href="/settings" className="tap press flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-white/90" aria-label="設定">
               <Icon name="settings" size={20} />
             </Link>
           </div>
@@ -462,7 +462,7 @@ export default async function HomePage() {
                       <Icon name={a.actor_type === "user" ? "briefcase" : "settings"} size={16} />
                     </span>
                   )}
-                  <Link href={`/tasks/${a.task_id}`} className="min-w-0 flex-1 active:opacity-70">
+                  <Link href={`/tasks/${a.task_id}`} className="tap min-w-0 flex-1 active:opacity-70">
                     <div className="truncate text-[14px] leading-snug">
                       <span className="font-semibold">{a.actor_type === "user" ? "あなた" : a.actor_type === "employee" ? a.actor_name : "システム"}</span>
                       <span className="text-ink/80">：{a.message}</span>

@@ -52,7 +52,7 @@ export default async function EventsPage() {
                   </p>
                   {e.note && <p className="mt-1 text-[13px]">{e.note}</p>}
                   {e.prep_task_id && e.prep_for === e.nextDate && (
-                    <Link href={`/tasks/${e.prep_task_id}/room`} className="mt-1.5 inline-block text-[13px] font-semibold text-brand">
+                    <Link href={`/tasks/${e.prep_task_id}/room`} className="flex min-h-11 items-center text-[13px] font-semibold text-brand">
                       白石の依頼で、チームが下調べしています →
                     </Link>
                   )}

@@ -22,7 +22,7 @@ export function Section({ title, children, action, footer }: { title?: string; c
       {(title || action) && (
         <div className="mb-2 flex items-end justify-between px-1">
           {title && <h2 className="text-[13px] font-semibold tracking-wide text-muted uppercase">{title}</h2>}
-          {action && <div className="text-[15px]">{action}</div>}
+          {action && <div className="tap-children text-[15px]">{action}</div>}
         </div>
       )}
       {children}
@@ -265,7 +265,7 @@ export function SegmentedLinks({ items, active }: { items: { href: string; label
           href={i.href}
           role="tab"
           aria-selected={active === i.key}
-          className={`flex-1 rounded-[9px] py-1.5 text-center text-[14px] font-semibold transition-colors ${
+          className={`tap flex-1 rounded-[9px] py-1.5 text-center text-[14px] font-semibold transition-colors ${
             active === i.key ? "bg-surface text-ink shadow-card" : "text-muted"
           }`}
         >
