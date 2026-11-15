@@ -236,15 +236,16 @@ describe("定期実行", () => {
     expect(r.ran).toEqual([]);
   });
 
-  it("1日1回：仕事探しと日報。同じ日に2回動いても二重に実行しない", async () => {
+  it("1日1回：仕事探し（日報は自動では作らない）。同じ日に2回動いても二重に実行しない", async () => {
     const sql = await getDb();
     await sql`update company_settings set autorun_frequency = 'daily', discovery_auto_start = false`;
     const tuesday = new Date("2030-01-08T00:00:00Z");
     const r1 = await runScheduledJobs(sql, tuesday);
-    expect(r1.ran).toEqual(["discovery", "daily_report"]);
+    expect(r1.ran).toEqual(["discovery"]);
+    expect(r1.reports).toEqual([]);
     const r2 = await runScheduledJobs(sql, tuesday);
     expect(r2.ran).toEqual([]);
-    expect(r2.skipped.length).toBe(2);
+    expect(r2.skipped.length).toBe(1);
   });
 
   it("同時に2つ動いても、片方しか実行しない", async () => {
@@ -253,7 +254,7 @@ describe("定期実行", () => {
     const monday = new Date("2030-01-07T00:00:00Z");
     const [a, b] = await Promise.all([runScheduledJobs(sql, monday), runScheduledJobs(sql, monday)]);
     const ran = [...a.ran, ...b.ran].sort();
-    expect(ran).toEqual(["discovery", "weekly_report"]);
+    expect(ran).toEqual(["discovery"]);
   });
 
   it("週1回：月曜以外は何もしない", async () => {

@@ -198,7 +198,7 @@ export const WORKFLOW_PHASE_LABEL: Record<WorkflowPhase, string> = {
   drafting: "成果物を作成",
   review: "監査・品質確認",
   rework: "修正対応",
-  final_report: "社長が報告書を作成",
+  final_report: "承認の準備",
   media: "動画の絵と声を作成",
   waiting_human: "経営者の確認待ち",
   done: "完了",
@@ -215,7 +215,7 @@ export const WORKFLOW_STEPS: { key: WorkflowPhase; label: string }[] = [
   { key: "drafting", label: "作成" },
   { key: "review", label: "監査" },
   { key: "media", label: "素材" },
-  { key: "final_report", label: "報告" },
+  { key: "final_report", label: "仕上げ" },
   { key: "waiting_human", label: "承認" },
 ];
 

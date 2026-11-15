@@ -1,5 +1,5 @@
 import "server-only";
-import type { DiscussionOutput, DraftOutput, FinalReportOutput, KickoffOutput, MediaPlanOutput, ReviewOutput } from "./schemas";
+import type { DiscussionOutput, DraftOutput, KickoffOutput, ReviewOutput } from "./schemas";
 import { productOf, type PromptContext } from "./prompts";
 
 // テスト用モックモード（AI_MOCK=1）のときだけ使う、決まった内容の返事。
@@ -94,26 +94,4 @@ export function mockReview(ctx: PromptContext): ReviewOutput {
         points: [],
         risks: ["需要は小規模テストで確認すること"],
       };
-}
-
-export function mockFinal(ctx: PromptContext): FinalReportOutput {
-  return {
-    report: `【テスト用モック】「${ctx.task.title}」が完了しました。成果物をご確認のうえ、承認をお願いします。`,
-    summary: `${ctx.task.title}の成果物が完成`,
-    lessons: ctx.members
-      .filter((m) => m.role !== "ceo")
-      .map((m) => ({ employee_id: m.employee_id, lesson: "根拠となる数字を最初から用意すると手戻りが減る" })),
-    next_steps: ["小規模テストを実施する"],
-  };
-}
-
-export function mockMediaPlan(ctx: PromptContext): MediaPlanOutput {
-  return {
-    scenes: [
-      { caption: "まだ手作業？", narration: "それ、まだ手でやってるの？", image_prompt: `${ctx.task.title}の最初の場面` },
-      { caption: "3分で終わる", narration: "実は3分で終わるやり方があるんです。", image_prompt: "やり方を見せる場面" },
-      { caption: "やってみて", narration: "今日からためしてみてね。", image_prompt: "笑顔でしめくくる場面" },
-    ],
-    voice: "明るく、少しゆっくり",
-  };
 }

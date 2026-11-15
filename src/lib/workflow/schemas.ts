@@ -77,12 +77,3 @@ export const MediaPlanSchema = z.object({
 });
 export type MediaPlanOutput = z.infer<typeof MediaPlanSchema>;
 
-export const FinalReportSchema = z.object({
-  report: z.string().describe("経営者への報告（社長として、自分の言葉で自然に。何ができたか・見てほしいこと・気になることが伝わればよい。500字以内。難しい言葉は使わない）"),
-  summary: z.string().describe("一行の要約（60字以内）"),
-  lessons: z
-    .array(z.object({ employee_id: z.string(), lesson: z.string().describe("この業務から学んだこと（次に活かす注意点）") }))
-    .describe("チームの各社員が次に活かすべき学び（各1つまで）"),
-  next_steps: z.array(z.string()).describe("今後の提案（最大3件）"),
-});
-export type FinalReportOutput = z.infer<typeof FinalReportSchema>;

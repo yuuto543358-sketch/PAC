@@ -187,6 +187,5 @@ describe("出品パッケージと、成果物の作り方", () => {
   it("チームは結論だけで終わらせず、すぐ使える形まで作る", () => {
     const ctx = { workflow: { plan: { output_format: "markdown_report" } }, roster: [] } as never;
     expect(buildStepInstruction("drafting", ctx)).toContain("結論や提案だけで終わらせない");
-    expect(buildStepInstruction("final_report", ctx)).toContain("next_steps");
   });
 });

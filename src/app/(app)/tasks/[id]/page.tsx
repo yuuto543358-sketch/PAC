@@ -156,6 +156,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                 </p>
               )}
               <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {deliverables[0]?.format === "video_script" && (
+                  <Link href={`/tasks/${task.id}/deliverables/${deliverables[0].version}`} className="btn-accent w-full">
+                    <Icon name="sparkles" size={20} stroke={2} />
+                    動画を見る・保存する
+                  </Link>
+                )}
                 <Link href={`/tasks/${task.id}/room`} className="btn-primary w-full">
                   <Icon name="chat" size={20} stroke={2} />
                   グループチャットを開く

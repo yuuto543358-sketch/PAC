@@ -1114,4 +1114,13 @@ begin
 end $$;
 `,
   },
+  {
+    version: 15,
+    name: "fewer_reports",
+    sql: /* sql */ `
+-- 絶対に必要な報告書以外は作らない（経営者の方針）：社員の自主研究メモは、はじめは止めておく（設定でオンにできる）
+alter table company_settings alter column life_research_enabled set default false;
+update company_settings set life_research_enabled = false;
+`,
+  },
 ];

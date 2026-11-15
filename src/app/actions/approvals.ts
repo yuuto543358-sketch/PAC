@@ -19,7 +19,9 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
     const sql = await getDb();
     await decideApproval(sql, id, decision, String(fd.get("note") ?? ""), String(fd.get("hash") ?? ""));
     await audit(sql, "user", `approval_${decision}`, "approval", id);
-    const [a] = await sql<{ task_id: string | null; action_type: string }[]>`select task_id, action_type from approvals where id = ${id}`;
+    const [a] = await sql<{ task_id: string | null; action_type: string; format: string | null }[]>`
+      select task_id, action_type, payload->>'format' as format from approvals where id = ${id}`;
+    const isVideo = a?.format === "video_script";
     const isDeliverable = a?.action_type === "accept_deliverable";
     const ownerSends = a?.action_type === "send_message";
     const ownerPosts = a?.action_type === "sns_post";
@@ -41,7 +43,9 @@ export async function decideApprovalAction(_p: ActionState, fd: FormData): Promi
         ? isDeliverable
           ? nextStage
             ? "承認しました。次の段階をチームが始めました"
-            : "承認しました。業務完了です"
+            : isVideo
+              ? "承認しました。この画面の「動画を書き出す」で、動画ファイルを保存できます"
+              : "承認しました。業務完了です"
           : ownerSends
             ? "承認しました。下のボタンから、ご自身で送ってください"
             : ownerPosts

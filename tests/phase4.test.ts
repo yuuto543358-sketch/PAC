@@ -264,15 +264,15 @@ describe("月報", () => {
     expect(row.content).toContain("あなたが記録したお金");
   });
 
-  it("毎月1日に月報を作る（同じ日に2回は作らない）。自動の報告は通知する", async () => {
+  it("毎月1日でも、月報は自動では作らない（必要なときにボタンで作る）", async () => {
     const sql = await getDb();
     await sql`update company_settings set autorun_frequency = 'weekly'`;
     const firstOfMonth = new Date("2030-02-01T00:00:00Z"); // 金曜日
+    const before = await sql<{ n: number }[]>`select count(*)::int as n from reports`;
     const r1 = await runScheduledJobs(sql, firstOfMonth);
-    expect(r1.ran).toEqual(["monthly_report"]);
-    const r2 = await runScheduledJobs(sql, firstOfMonth);
-    expect(r2.ran).toEqual([]);
-    const reportId = r1.reports[0].reportId;
-    expect(await sql`select 1 from notifications where dedupe_key = ${`report:${reportId}`}`).toHaveLength(1);
+    expect(r1.ran).toEqual([]);
+    expect(r1.reports).toEqual([]);
+    const after = await sql<{ n: number }[]>`select count(*)::int as n from reports`;
+    expect(after[0].n).toBe(before[0].n);
   });
 });

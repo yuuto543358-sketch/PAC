@@ -95,13 +95,13 @@ export default async function SettingsPage() {
             <p>毎日、朝（午前7時半ごろ）に自動で動きます。</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す・社長が日報を書く。月曜は週報、毎月1日は月報も書く。
+                <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す。
               </li>
               <li>
-                <b className="text-ink">週1回</b>：月曜だけ、仕事を探して週報を書く。毎月1日は月報も書く。
+                <b className="text-ink">週1回</b>：月曜だけ、仕事を探す。
               </li>
               <li>
-                <b className="text-ink">停止</b>：自動では何もしません（「事業開発」「報告書」の画面のボタンで、いつでも手動で動かせます）。
+                <b className="text-ink">停止</b>：自動では何もしません（「事業開発」の画面のボタンで、いつでも手動で動かせます）。
               </li>
             </ul>
             <p>

@@ -12,6 +12,7 @@ import { OwnerDoPanel, SelfPostPanel, SelfSendPanel } from "./SelfSendPanel";
 import { composeUrl, platformOf } from "@/lib/sns/post";
 import { OWNER_SENDS_ACTION_TYPES } from "@/lib/constants";
 import { DocumentView } from "@/components/DocumentView";
+import { VideoSection } from "@/components/VideoSection";
 
 // 差し戻し後のチームの作業（バックグラウンド）を待つ時間（秒）
 export const maxDuration = 300;
@@ -98,9 +99,15 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
           </Link>
         )}
 
+        {isDeliverable && a.task_id && deliverableVersion && a.payload?.format === "video_script" && (
+          <Section title={a.status === "approved" ? "動画（ここで保存できます）" : "動画（承認の前に確かめられます）"}>
+            <VideoSection taskId={a.task_id} version={deliverableVersion} title={a.title.replace(/^成果物の確認：/, "")} />
+          </Section>
+        )}
+
         {isDeliverable ? (
           <Section
-            title="確認する成果物"
+            title={a.payload?.format === "video_script" ? "台本" : "確認する成果物"}
             action={
               a.task_id && deliverableVersion ? (
                 <Link href={`/tasks/${a.task_id}/deliverables/${deliverableVersion}`} className="tap font-medium text-brand">

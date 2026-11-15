@@ -59,7 +59,6 @@ describe("やさしい言葉のルール", () => {
     expect(buildStepInstruction("drafting", ctx)).toContain("やさしい言葉");
     // 監査役は言葉づかいの添削はしない（内容だけを見る）
     expect(buildStepInstruction("review", ctx)).toContain("言葉づかい・書き方・好みの問題・細かい表現は指摘しない");
-    expect(buildStepInstruction("final_report", ctx)).toContain("書き方は自由");
   });
 
   it("事業・販売に関係する業務だけ、売る場所の選び方（経営者の方針）が入る", () => {

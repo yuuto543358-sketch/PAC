@@ -4,7 +4,7 @@ import type { Sql } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { getSettings } from "@/lib/repo/settings";
 import { runDiscovery, type DiscoveryResult } from "./discovery";
-import { generateCompanyReport, type ReportResult } from "./reports";
+import type { ReportResult } from "./reports";
 import { runSnsPlanning, type SnsPlanResult } from "./sns";
 import { runLifeJobs, type LifeJobsResult } from "@/lib/life/jobs";
 import { advanceAllBusinesses } from "@/lib/business/pipeline";
@@ -132,34 +132,8 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
     }
   }
 
-  // 日報: 毎日（daily のとき）
-  if (freq === "daily") {
-    if (await claim(sql, "last_daily_report_on", date)) {
-      result.reports.push(await generateCompanyReport(sql, "daily", "scheduled"));
-      result.ran.push("daily_report");
-    } else {
-      result.skipped.push("日報は今日すでに作成済み");
-    }
-  }
-
-  // 週報: 月曜（daily・weekly どちらでも）
-  if (isMonday) {
-    if (await claim(sql, "last_weekly_report_on", date)) {
-      result.reports.push(await generateCompanyReport(sql, "weekly", "scheduled"));
-      result.ran.push("weekly_report");
-    } else {
-      result.skipped.push("週報は今日すでに作成済み");
-    }
-  }
-  // 月報: 毎月1日（daily・weekly どちらでも）
-  if (date.endsWith("-01")) {
-    if (await claim(sql, "last_monthly_report_on", date)) {
-      result.reports.push(await generateCompanyReport(sql, "monthly", "scheduled"));
-      result.ran.push("monthly_report");
-    } else {
-      result.skipped.push("月報は今日すでに作成済み");
-    }
-  }
+  // 日報・週報・月報は、自動では作らない（AIの費用を使うわりに、なくても困らないため。経営者の方針 2026年11月）。
+  // 必要なときは「報告書」の画面のボタンで作れる。
   log.step("done", { freq, ran: result.ran, skipped: result.skipped.length });
   return result;
 }

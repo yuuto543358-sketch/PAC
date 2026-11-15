@@ -7,6 +7,7 @@ import { mockHooks } from "@/lib/ai/client";
 import { getWorkflow, initWorkflow, listDeliverables, listRoomMessages } from "@/lib/workflow/repo";
 import { runWorkflows, phaseAfterCheck } from "@/lib/workflow/engine";
 import { listMediaAssets } from "@/lib/media/repo";
+import { remakeMissingMedia } from "@/lib/media/produce";
 import { baseTitle, getSeries, runDueSeries, updateSeries } from "@/lib/series";
 import { addDaysJst, jstDateParts } from "@/lib/format";
 import { isTextModel } from "@/lib/pricing";
@@ -91,12 +92,12 @@ describe("動画の実物：場面の絵とナレーションの声", () => {
     const [t] = await sql<{ budget_limit_jpy: number }[]>`select budget_limit_jpy::float8 as budget_limit_jpy from tasks where id = ${taskId}`;
     expect(t.budget_limit_jpy).toBe(100);
     const msgs = await listRoomMessages(sql, taskId);
-    expect(msgs.some((m) => m.content.includes("絵とナレーションの声ができました"))).toBe(true);
+    expect(msgs.some((m) => m.content.includes("動画の材料（場面ごとの絵・ナレーションの声）ができました"))).toBe(true);
   });
 
-  it("絵や声を作れないときは、止まったままにせず、台本だけで報告する", async () => {
+  it("絵や声を作れなくても止まらない：絵のない場面は文字のスライド・声なしで動画にでき、あとで足りない分を作り直せる", async () => {
     const { sql, taskId } = await newTask("節約レシピのショート動画を作る");
-    // 議論・作成・監査までは進めてから、絵づくりを失敗させる
+    // 議論・作成・監査までは進めてから、絵づくりと声づくりを失敗させる
     for (let i = 0; i < 20; i++) {
       const wf = (await getWorkflow(sql, taskId))!;
       if (wf.phase === "media") break;
@@ -104,12 +105,42 @@ describe("動画の実物：場面の絵とナレーションの声", () => {
     }
     expect((await getWorkflow(sql, taskId))!.phase).toBe("media");
     await runWorkflows(sql, { taskIds: [taskId], maxSteps: 1, deadlineMs: 30_000 }); // 場面に分ける
-    mockHooks.failNext = 2;
+    mockHooks.failNext = 2; // 1枚目の絵と、声を失敗させる
     await runAll([taskId]);
-    const wf = (await getWorkflow(sql, taskId))!;
+    let wf = (await getWorkflow(sql, taskId))!;
     expect(wf.phase).toBe("waiting_human");
-    expect((wf.plan as { media?: { skipped?: string } }).media?.skipped).toBeTruthy();
-    expect((await listRoomMessages(sql, taskId)).some((m) => m.content.includes("台本だけで報告します"))).toBe(true);
+    const media = (wf.plan as { media?: { imageError?: string; voiceError?: string; scenes: unknown[] } }).media!;
+    expect(media.imageError).toBeTruthy();
+    expect(media.voiceError).toBeTruthy();
+    expect(media.scenes).toHaveLength(3);
+    const msgs = await listRoomMessages(sql, taskId);
+    expect(msgs.some((m) => m.content.includes("文字のスライドで動画にします"))).toBe(true);
+    expect(msgs.some((m) => m.content.includes("声なし"))).toBe(true);
+    // 承認の依頼はちゃんと届く
+    const [a] = await sql<{ reason: string }[]>`select reason from approvals where task_id = ${taskId} and action_type = 'accept_deliverable' and status = 'pending'`;
+    expect(a.reason).toContain("文字のスライド");
+
+    // 「足りない絵と声を作る」：作れなかった分だけ作り直す
+    const r = await remakeMissingMedia(sql, taskId);
+    expect(r.ok).toBe(true);
+    wf = (await getWorkflow(sql, taskId))!;
+    const after = (wf.plan as { media?: { imageError?: string; voiceError?: string; images: number[]; audio: boolean } }).media!;
+    expect(after.imageError).toBeUndefined();
+    expect(after.images.sort()).toEqual([1, 2, 3]);
+    expect(after.audio).toBe(true);
+    const [d] = await listDeliverables(sql, taskId);
+    expect((await listMediaAssets(sql, taskId, d.version)).length).toBe(4);
+  });
+
+  it("完了報告はAIで作らない（承認の依頼はアプリが作る・報告書は増えない）", async () => {
+    const { sql, taskId } = await newTask("片付けのコツのショート動画をもう1本作る");
+    await runAll([taskId]);
+    const purposes = await sql<{ purpose: string }[]>`select purpose from api_usage where task_id = ${taskId}`;
+    expect(purposes.some((p) => p.purpose === "team:final_report")).toBe(false);
+    expect(await sql`select 1 from reports where task_id = ${taskId}`).toHaveLength(0);
+    const [a] = await sql<{ reason: string }[]>`select reason from approvals where task_id = ${taskId} and action_type = 'accept_deliverable'`;
+    expect(a.reason).toContain("を作りました");
+    expect(a.reason).toContain("動画を書き出す");
   });
 
   it("動画以外は絵と声を作らない／絵と声のモデルは設定で選べない", () => {

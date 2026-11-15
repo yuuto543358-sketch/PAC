@@ -56,7 +56,7 @@ afterAll(async () => {
 });
 
 describe("チームでの自動進行", () => {
-  it("社長がチームを編成 → 議論 → 成果物 → 監査 → 社長の報告 → 経営者の承認待ち まで自動で進む", async () => {
+  it("社長がチームを編成 → 議論 → 成果物 → 監査 → 経営者の承認待ち まで自動で進む（完了報告はAIで作らない）", async () => {
     const { sql, taskId } = await newTeamTask("競合サービスの市場調査");
     const run = await runAll(taskId);
     const wf = (await getWorkflow(sql, taskId))!;
@@ -78,7 +78,6 @@ describe("チームでの自動進行", () => {
       "bizdev:opinion",
       "research:deliverable",
       "finance:review",
-      "president:report",
     ]);
 
     const dels = await listDeliverables(sql, taskId);
@@ -89,13 +88,10 @@ describe("チームでの自動進行", () => {
     const [task] = await sql`select status, assignee_id, ai_call_count from tasks where id = ${taskId}`;
     expect(task.status).toBe("awaiting_approval");
     expect(task.assignee_id).toBe("research");
-    expect(task.ai_call_count).toBe(6);
-    expect(run.steps).toBeGreaterThanOrEqual(6);
-
-    const [report] = await sql`select report_type, content from reports where task_id = ${taskId}`;
-    expect(report.report_type).toBe("task");
-    const lessons = await sql`select employee_id from knowledge where source_task_id = ${taskId}`;
-    expect(lessons.length).toBeGreaterThanOrEqual(2);
+    // AIの呼び出しは5回（編成・議論2・作成・監査）。完了報告の分（以前は6回目）はなくなった
+    expect(task.ai_call_count).toBe(5);
+    expect(run.steps).toBeGreaterThanOrEqual(5);
+    expect(await sql`select 1 from reports where task_id = ${taskId}`).toHaveLength(0);
 
     // 経営者が承認 → 完了
     const approvals = await pendingApprovals(taskId);
@@ -120,7 +116,8 @@ describe("チームでの自動進行", () => {
     // 監査は1回だけ（監査 → 修正 → 監査 … のくり返しが起きない）
     expect(msgs.filter((m) => m.kind === "review").map((r) => r.meta.verdict)).toEqual(["revise"]);
     expect(msgs.some((m) => m.author_type === "system" && m.content.includes("再監査はせずに"))).toBe(true);
-    expect(msgs.filter((m) => m.kind === "report")).toHaveLength(1);
+    // 完了報告はAIで作らない（費用の節約）
+    expect(msgs.filter((m) => m.kind === "report")).toHaveLength(0);
     expect((await pendingApprovals(taskId)).map((a) => a.action_type)).toEqual(["accept_deliverable"]);
   });
 

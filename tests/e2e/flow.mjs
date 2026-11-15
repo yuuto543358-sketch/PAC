@@ -86,7 +86,7 @@ await page.waitForURL(/\/room/);
 check("社長のチャットからチームのグループチャットへ移動できる", true);
 await page.getByText("成果物の確認をお願いします").waitFor({ timeout: 90000 });
 check("チームが自動で 計画→議論→作成→監査→報告 まで進む", true);
-for (const kind of ["計画", "調査メモ", "意見", "監査", "報告"]) {
+for (const kind of ["計画", "調査メモ", "意見", "監査"]) {
   check(`グループチャットに「${kind}」の発言`, (await page.locator("main span", { hasText: new RegExp(`^${kind}$`) }).count()) > 0);
 }
 check("グループチャット画面では下のメニューを隠す", (await page.locator("nav[aria-label=メインメニュー]").count()) === 0);
@@ -230,10 +230,13 @@ await shot("16b-video-deliverable");
 // 承認すると、そこで終わらず「シリーズ」として次の回を作り続ける
 await page.goto(`${BASE}/approvals`);
 await page.locator("main ul li a", { hasText: "朝のルーティン紹介のショート動画" }).first().click();
-await page.getByText("確認する成果物").waitFor();
+await page.getByText("台本", { exact: true }).first().waitFor();
 check("動画の承認画面に「次の回を自動で作り始めます」と書いてある", (await page.getByText(/次の回を自動で作り始めます/).count()) > 0);
+check("動画の承認画面で、その場で動画を再生・書き出しできる",
+  (await page.locator("canvas[aria-label=動画のプレビュー]").count()) === 1 && (await page.getByRole("button", { name: "動画を書き出す" }).count()) === 1);
 await page.getByRole("button", { name: "承認する" }).click();
-await page.getByText("承認しました。業務完了です").waitFor();
+await page.getByText("承認しました。この画面の「動画を書き出す」で、動画ファイルを保存できます").waitFor();
+check("承認したあとも、同じ画面で動画を書き出せる", (await page.getByRole("button", { name: "動画を書き出す" }).count()) === 1);
 await page.goto(`${BASE}/series`);
 check("シリーズ画面に、承認した動画のシリーズが出る（3日ごと）",
   (await page.getByText("朝のルーティン紹介のショート動画を作る", { exact: true }).count()) === 1 && (await page.getByText(/3日ごとに作る・次の回は/).count()) === 1);
@@ -362,7 +365,7 @@ check("事業の画面にお金が出る", (await page.getByText("この事業�
 
 // 報告書：今すぐ日報を作る（Phase 3）
 await page.goto(`${BASE}/reports`);
-check("報告書に社長の完了報告が保存される", (await page.getByText("業務完了報告：").count()) > 0);
+check("業務の完了報告は作らない（AIの費用の節約）", (await page.getByText("業務完了報告：").count()) === 0);
 await page.getByRole("button", { name: "日報を作る" }).click();
 await page.getByRole("status").filter({ hasText: "日報を作りました" }).waitFor({ timeout: 60_000 });
 await page.reload();

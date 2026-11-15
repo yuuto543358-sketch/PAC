@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { dateTime } from "@/lib/format";
 import { REPORT_TYPE_LABEL } from "@/lib/constants";
-import { getSettings } from "@/lib/repo/settings";
 import { Empty, Page, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DocumentView } from "@/components/DocumentView";
@@ -15,17 +14,8 @@ type ReportRow = { id: string; report_type: string; title: string; content: stri
 
 export default async function ReportsPage() {
   const sql = await getDb();
-  const [reports, settings] = await Promise.all([
-    sql<ReportRow[]>`
-      select id, report_type, title, content, task_id, created_at from reports order by created_at desc limit 50`,
-    getSettings(sql),
-  ]);
-  const autoLabel =
-    settings.autorun_frequency === "daily"
-      ? "毎日（月曜は週報、毎月1日は月報も）"
-      : settings.autorun_frequency === "weekly"
-        ? "毎週月曜（毎月1日は月報も）"
-        : "停止中";
+  const reports = await sql<ReportRow[]>`
+    select id, report_type, title, content, task_id, created_at from reports order by created_at desc limit 50`;
   return (
     <>
       <PageHeader title="報告書" subtitle={`${reports.length}件`} back="/more" backLabel="メニュー" />
@@ -35,12 +25,7 @@ export default async function ReportsPage() {
             社長の<b>天城 翔</b>が、会社の様子をまとめて報告します。数字はシステムが自動で集計した事実です。
           </p>
           <ReportNowButtons />
-          <p className="text-xs text-muted">
-            1回 約1円。自動の報告：<b className="text-ink">{autoLabel}</b>
-            <Link href="/settings#autorun" className="tap ml-1 font-semibold text-brand">
-              設定を変える
-            </Link>
-          </p>
+          <p className="text-xs text-muted">1回 約1円。AIの費用を節約するため、日報・週報・月報は自動では作りません。必要なときだけ、上のボタンで作ってください。</p>
         </div>
         {reports.length === 0 ? (
           <Empty icon="report">まだ報告書はありません。上のボタンで作るか、チームが業務を完了すると、ここに保存されます。</Empty>

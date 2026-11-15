@@ -392,8 +392,8 @@ export default async function HomePage() {
                 </>
               ) : (
                 <>
-                  <span className="block text-[15px] font-semibold">日報・週報</span>
-                  <span className="block text-[12px] text-muted">まだありません。報告書の画面で作れます</span>
+                  <span className="block text-[15px] font-semibold">報告書</span>
+                  <span className="block text-[12px] text-muted">必要なときに、報告書の画面で作れます</span>
                 </>
               )}
             </span>

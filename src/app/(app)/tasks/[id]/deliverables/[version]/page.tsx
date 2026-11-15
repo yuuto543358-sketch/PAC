@@ -2,14 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getTask } from "@/lib/repo/tasks";
-import { getDeliverable, getWorkflow, listDeliverables } from "@/lib/workflow/repo";
-import { listMediaAssets } from "@/lib/media/repo";
-import { VideoComposer, type ComposerScene } from "@/components/VideoComposer";
+import { getDeliverable, listDeliverables } from "@/lib/workflow/repo";
+import { VideoSection } from "@/components/VideoSection";
 import { DELIVERABLE_FORMATS, DELIVERABLE_STATUS_LABEL } from "@/lib/constants";
 import { dateTime } from "@/lib/format";
 import { DocumentView } from "@/components/DocumentView";
 import { Page, PageHeader, Section } from "@/components/ui";
 import { NoteCopyButtons, OutputButtons, SectionCopyButtons } from "./OutputButtons";
+
+// 「足りない絵と声を作る」は1〜2分かかることがあるため
+export const maxDuration = 300;
 
 export default async function DeliverablePage({ params }: { params: Promise<{ id: string; version: string }> }) {
   const { id, version } = await params;
@@ -18,19 +20,8 @@ export default async function DeliverablePage({ params }: { params: Promise<{ id
   const sql = await getDb();
   const task = await getTask(sql, id);
   if (!task) notFound();
-  const [d, all, wf] = await Promise.all([getDeliverable(sql, id, v), listDeliverables(sql, id), getWorkflow(sql, id)]);
+  const [d, all] = await Promise.all([getDeliverable(sql, id, v), listDeliverables(sql, id)]);
   if (!d) notFound();
-  // 動画：AIが作った場面の絵とナレーションの声
-  type MediaPlan = { version: number; scenes: { no: number; caption: string; narration: string }[]; images: number[]; audio: boolean; skipped?: string };
-  const media = d.format === "video_script" ? ((wf?.plan as { media?: MediaPlan } | undefined)?.media ?? null) : null;
-  const assets = media && media.version === d.version ? await listMediaAssets(sql, id, d.version) : [];
-  const imageOf = (no: number) => assets.find((a) => a.kind === "image" && a.scene_no === no);
-  const audio = assets.find((a) => a.kind === "audio") ?? null;
-  const composerScenes: ComposerScene[] | null =
-    media && media.version === d.version && media.scenes.length > 0 && media.scenes.every((s) => imageOf(s.no))
-      ? media.scenes.map((s) => ({ no: s.no, caption: s.caption, narration: s.narration, imageUrl: `/api/media/${imageOf(s.no)!.id}` }))
-      : null;
-  const mediaWorking = d.format === "video_script" && wf?.phase === "media" && !composerScenes;
   const fmt = DELIVERABLE_FORMATS.find((f) => f.id === d.format) ?? DELIVERABLE_FORMATS[0];
   const safeName = d.title.replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 60) || "deliverable";
   const statusTone =
@@ -75,42 +66,7 @@ export default async function DeliverablePage({ params }: { params: Promise<{ id
 
         {d.format === "video_script" && (
           <Section title="動画">
-            <div className="card p-4">
-              {composerScenes ? (
-                <>
-                  <VideoComposer title={d.title} scenes={composerScenes} audioUrl={audio && media?.audio ? `/api/media/${audio.id}` : null} />
-                  <p className="mt-3 text-[12px] leading-relaxed text-muted">
-                    AIが作った場面の絵・ナレーションの声・テロップを、この端末の中で1本の縦長動画につなげます（どこにも送信しません）。
-                    「動画を書き出す」は動画と同じ長さの時間がかかります。BGMを付けたいときは、保存した動画を編集アプリで開いて足してください。
-                  </p>
-                  <details className="mt-1">
-                    <summary className="cursor-pointer py-3 text-[14px] font-semibold text-brand">材料を1つずつ保存する</summary>
-                    <ul className="mt-2 grid grid-cols-2 gap-2">
-                      {media!.scenes.map((s) => (
-                        <li key={s.no}>
-                          <a className="btn-secondary block truncate px-2 text-[13px]" href={`/api/media/${imageOf(s.no)!.id}?download=1`}>
-                            場面{s.no}の絵
-                          </a>
-                        </li>
-                      ))}
-                      {audio && (
-                        <li>
-                          <a className="btn-secondary block truncate px-2 text-[13px]" href={`/api/media/${audio.id}?download=1`}>
-                            ナレーションの声
-                          </a>
-                        </li>
-                      )}
-                    </ul>
-                  </details>
-                </>
-              ) : mediaWorking ? (
-                <p className="text-[14px] text-muted">チームが場面の絵とナレーションの声を作っています（{media?.images.length ?? 0}/{media?.scenes.length || "?"}枚）。できたら、ここで動画を再生・保存できます。</p>
-              ) : media?.skipped ? (
-                <p className="text-[14px] text-muted">絵や声を作れませんでした（{media.skipped}）。グループチャットで「もう一度、絵と声を作って」と指示すると、作り直します。</p>
-              ) : (
-                <p className="text-[14px] text-muted">この版の絵と声はまだありません。</p>
-              )}
-            </div>
+            <VideoSection taskId={id} version={d.version} title={d.title} />
           </Section>
         )}
 

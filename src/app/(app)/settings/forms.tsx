@@ -183,7 +183,7 @@ export function NotifyForm({ initial }: { initial: { notify_approvals: boolean; 
         <input type="checkbox" name="notify_approvals" defaultChecked={initial.notify_approvals} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" />
         <span>
           承認のお願い・チームからの質問・自動の報告
-          <span className="block text-xs text-muted">あなたの返事が必要なときや、日報・週報・月報、新しい事業の候補が届いたとき</span>
+          <span className="block text-xs text-muted">あなたの返事が必要なときや、新しい事業の候補が届いたとき</span>
         </span>
       </label>
       <label className="flex items-start gap-2.5 text-sm">

@@ -6,7 +6,7 @@ import { showToast } from "@/components/Toaster";
 // AIが作った「場面の絵」と「ナレーションの声」と「テロップ」を、この端末（iPhone）の中で1本の縦長動画につなげます。
 // 動画づくりはすべて端末の中で行い、どこにも送信しません。書き出した動画は「保存」で写真アプリなどに保存できます。
 
-export type ComposerScene = { no: number; caption: string; narration: string; imageUrl: string };
+export type ComposerScene = { no: number; caption: string; narration: string; imageUrl: string | null };
 
 const W = 720;
 const H = 1280;
@@ -15,7 +15,17 @@ const MIN_SCENE = 1.2;
 const TAIL = 0.6;
 const FADE = 0.35;
 
-type Loaded = { images: HTMLImageElement[]; audio: AudioBuffer | null; durations: number[]; total: number };
+type Loaded = { images: (HTMLImageElement | null)[]; audio: AudioBuffer | null; durations: number[]; total: number };
+
+/** 絵のない場面の背景（文字のスライド） */
+const CARD_COLORS: [string, string][] = [
+  ["#0f766e", "#134e4a"],
+  ["#7c3aed", "#4c1d95"],
+  ["#c2410c", "#7c2d12"],
+  ["#1d4ed8", "#1e3a8a"],
+  ["#be185d", "#831843"],
+  ["#4d7c0f", "#365314"],
+];
 
 function pickMime(): string {
   const candidates = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
@@ -54,7 +64,19 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return lines;
 }
 
-function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, zoom: number, alpha: number) {
+function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, zoom: number, alpha: number, sceneIndex = 0) {
+  if (!img) {
+    // 絵がない場面：色のグラデーションの「文字のスライド」
+    const [a, b] = CARD_COLORS[sceneIndex % CARD_COLORS.length];
+    const g = ctx.createLinearGradient(0, 0, W * 0.4, H);
+    g.addColorStop(0, a);
+    g.addColorStop(1, b);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    return;
+  }
   const iw = img.naturalWidth || W;
   const ih = img.naturalHeight || H;
   const scale = Math.max(W / iw, H / ih) * zoom;
@@ -81,10 +103,21 @@ function drawFrame(ctx: CanvasRenderingContext2D, t: number, loaded: Loaded, sce
   const p = Math.min(1, Math.max(0, (t - start) / d));
   // 前の場面からふわっと切り替える
   if (idx > 0 && t - start < FADE) {
-    drawCover(ctx, loaded.images[idx - 1], 1.08, 1);
-    drawCover(ctx, loaded.images[idx], 1 + 0.08 * p, (t - start) / FADE);
+    drawCover(ctx, loaded.images[idx - 1], 1.08, 1, idx - 1);
+    drawCover(ctx, loaded.images[idx], 1 + 0.08 * p, (t - start) / FADE, idx);
   } else {
-    drawCover(ctx, loaded.images[idx], 1 + 0.08 * p, 1);
+    drawCover(ctx, loaded.images[idx], 1 + 0.08 * p, 1, idx);
+  }
+  // 文字のスライド：話す言葉を大きく真ん中に
+  if (!loaded.images[idx]) {
+    const text = (scenes[idx].narration || scenes[idx].caption).trim();
+    ctx.font = "bold 50px 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+    const lines = wrapLines(ctx, text, W - 140, 7);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const top = H / 2 - 120 - ((lines.length - 1) * 74) / 2;
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, top + i * 74));
   }
   // テロップ
   const caption = scenes[idx].caption.trim();
@@ -121,7 +154,7 @@ export function VideoComposer({ title, scenes, audioUrl }: { title: string; scen
   async function load(): Promise<Loaded> {
     if (loadedRef.current) return loadedRef.current;
     setState("loading");
-    const images = await Promise.all(scenes.map((s) => loadImage(s.imageUrl)));
+    const images = await Promise.all(scenes.map((s) => (s.imageUrl ? loadImage(s.imageUrl).catch(() => null) : Promise.resolve(null))));
     let audio: AudioBuffer | null = null;
     if (audioUrl) {
       const buf = await (await fetch(audioUrl)).arrayBuffer();

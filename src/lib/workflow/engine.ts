@@ -33,19 +33,15 @@ import { matchesRequestedProduct, type RequestedProduct } from "./product";
 import {
   DiscussionSchema,
   DraftSchema,
-  FinalReportSchema,
   KickoffSchema,
   ReviewSchema,
   type DiscussionOutput,
   type DraftOutput,
-  type FinalReportOutput,
   type KickoffOutput,
   type ReviewOutput,
 } from "./schemas";
-import { mockDiscussion, mockDraft, mockFinal, mockKickoff, mockMediaPlan, mockReview } from "./mock";
-import { MediaPlanSchema, type MediaPlanOutput } from "./schemas";
-import { generateImage, generateSpeech } from "@/lib/media/generate";
-import { saveMediaAsset } from "@/lib/media/repo";
+import { mockDiscussion, mockDraft, mockKickoff, mockReview } from "./mock";
+import { mediaDoneMessage, mediaStateOf, produceMediaStep } from "@/lib/media/produce";
 
 // ===== 安全のための上限 =====
 /** 1つの業務でAIが成功した作業の最大回数（これを超えたら停止して経営者に知らせる） */
@@ -131,7 +127,6 @@ const CONFIG = {
   drafting: { schema: DraftSchema, schemaName: "team_draft", maxTokens: 9000, effort: "medium", mock: mockDraft },
   rework: { schema: DraftSchema, schemaName: "team_rework", maxTokens: 9000, effort: "medium", mock: mockDraft },
   review: { schema: ReviewSchema, schemaName: "team_review", maxTokens: 2500, effort: "low", mock: mockReview },
-  final_report: { schema: FinalReportSchema, schemaName: "team_final_report", maxTokens: 3500, effort: "low", mock: mockFinal },
 } satisfies Record<string, CallConfig<z.ZodType>>;
 
 /**
@@ -217,6 +212,14 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
     webSearch: shouldUseWebSearch(wf.phase, speaker, settings),
   };
   if (wf.phase === "media") return doMediaStep(sql, wf, ctx, members);
+  if (wf.phase === "final_report") {
+    // 完了報告はAIに書かせない（費用の節約）。承認の依頼は、アプリが事実だけで作る
+    await begin(sql, async (tx) => {
+      await finishForApproval(tx, wf, members);
+      await tx`update task_workflows set steps = steps + 1, failures = 0, last_step_at = now(), updated_at = now() where task_id = ${wf.task_id}`;
+    });
+    return { status: "transitioned", phase: wf.phase, to: "waiting_human" };
+  }
 
   const phase = wf.phase as keyof typeof CONFIG;
   const cfg = CONFIG[phase];
@@ -264,9 +267,6 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
         break;
       case "review":
         await applyReview(tx, wf, speaker, result.data as ReviewOutput, result.usageId, meta, product);
-        break;
-      case "final_report":
-        await applyFinal(tx, wf, task.title, roster, members, result.data as FinalReportOutput, result.usageId, meta);
         break;
     }
     await tx`
@@ -462,35 +462,16 @@ async function applyReview(
   }
 }
 
-async function applyFinal(
-  tx: Tx,
-  wf: Workflow,
-  taskTitle: string,
-  roster: EmployeeWithStats[],
-  members: Member[],
-  out: FinalReportOutput,
-  usageId: string,
-  meta: Meta,
-) {
+/**
+ * 成果物を経営者の承認に回す（AIは使わない）。
+ * 以前は社長がAIで完了報告を書いていたが、費用がかかるだけなので、事実（成果物・監査の注意点・動画の材料）だけで承認の依頼を作る。
+ */
+async function finishForApproval(tx: Tx, wf: Workflow, members: Member[]) {
   const latest = await getDeliverable(tx, wf.task_id);
-  const nextSteps = out.next_steps.slice(0, 3);
-  const reportBody = `${out.report}${nextSteps.length ? `\n\n今後の提案:\n${nextSteps.map((s) => `・${s}`).join("\n")}` : ""}`;
-  await tx`
-    insert into reports (report_type, title, content, employee_id, task_id, period_start, period_end)
-    values ('task', ${`業務完了報告：${taskTitle}`.slice(0, 200)}, ${reportBody}, 'president', ${wf.task_id},
-      (now() at time zone 'Asia/Tokyo')::date, (now() at time zone 'Asia/Tokyo')::date)`;
-  await addRoomMessage(tx, { taskId: wf.task_id, authorType: "employee", employeeId: "president", kind: "report", content: reportBody, meta, apiUsageId: usageId });
-
-  // 学びを社員の記憶として保存（次の仕事のときに参照される）
   const memberIds = new Set(members.map((m) => m.employee_id));
-  for (const l of out.lessons.slice(0, 6)) {
-    if (!memberIds.has(l.employee_id) || !l.lesson.trim()) continue;
-    await tx`
-      insert into knowledge (employee_id, category, title, content, source_task_id, created_by)
-      values (${l.employee_id}, 'lesson', ${`「${taskTitle}」からの学び`.slice(0, 200)}, ${l.lesson.slice(0, 1000)}, ${wf.task_id}, 'employee')`;
-  }
-  await tx`update employees set experience_points = experience_points + 2 where id in ${tx([...memberIds])}`;
-
+  if (memberIds.size) await tx`update employees set experience_points = experience_points + 2 where id in ${tx([...memberIds])}`;
+  const media = latest?.format === "video_script" ? mediaStateOf(wf) : null;
+  const mediaNote = media && media.version === latest?.version ? `\n${mediaDoneMessage(media)}` : "";
   const risks = (wf.plan as { review_risks?: string[] }).review_risks ?? [];
   if (latest) {
     await createApprovalTx(
@@ -501,7 +482,7 @@ async function applyFinal(
         actionType: "accept_deliverable",
         title: `成果物の確認：${latest.title}`,
         content: latest.content,
-        reason: out.summary || "チームの成果物が完成しました",
+        reason: `チームが「${latest.title}」を作りました。${mediaNote}`.trim(),
         destination: "社内（成果物の受け取り）",
         estimatedCostJpy: 0,
         risks: risks.join("\n") || "特になし",
@@ -541,117 +522,37 @@ async function applyFinal(
     await systemMessage(tx, wf.task_id, `外部への操作の承認依頼を提出しました：${a.title}（${APPROVAL_ACTION_LABEL[a.action_type as keyof typeof APPROVAL_ACTION_LABEL] ?? a.action_type}）`, "warn");
   }
   await updateWorkflow(tx, wf.task_id, { phase: "waiting_human", waiting_reason: "acceptance", resume_phase: null });
-  await systemMessage(tx, wf.task_id, "成果物が完成しました。承認センターで内容を確認し、承認してください（差し戻すと、コメントが修正指示としてチームに伝わります）。", "warn");
-  void roster;
+  await systemMessage(
+    tx,
+    wf.task_id,
+    `成果物が完成しました。承認センターで内容を確認し、承認してください（差し戻すと、コメントが修正指示としてチームに伝わります）。${latest?.format === "video_script" ? "動画は、承認の画面の「動画を書き出す」で動画ファイルにして保存できます。" : ""}`,
+    "warn",
+  );
 }
 
 // ===== 動画の実物（場面の絵・ナレーションの声）を作る =====
 
-/** 品質の確認が終わったあとの段階：動画なら絵と声を作り、それ以外は社長の報告へ */
+/** 品質の確認が終わったあとの段階：動画なら絵と声を作り、それ以外は承認へ */
 export function phaseAfterCheck(product: RequestedProduct | null, format: string | null | undefined): WorkflowPhase {
   return product?.format === "video_script" && format === "video_script" ? "media" : "final_report";
 }
 
-/** 1つの動画で作る場面の数の上限（費用を抑えるため） */
-export const MAX_SCENES = 6;
-
-type MediaState = {
-  version: number;
-  scenes: { no: number; caption: string; narration: string; image_prompt: string }[];
-  voice: string;
-  images: number[];
-  audio: boolean;
-  skipped?: string;
-};
-
-function mediaStateOf(wf: Workflow): MediaState | null {
-  return ((wf.plan as { media?: MediaState }).media ?? null) as MediaState | null;
-}
-
-/**
- * 動画の材料を1つずつ作る（1回の作業でAIの呼び出しは1回）：
- * 台本を場面に分ける → 場面ごとに絵を1枚ずつ → ナレーションの声 → 社長の報告へ
- */
+/** 動画の材料を1つずつ作る（絵や声が作れなくても止めない。くわしくは src/lib/media/produce.ts） */
 async function doMediaStep(sql: Sql, wf: Workflow, ctx: PromptContext, members: Member[]): Promise<StepResult> {
   const log = createStepLogger("media");
-  const latest = ctx.deliverable;
-  if (!latest || latest.format !== "video_script") {
-    await begin(sql, (tx) => moveTo(tx, wf, "final_report"));
-    return { status: "transitioned", phase: wf.phase, to: "final_report" };
-  }
   const speaker = ctx.speaker;
-  const state = mediaStateOf(wf);
-  const savePlan = (tx: Tx, media: MediaState) =>
-    updateWorkflow(tx, wf.task_id, { plan: { ...wf.plan, media } as Workflow["plan"] });
-
   await sql`update employees set status = 'working' where id = ${speaker.id}`;
   try {
-    // 1) 台本を場面に分ける（新しい版になったら分け直す）
-    if (!state || state.version !== latest.version) {
-      const result = await callStructured(sql, {
-        model: ctx.settings.model_standard,
-        effort: "low",
-        maxTokens: 2500,
-        system: buildTeamContext(ctx),
-        messages: [
-          {
-            role: "user",
-            content: `最新の成果物（動画の台本）を、アプリが絵と声にするための場面に分けてください。
-- 台本の順番どおりに、3〜${MAX_SCENES}個の場面にする（場面が多ければまとめる）。
-- narration は台本の言葉をそのまま使う。caption は短く。
-- image_prompt は、その場面の絵の説明。文字・ロゴ・実在の人物の顔は入れない。`,
-          },
-        ],
-        schema: MediaPlanSchema,
-        schemaName: "video_media_plan",
-        purpose: "team:media_plan",
-        employeeId: speaker.id,
-        taskId: wf.task_id,
-        mock: () => mockMediaPlan(ctx),
-      });
-      if (!result.ok) return handleFailure(sql, wf, members, speaker, result.message);
-      const data = result.data as MediaPlanOutput;
-      const scenes = data.scenes
-        .filter((s) => s.narration.trim() || s.image_prompt.trim())
-        .slice(0, MAX_SCENES)
-        .map((s, i) => ({ no: i + 1, caption: s.caption.slice(0, 40), narration: s.narration.slice(0, 600), image_prompt: s.image_prompt.slice(0, 800) }));
-      if (scenes.length === 0) return handleFailure(sql, wf, members, speaker, "台本を場面に分けられませんでした");
-      await begin(sql, async (tx) => {
-        await savePlan(tx, { version: latest.version, scenes, voice: data.voice.slice(0, 300), images: [], audio: false });
-        await systemMessage(tx, wf.task_id, `台本を${scenes.length}つの場面に分けました。場面ごとの絵とナレーションの声を作ります。`);
-        await stepDone(tx, wf.task_id);
-      });
-      return { status: "stepped", phase: wf.phase, speakerId: speaker.id, costJpy: result.costJpy };
+    const r = await produceMediaStep(sql, wf.task_id, speaker.id);
+    if (r.status === "progress") {
+      await sql`update task_workflows set steps = steps + 1, failures = 0, last_step_at = now(), updated_at = now() where task_id = ${wf.task_id}`;
+      return { status: "stepped", phase: wf.phase, speakerId: speaker.id, costJpy: r.costJpy };
     }
-
-    // 2) 場面の絵を1枚ずつ
-    const nextScene = state.scenes.find((s) => !state.images.includes(s.no));
-    if (nextScene) {
-      const img = await generateImage(sql, nextScene.image_prompt, { taskId: wf.task_id, employeeId: speaker.id, purpose: "team:media_image", sceneNo: nextScene.no });
-      await begin(sql, async (tx) => {
-        await saveMediaAsset(tx, { taskId: wf.task_id, version: latest.version, kind: "image", sceneNo: nextScene.no, mime: img.mime, data: img.data, prompt: nextScene.image_prompt, usageId: img.usageId });
-        await savePlan(tx, { ...state, images: [...state.images, nextScene.no] });
-        await stepDone(tx, wf.task_id);
-      });
-      log.step("image", { task: wf.task_id, scene: nextScene.no, costJpy: img.costJpy });
-      return { status: "stepped", phase: wf.phase, speakerId: speaker.id, costJpy: img.costJpy };
-    }
-
-    // 3) ナレーションの声（全部の場面をまとめて1本）
-    if (!state.audio) {
-      const text = state.scenes.map((s) => s.narration.trim()).filter(Boolean).join("\n\n");
-      const voice = await generateSpeech(sql, text, state.voice, { taskId: wf.task_id, employeeId: speaker.id, purpose: "team:media_voice" });
-      await begin(sql, async (tx) => {
-        await saveMediaAsset(tx, { taskId: wf.task_id, version: latest.version, kind: "audio", sceneNo: 0, mime: voice.mime, data: voice.data, prompt: text, usageId: voice.usageId });
-        await savePlan(tx, { ...state, audio: true });
-        await systemMessage(tx, wf.task_id, "動画の絵とナレーションの声ができました。成果物の画面で、動画を再生・保存できます。");
-        await moveTo(tx, wf, "final_report");
-        await stepDone(tx, wf.task_id);
-      });
-      return { status: "stepped", phase: wf.phase, speakerId: speaker.id, costJpy: voice.costJpy };
-    }
-
-    await begin(sql, (tx) => moveTo(tx, wf, "final_report"));
+    const fresh = (await getWorkflow(sql, wf.task_id)) ?? wf;
+    await begin(sql, async (tx) => {
+      if (r.status === "done") await systemMessage(tx, wf.task_id, mediaDoneMessage(mediaStateOf(fresh)));
+      await moveTo(tx, fresh, "final_report");
+    });
     return { status: "transitioned", phase: wf.phase, to: "final_report" };
   } catch (err) {
     if (err instanceof BudgetBlockedError) return handleBudgetBlock(sql, wf, err);
@@ -661,12 +562,6 @@ async function doMediaStep(sql: Sql, wf: Workflow, ctx: PromptContext, members: 
   } finally {
     await sql`update employees set status = 'idle' where id = ${speaker.id}`;
   }
-}
-
-async function stepDone(tx: Tx, taskId: string) {
-  await tx`
-    update task_workflows set steps = steps + 1, failures = 0, last_step_at = now(), updated_at = now()
-    where task_id = ${taskId}`;
 }
 
 // ===== 予算・失敗の扱い =====
@@ -740,13 +635,13 @@ async function handleFailure(sql: Sql, wf: Workflow, members: Member[], speaker:
         });
       }
     } else if (wf.phase === "media") {
-      // 絵や声が作れないときは、台本だけで社長の報告に進む（止まったままにしない）
+      // 台本を場面に分けられないときは、台本だけで承認に進む（止まったままにしない。あとで「絵と声を作る」ボタンでやり直せる）
       const media = mediaStateOf(wf);
       await updateWorkflow(tx, wf.task_id, {
         plan: { ...wf.plan, media: { ...(media ?? { version: 0, scenes: [], voice: "", images: [], audio: false }), skipped: reason } } as Workflow["plan"],
         failures: 0,
       });
-      await systemMessage(tx, wf.task_id, `動画の絵や声を作れなかったので、台本だけで報告します（理由：${reason}）。`, "warn");
+      await systemMessage(tx, wf.task_id, `動画の場面分けがうまくいかなかったので、いったん台本だけで承認に回します（理由：${reason}）。成果物の画面の「足りない絵と声を作る」で、あとから作り直せます。`, "warn");
       await moveTo(tx, wf, "final_report");
     } else if (wf.phase === "review" && wf.reviewer_id !== "president") {
       await updateWorkflow(tx, wf.task_id, { reviewer_id: "president", failures: 0 });
