@@ -37,8 +37,8 @@ check("間違ったパスワードは拒否", true);
 await page.fill("#password", PASSWORD);
 await page.click("button[type=submit]");
 await page.waitForURL(`${BASE}/`);
-await page.getByText("本日の会社の状況").waitFor();
-check("ログインしてホーム表示", true);
+await page.getByText("今月の売上").waitFor();
+check("ログインしてホーム表示（メディア事業のダッシュボード）", true);
 await shot("01-home");
 
 // --- 社員 ---
@@ -112,7 +112,7 @@ await shot("16-deliverable");
 
 // --- 承認 ---
 await page.goto(`${BASE}/`);
-check("ホームにチームの進行状況", (await page.getByText("成果物の承認待ち").count()) > 0);
+check("ホームの「あなたの番」に承認待ちが件数つきで出る", /承認待ち/.test(await page.locator("section[aria-label=あなたの番]").innerText()));
 const badge = await page.locator("nav[aria-label=メインメニュー] a[href='/approvals'] span").last().textContent();
 check("承認タブに未確認件数バッジ", Number(badge?.trim()) >= 2, `badge=${badge}`);
 await page.click("nav >> text=承認");
@@ -412,194 +412,87 @@ const xHref = (await page.getByRole("link", { name: "Xで開く" }).getAttribute
 check("承認後は「Xで開く」で、文章入りの投稿画面を開ける（アプリは投稿しない）", xHref.startsWith("https://x.com/intent/post?text="), xHref.slice(0, 60));
 check("「文章をコピー」ボタンもある", (await page.getByRole("button", { name: "文章をコピー" }).count()) === 1);
 
-// ===== ライフインテリジェンス =====
-await page.goto(`${BASE}/more`);
-await page.getByText("今日の暮らし・質問・分析・改善提案").click();
-await page.waitForURL(/\/life$/);
-await page.getByText("情報の集まり具合").waitFor();
-check("メニューからライフを開ける", true);
-const askBtn = page.getByRole("button", { name: "今すぐ質問をもらう（無料）" });
-if (await askBtn.count()) {
-  await askBtn.click();
-  await page.getByRole("status").filter({ hasText: /質問を\d問作りました/ }).waitFor();
+// ===== AI Media Company：市場調査 → ジャンル選定 → ブランド → 記事 → 公開・売上の記録 → Xの投稿 =====
+// AI社員を動かす（バックグラウンド）。短時間に呼び出しが集中すると安全装置で止まるので、そのときは1分待ってもう一度動かす
+async function runMediaUntil(path, text, tries = 5) {
+  for (let i = 0; i < tries; i++) {
+    await page.goto(`${BASE}/media/management`);
+    await page.getByRole("button", { name: "今すぐAI社員を動かす" }).click();
+    await page.getByRole("status").filter({ hasText: /AI社員が仕事を始めました/ }).waitFor();
+    for (let w = 0; w < 6; w++) {
+      await page.waitForTimeout(5000);
+      await page.goto(`${BASE}${path}`);
+      if ((await page.getByText(text).count()) > 0) return true;
+    }
+    await page.waitForTimeout(61_000);
+  }
+  return false;
 }
-await page.reload();
-check("森野からの質問が届く（理由つき）", (await page.getByText(/^質問の理由：/).count()) > 0);
-await shot("25-life");
-// 1問目に答える
-const qForm = page.locator("form").filter({ has: page.getByRole("button", { name: "答える", exact: true }) }).first();
-const numIn = qForm.locator("input[name=value]");
-if (await numIn.count()) await numIn.fill("65000");
-else if (await qForm.locator("textarea[name=value]").count()) await qForm.locator("textarea[name=value]").fill("テストの回答");
-else await qForm.locator("label").first().click();
-await qForm.getByRole("button", { name: "答える", exact: true }).click();
-await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
-check("質問に答えると記録される", true);
-const q2 = page.locator("form").filter({ has: page.getByRole("button", { name: "スキップ" }) }).first();
-await q2.getByRole("button", { name: "スキップ" }).click();
-await page.getByRole("status").filter({ hasText: "スキップしました" }).waitFor();
-check("質問はスキップできる", true);
+check("タブに「記事」がある（ライフはメニューから外した）",
+  (await page.locator("nav[aria-label=メインメニュー] a[href='/media/articles']").count()) === 1 &&
+  (await page.locator("nav[aria-label=メインメニュー] a[href='/life']").count()) === 0);
+const researched = await runMediaUntil("/media/research", "選定");
+check("市場調査部が複数ジャンルを調べ、上位3つを深掘りして1つを選ぶ", researched && (await page.getByText("深掘りした上位3ジャンル").count()) === 1 && (await page.getByText(/調べたジャンル（\d+）/).count()) === 1);
+check("ジャンルは100点満点で評価され、項目ごとの点数が出る", (await page.getByText("読者需要").count()) > 0 && (await page.getByText("運営コスト").count()) > 0);
+await shot("40-media-research");
+await page.goto(`${BASE}/media/brand`);
+const branded = (await page.getByText("販売商品").count()) > 0 || (await runMediaUntil("/media/brand", "販売商品"));
+check("事業開発部がメディアブランド（名前・読者・紹介文・商品）を設計する", branded && (await page.getByText("X の紹介文").count()) === 1);
+await page.fill("input[name=note_url]", "https://note.com/test_media");
+await page.fill("input[name=x_handle]", "@test_media");
+await page.getByRole("button", { name: "アカウントを記録する" }).click();
+await page.getByRole("status").filter({ hasText: "アカウントを記録しました" }).waitFor();
+check("note と X のアカウントを記録できる", true);
+await shot("41-media-brand");
 
-// 生活情報：携帯電話料金を記録 → 直す（履歴が残る）→ もう1件記録
-await page.goto(`${BASE}/life/records/phone_bill`);
-await page.locator("form").filter({ has: page.getByRole("button", { name: "記録する" }) }).locator("input[name=value]").fill("3000");
-await page.getByRole("button", { name: "記録する" }).click();
-await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
-await page.reload();
-await page.getByText("直す・削除する").first().click();
-const editForm = page.locator("form").filter({ has: page.getByRole("button", { name: "この記録を直す" }) });
-await editForm.locator("input[name=value]").fill("3500");
-await editForm.locator("input[name=reason]").fill("打ち間違い");
-await editForm.getByRole("button", { name: "この記録を直す" }).click();
-await page.getByRole("status").filter({ hasText: "記録を直しました" }).waitFor();
-await page.reload();
-check("記録を直すと、修正の履歴が残る", (await page.getByText(/に修正：3,000 → 3,500（打ち間違い）/).count()) > 0);
-await page.locator("form").filter({ has: page.getByRole("button", { name: "記録する" }) }).locator("input[name=value]").fill("6500");
-await page.getByRole("button", { name: "記録する" }).click();
-await page.getByRole("status").filter({ hasText: "記録しました" }).waitFor();
-await page.reload();
-check("値が変わると、前の値も残り「変わりました」と出る", (await page.getByText("変わりました：3,500円/月 → 6,500円/月").count()) > 0);
-check("2件以上の数字はグラフになる", (await page.locator("svg[role=img]").count()) > 0);
-await shot("26-life-record");
-
-// 分析 → 改善提案 → チームで検討
-await page.goto(`${BASE}/life/reports`);
-for (let attempt = 0; attempt < 3; attempt++) {
-  await page.getByRole("button", { name: "今すぐ分析する（約1〜2円）" }).click();
-  const res = page.getByText(/分析を作りました|1分ほど待ってください/).first();
-  await res.waitFor({ timeout: 60_000 });
-  if (/分析を作りました/.test(await res.innerText())) break;
-  await page.waitForTimeout(61_000);
-  await page.reload();
-}
-check("分析レポートを作れる", true);
-await page.reload();
-await page.locator("main a[href^='/life/reports/']").first().click();
-await page.getByText("固定費（いまの値）").waitFor();
-check("レポートに固定費と足りない情報が出る", (await page.getByText("足りない情報").count()) > 0);
-await shot("27-life-report");
-// 優先度の高い提案は、自動でチームの検討（「検討中」）になる
-await page.goto(`${BASE}/life/suggestions?status=considering`);
-const sugg = page.locator("main a[href^='/life/suggestions/']").first();
-check("改善提案が届き、自動でチームの検討になる", (await sugg.count()) > 0);
-await sugg.click();
-await page.getByText("そう考えた根拠").waitFor();
-check("提案に根拠などの7つの項目が出る", (await page.getByText("そう考えた根拠").count()) === 1 && (await page.getByText("おすすめの対応").count()) === 1);
-check("提案からチームのグループチャットへ行ける", (await page.getByText("グループチャットを見る").count()) === 1);
-await shot("28-life-suggestion");
-
-// 設定
-await page.goto(`${BASE}/life/settings`);
-await page.locator("select[name=frequency]").selectOption("low");
-await page.getByRole("button", { name: "ライフの設定を保存" }).click();
-await page.getByRole("status").filter({ hasText: "ライフの設定を保存しました" }).waitFor();
-check("質問の頻度を変えられる", true);
+const written = await runMediaUntil("/media/articles?status=ready", "完成（公開待ち）");
+check("記事が 企画 → 情報源 → 執筆 → 品質検査 を経て完成する", written);
+await page.locator("main ul li a").first().click();
+await page.getByText("note に公開する（あなたが行う）").waitFor();
+check("完成した記事は note に貼れる（タイトル・本文・参考にした情報をコピー）",
+  (await page.getByRole("button", { name: "タイトル" }).count()) === 1 && (await page.getByRole("button", { name: "参考にした情報" }).count()) === 1);
+check("記事に品質検査の点数・情報源が残る", (await page.getByText("品質検査（監査・品質管理部）").count()) === 1 && (await page.getByText("情報源").count()) > 0);
+await shot("42-media-article");
+await page.fill("input[name=url]", "https://note.com/test_media/n/n0123456789ab");
+await page.getByRole("button", { name: "公開した" }).click();
+await page.getByRole("status").filter({ hasText: "公開済みにしました" }).waitFor();
+await page.fill("input[name=views]", "150");
+await page.fill("input[name=likes]", "12");
+await page.fill("input[name=sales]", "2");
+await page.fill("input[name=revenue]", "600");
+await page.getByRole("button", { name: "数字を記録する" }).click();
+await page.getByRole("status").filter({ hasText: /お金の記録にも入れました/ }).waitFor();
+check("公開したURLと、閲覧数・販売数・売上を記録できる（売上はお金の記録にも入る）", true);
 await page.goto(`${BASE}/`);
-{
-  const turn = page.locator("section[aria-label=あなたの番]");
-  check("ホームの「あなたの番」に森野からの質問が件数つきで出る", (await turn.getByText("森野からの質問").count()) === 1 && /\d+問/.test(await turn.innerText()));
-}
+check("ホームの今月の売上に、記録した売上が出る", (await page.getByText("600円").count()) > 0);
 
-// ===== QOL：毎日のチェック・習慣・これから起きること・目標・ふりかえり =====
-await page.goto(`${BASE}/`);
-check("タブに「ライフ」がある", (await page.locator("nav[aria-label=メインメニュー] a[href='/life']").count()) === 1);
-await page.getByText("今日の調子は？（10秒）").waitFor();
-{
-  // ホームの並び：あなたの番（承認 → 質問）→ 今日のチェック → 習慣。重なっていた欄はない
-  const y = async (loc) => (await loc.first().boundingBox())?.y ?? -1;
-  const turn = page.locator("section[aria-label=あなたの番]");
-  const turnText = await turn.innerText();
-  const yTurn = await y(turn);
-  const yCheck = await y(page.getByText("今日の調子は？（10秒）"));
-  check("ホームの「あなたの番」は件数つきで、今日のチェックより上", /あなたの番（\d+件）/.test(turnText) && yTurn >= 0 && yTurn < yCheck);
-  check("「あなたの番」の中は 承認待ち → 森野からの質問 の順", turnText.indexOf("承認待ち") >= 0 && turnText.indexOf("承認待ち") < turnText.indexOf("森野からの質問"));
-  check("ホームに「進行中の業務」の欄はなく、「チームの進行状況」に一本化", (await page.getByText("進行中の業務", { exact: true }).count()) === 0 && (await page.getByText("チームの進行状況").count()) === 1);
-  const recent = page.locator("section", { has: page.getByRole("heading", { name: "最近の動き" }) });
-  check("「最近の動き」は最新3件まで＋「すべて見る」", (await recent.locator("ol > li").count()) <= 3 && (await recent.getByRole("link", { name: "すべて見る" }).count()) === 1);
-}
-for (const [name, v] of [["mood", 4], ["energy", 3], ["sleep", 2], ["stress", 3]]) {
-  await page.locator(`label:has(input[name=${name}][value="${v}"])`).first().click();
-}
-await page.getByRole("button", { name: "今日のチェックを記録する" }).click();
-await page.getByRole("status").filter({ hasText: "今日のチェックを記録しました" }).waitFor();
-await page.reload();
-check("ホームで毎日のQOLチェックができ、スコアが出る", (await page.getByText("今日のQOLスコア").count()) === 1);
-await shot("29-home-today");
+await page.goto(`${BASE}/media/sns`);
+const waitingPost = page.locator("a[href^='/approvals/']").first();
+if ((await waitingPost.count()) === 0) await runMediaUntil("/media/sns", /承認待ち（[1-9]/);
+await page.locator("a[href^='/approvals/']").first().click();
+await page.getByRole("button", { name: "承認する" }).click();
+await page.getByRole("status").filter({ hasText: "ご自身で投稿してください" }).waitFor();
+await page.goto(`${BASE}/media/sns`);
+check("承認したXの投稿は「Xで開く」で自分で投稿する（アプリは投稿しない）", (await page.getByRole("link", { name: "Xで開く" }).count()) > 0);
+await page.locator("input[name=impressions]").first().fill("300");
+await page.getByRole("button", { name: "投稿した（記録する）" }).first().click();
+await page.getByRole("status").filter({ hasText: "投稿済みとして記録しました" }).waitFor();
+check("Xに投稿したことと反応を記録できる", true);
+await shot("43-media-sns");
 
-await page.goto(`${BASE}/life/habits`);
-await page.fill("input[name=title]", "寝る前にスマホを置く");
-await page.getByRole("button", { name: "習慣を始める" }).click();
-await page.getByRole("status").filter({ hasText: "習慣を始めました" }).waitFor();
-await page.goto(`${BASE}/`);
-await page.getByRole("button", { name: "寝る前にスマホを置くをできたにする" }).click();
-await page.getByRole("status").filter({ hasText: "できた！" }).waitFor();
-await page.reload();
-check("ホームで今日の習慣にチェックできる（1日続いています）", (await page.getByText("1日続いています").count()) > 0);
-
-await page.goto(`${BASE}/life/events`);
-await page.fill("input[name=title]", "車検");
-const in3 = new Date(Date.now() + 3 * 86400000 + 9 * 3600000).toISOString().slice(0, 10);
-await page.fill("input[name=date]", in3);
-await page.fill("input[name=amount]", "80000");
-await page.getByRole("button", { name: "予定を登録する" }).click();
-await page.getByRole("status").filter({ hasText: "予定を登録しました" }).waitFor();
-await page.reload();
-check("これから起きることを登録すると、残り日数と出費が出る", (await page.getByText("あと3日").count()) > 0 && (await page.getByText("80,000円").count()) > 0);
-await page.goto(`${BASE}/`);
-check("ホームの「これからのこと」に予定が出る", (await page.getByText("あと3日・80,000円").count()) > 0);
-
-await page.goto(`${BASE}/life/goals`);
-await page.fill("input[name=title]", "体重を3kg減らす");
-await page.fill("input[name=start]", "70");
-await page.fill("input[name=target]", "67");
-await page.fill("input[name=unit]", "kg");
-await page.getByRole("button", { name: "目標を登録する" }).click();
-await page.getByRole("status").filter({ hasText: "目標を登録しました" }).waitFor();
-await page.reload();
-await page.locator("main a[href^='/life/goals/']").first().click();
-await page.locator("input[name=value]").fill("69");
-await page.getByRole("button", { name: "進み具合を記録する" }).click();
-await page.getByRole("status").filter({ hasText: "進み具合を記録しました" }).waitFor();
-await page.reload();
-check("目標の進み具合（%）が出る", (await page.getByText("33%").count()) > 0);
-await shot("30-goal");
-
-await page.goto(`${BASE}/life/reviews`);
-for (let attempt = 0; attempt < 3; attempt++) {
-  await page.getByRole("button", { name: "この1週間をふりかえる（約1円）" }).click();
-  const res = page.getByText(/ふりかえりを作りました|1分ほど待ってください/).first();
-  await res.waitFor({ timeout: 60_000 });
-  if (/ふりかえりを作りました/.test(await res.innerText())) break;
-  await page.waitForTimeout(61_000);
-  await page.reload();
-}
-await page.reload();
-await page.locator("main a[href^='/life/reviews/']").first().click();
-check("週のふりかえりに「来週の一歩」がある", (await page.getByText(/来週の一歩/).count()) > 0);
-await page.goto(`${BASE}/life/habits`);
-check("ふりかえりから、おすすめの習慣が届く（始めるかは自分で選ぶ）", (await page.getByRole("button", { name: "始める" }).count()) > 0);
-await shot("31-habits");
+await page.goto(`${BASE}/media/management`);
+check("経営管理に予算（AI・全体）・状態・実行の記録が出る",
+  (await page.getByText("事業全体").count()) === 1 && (await page.getByText(/いまの状態：/).count()) === 1 && (await page.getByText("実行の記録").count()) === 1);
+check("実行の記録に、部署・開始・終了・費用が残る", (await page.getByText(/市場調査部・.*開始/).count()) > 0);
+await shot("44-media-management");
+await page.goto(`${BASE}/employees/research`);
+check("社員の画面に、メディア事業での仕事の履歴が出る", (await page.getByText("メディア事業での仕事").count()) === 1);
 
 // ===== 裏で動く仕事：定期実行（GitHub と同じ呼び方）→ 先回りの準備・自主研究 =====
 const cronOk = await page.request.get(`${BASE}/api/cron/workflow`, { headers: { Authorization: `Bearer ${process.env.CRON_SECRET ?? "cron-secret-for-local-test-0123456789"}` } });
 check("合言葉つきの定期実行は動く", cronOk.status() === 200);
-await page.goto(`${BASE}/life/events`);
-check("予定が近づくと、白石の依頼でチームが下調べを始める", (await page.getByText("白石の依頼で、チームが下調べしています →").count()) > 0);
 await page.goto(`${BASE}/settings`);
 check("設定に「最後に自動で動いた時刻」が出る", (await page.getByText("まだ動いていません").count()) === 0 && (await page.getByText("最後に自動で動いた時刻").count()) === 1);
-await page.goto(`${BASE}/life`);
-for (let attempt = 0; attempt < 3; attempt++) {
-  await page.getByRole("button", { name: "今週の担当に、いま自主研究を頼む（約3〜6円）" }).click();
-  const res = page.getByText(/自主研究のメモを書きました|1分ほど待ってください/).first();
-  await res.waitFor({ timeout: 60_000 });
-  if (/メモを書きました/.test(await res.innerText())) break;
-  await page.waitForTimeout(61_000);
-  await page.reload();
-}
-await page.goto(`${BASE}/reports`);
-check("社員の自主研究のメモが報告書に届く", (await page.getByText("社員の自主研究").count()) > 0);
-await page.goto(`${BASE}/life/settings`);
-check("裏で動く仕事は設定でオン・オフできる", (await page.getByText("社員の自主研究（毎週木曜に1人ずつ・約3〜6円）").count()) === 1);
 
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);
@@ -658,7 +551,7 @@ async function smallTapTargets() {
     return bad;
   });
 }
-for (const path of ["/", "/life", "/employees", "/approvals", "/more"]) {
+for (const path of ["/", "/media/articles", "/employees", "/approvals", "/more", "/media/management"]) {
   await page.goto(`${BASE}${path}`);
   await page.waitForLoadState("networkidle");
   const bad = await smallTapTargets();

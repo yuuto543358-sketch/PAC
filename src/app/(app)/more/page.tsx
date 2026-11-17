@@ -22,32 +22,35 @@ export default async function MorePage() {
           </div>
         </div>
 
-        <Section title="暮らし（いちばん大事な仕事）">
+        <Section title="メディア事業">
           <List>
-            <ListRow href="/life" leading={<IconTile name="sparkles" color="#0f766e" />} title="ライフ" subtitle="今日の暮らし・質問・分析・改善提案" />
-            <ListRow href="/life/habits" leading={<IconTile name="check" color="#16a34a" />} title="小さな習慣" subtitle="続けたいことにチェック" />
-            <ListRow href="/life/events" leading={<IconTile name="clock" color="#c2410c" />} title="これから起きること" subtitle="車検・更新・税金・誕生日など" />
-            <ListRow href="/life/goals" leading={<IconTile name="star" color="#7c3aed" />} title="目標" subtitle="進み具合とふりかえり" />
+            <ListRow href="/media/management" leading={<IconTile name="trend" color="#15803d" />} title="経営管理" subtitle="予算・AIの利用料・収益・経営レポート・自動実行" />
+            <ListRow href="/media/research" leading={<IconTile name="search" color="#1d4ed8" />} title="市場調査" subtitle="ジャンルの評価・根拠・選んだ理由" />
+            <ListRow href="/media/brand" leading={<IconTile name="star" color="#7c3aed" />} title="メディア" subtitle="ブランド・読者・紹介文・アカウント・商品" />
+            <ListRow href="/media/articles" leading={<IconTile name="document" color="#0f766e" />} title="記事" subtitle="作成状況・公開・品質・売上" />
+            <ListRow href="/media/sns" leading={<IconTile name="send" color="#0ea5e9" />} title="X運営" subtitle="投稿案・予定・投稿の記録・反応" />
           </List>
         </Section>
 
-        <Section title="経営">
+        <Section title="お金">
           <List>
             <ListRow href="/finance" leading={<IconTile name="wallet" color="#15803d" />} title="財務管理" subtitle="もうけ・お金の記録・AIの利用料" />
-            <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="AIが見つけた事業の候補" />
-            <ListRow href="/sns" leading={<IconTile name="send" color="#0ea5e9" />} title="SNS運用" subtitle="AIが投稿案を作り、承認すると投稿" />
-            <ListRow href="/series" leading={<IconTile name="history" color="#be185d" />} title="シリーズ" subtitle="動画・記事を作り続ける（次の回を自動で）" />
-            <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="必要なときに作る日報・週報・月報" />
+            <ListRow href="/reports" leading={<IconTile name="report" color="#7c3aed" />} title="報告書" subtitle="週の分析・月の経営会議・必要なときの報告" />
           </List>
         </Section>
-
-
 
         <Section title="会社">
           <List>
             <ListRow href="/employees" leading={<IconTile name="users" color="#2563eb" />} title="社員" subtitle="プロフィール・評価・チャット" />
             <ListRow href="/tasks" leading={<IconTile name="tasks" color="#0f766e" />} title="業務管理" subtitle="すべての業務と履歴" />
             <ListRow href="/approvals" leading={<IconTile name="approve" color="#ea580c" />} title="承認センター" subtitle="外部への実行の承認" />
+          </List>
+        </Section>
+
+        <Section title="そのほかの機能">
+          <List>
+            <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="AIが見つけた事業の候補" />
+            <ListRow href="/series" leading={<IconTile name="history" color="#be185d" />} title="シリーズ" subtitle="動画・記事を作り続ける（次の回を自動で）" />
           </List>
         </Section>
 
@@ -63,7 +66,7 @@ export default async function MorePage() {
             ログアウト
           </button>
         </form>
-        <p className="text-center text-[12px] text-faint">PERSONAL AI COMPANY ・ Phase 4 ・ バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
+        <p className="text-center text-[12px] text-faint">AI Media Company ・ バージョン {process.env.NEXT_PUBLIC_BUILD_COMMIT}</p>
       </Page>
     </>
   );

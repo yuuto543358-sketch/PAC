@@ -6,13 +6,13 @@ import { Icon, type IconName } from "./Icon";
 
 const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: "/", label: "ホーム", icon: "home" },
-  { href: "/life", label: "ライフ", icon: "sparkles" },
+  { href: "/media/articles", label: "記事", icon: "document" },
   { href: "/employees", label: "社員", icon: "users" },
   { href: "/approvals", label: "承認", icon: "approve" },
   { href: "/more", label: "メニュー", icon: "menu" },
 ];
 
-const MORE_PATHS = ["/more", "/business", "/reports", "/finance", "/settings", "/tasks", "/sns", "/series"];
+const MORE_PATHS = ["/more", "/business", "/reports", "/finance", "/settings", "/tasks", "/sns", "/series", "/media/research", "/media/brand", "/media/sns", "/media/management", "/life"];
 
 /** チャット画面では、メッセージアプリのように下のメニューを隠して全画面にする */
 function isFullScreen(pathname: string) {

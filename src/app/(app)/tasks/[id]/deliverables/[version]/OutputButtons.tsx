@@ -54,7 +54,7 @@ export function splitNoteArticle(content: string) {
     const re = new RegExp(`^##\\s*${name}[^\\n]*\\n([\\s\\S]*?)(?=^##\\s|(?![\\s\\S]))`, "m");
     return content.match(re)?.[1]?.trim() ?? "";
   };
-  return { title, price, free: section("無料"), paid: section("有料"), tags: section("ハッシュタグ") };
+  return { title, price, free: section("無料"), paid: section("有料"), refs: section("参考"), tags: section("ハッシュタグ") };
 }
 
 /** note に貼り付けるためのボタン（タイトル・無料部分・有料部分・ハッシュタグを別々にコピー） */
@@ -64,6 +64,7 @@ export function NoteCopyButtons({ content }: { content: string }) {
     { label: "タイトル", text: parts.title },
     { label: "無料部分", text: parts.free },
     { label: "有料部分", text: parts.paid },
+    { label: "参考にした情報", text: parts.refs },
     { label: "ハッシュタグ", text: parts.tags },
   ].filter((i) => i.text);
   if (items.length === 0) return null;

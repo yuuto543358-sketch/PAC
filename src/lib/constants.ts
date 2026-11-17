@@ -289,6 +289,8 @@ export const REPORT_TYPE_LABEL: Record<string, string> = {
   bizdev: "事業開発",
   employee: "社員の自主研究",
   task: "業務の完了報告",
+  media_weekly: "週の分析",
+  media_monthly: "月の経営会議",
 };
 
 /** 自動で仕事を探したとき、同時に進める「AIが見つけた業務」の上限（費用を抑えるため） */

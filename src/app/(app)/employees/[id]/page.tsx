@@ -1,3 +1,4 @@
+import { JOB_KIND_LABEL } from "@/lib/mediaco/repo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
@@ -28,12 +29,16 @@ export default async function EmployeeDetailPage({
   const sql = await getDb();
   const e = await getEmployee(sql, id);
   if (!e) notFound();
-  const [tasks, ratings, memories] = await Promise.all([
+  const [tasks, ratings, memories, jobs] = await Promise.all([
     listTasks(sql, { assignee: id, view: "all" }, 30),
     listRatings(sql, id),
     sql<{ id: string; title: string; content: string; created_at: Date; source_task_id: string | null }[]>`
       select id, title, content, created_at, source_task_id from knowledge where employee_id = ${id} order by created_at desc limit 10`,
+    sql<{ id: string; kind: string; status: string; summary: string; error: string; started_at: Date; finished_at: Date | null }[]>`
+      select id, kind, status, summary, error, started_at, finished_at from media_jobs where employee_id = ${id} order by started_at desc limit 15`,
   ]);
+  const running = jobs.find((j) => j.status === "running");
+  const doneCount = jobs.filter((j) => j.status === "done").length;
   const firstName = e.name.split(" ")[1] ?? e.name;
   const base = `/employees/${e.id}`;
 
@@ -98,6 +103,27 @@ export default async function EmployeeDetailPage({
 
         {tab === "profile" && (
           <>
+            <Section title="メディア事業での仕事">
+              <div className="card p-4">
+                <p className="text-[14px]">
+                  {running ? <>いま：<b>{JOB_KIND_LABEL[running.kind] ?? running.kind}</b></> : "いまは待機中です。"}
+                  <span className="ml-1 text-[12px] text-muted">（最近の{jobs.length}件のうち完了 {doneCount}件）</span>
+                </p>
+                {jobs.length > 0 && (
+                  <ol className="mt-2 divide-y divide-separator text-[13px]">
+                    {jobs.slice(0, 8).map((j) => (
+                      <li key={j.id} className="py-2">
+                        <span className="font-semibold">{JOB_KIND_LABEL[j.kind] ?? j.kind}</span>
+                        <span className={`ml-1.5 text-[12px] ${j.status === "failed" ? "text-danger" : "text-muted"}`}>
+                          {j.status === "done" ? "完了" : j.status === "failed" ? "失敗" : j.status === "running" ? "実行中" : "見送り"}・{dateTime(j.started_at)}
+                        </span>
+                        <span className="block text-ink/80">{j.status === "failed" ? j.error : j.summary}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </Section>
             <Section title="直接指示を出す">
               <div className="card p-4">
                 <DirectInstructionForm employeeId={e.id} />
