@@ -162,6 +162,12 @@ async function runMigrations(sql: Sql, log: StepLogger) {
     log.step("migration lock acquired");
     await tx.unsafe(`create table if not exists schema_migrations (
       version int primary key, name text not null, applied_at timestamptz not null default now())`);
+    // この表も、Supabase の公開用の役割（anon / authenticated）からは見えないようにする
+    await tx.unsafe(`alter table schema_migrations enable row level security`);
+    await tx.unsafe(`do $$ begin
+      if exists (select 1 from pg_roles where rolname = 'anon') then revoke all on table schema_migrations from anon; end if;
+      if exists (select 1 from pg_roles where rolname = 'authenticated') then revoke all on table schema_migrations from authenticated; end if;
+    end $$`);
     const rows = await tx<{ version: number }[]>`select version from schema_migrations`;
     const applied = new Set(rows.map((r) => r.version));
     for (const m of MIGRATIONS) {
