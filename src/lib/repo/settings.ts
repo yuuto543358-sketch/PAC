@@ -55,6 +55,24 @@ export type CompanySettings = {
   last_life_research_on: Date | null;
   last_cron_at: Date | null;
   last_ops_review_on: Date | null;
+  /** メディア事業（AI Media Company）を自動で動かすか */
+  media_enabled: boolean;
+  media_articles_per_day: number;
+  media_posts_per_day: number;
+  media_lease_until: Date | null;
+  media_lease_owner: string;
+  last_media_plan_on: Date | null;
+  last_media_posts_on: Date | null;
+  last_media_weekly_on: Date | null;
+  last_media_research_on: Date | null;
+  last_media_monthly_on: string;
+  /** 週の分析で分かった「成果が良いテーマ・改善点」（次の記事づくりに使う） */
+  media_insights: string;
+  /** 事業全体の月の予算（AI以外もふくむ） */
+  business_budget_jpy: number;
+  budget_allocation: { ai: number; research: number; other: number; reserve: number };
+  /** ライフ機能（いまは使っていない） */
+  life_enabled: boolean;
   updated_at: Date;
 };
 

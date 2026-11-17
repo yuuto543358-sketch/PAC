@@ -22,7 +22,7 @@ async function reset() {
   await sql`delete from life_events`;
   await sql`delete from life_habits`;
   await sql`delete from life_checkins`;
-  await sql`update company_settings set emergency_stop = false, life_review_enabled = true, last_life_review_on = null,
+  await sql`update company_settings set media_enabled = false, life_enabled = true, emergency_stop = false, life_review_enabled = true, last_life_review_on = null,
     life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', autorun_frequency = 'off', sns_plan_frequency = 'off'`;
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,
     daily_limit_jpy = 100000, max_calls_per_day = 2000, max_calls_per_minute = 60`;

@@ -1,5 +1,6 @@
 import "server-only";
 import { runDueSeries } from "@/lib/series";
+import { runMediaEngine, type EngineResult } from "@/lib/mediaco/engine";
 import type { Sql } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { getSettings } from "@/lib/repo/settings";
@@ -21,6 +22,8 @@ export type ScheduledJobsResult = {
   discovery?: DiscoveryResult;
   sns?: SnsPlanResult;
   life?: LifeJobsResult;
+  /** AI Media Company の自動運営 */
+  media?: EngineResult;
   reports: ReportResult[];
   /** チームでの作業を始めた業務 */
   taskIds: string[];
@@ -62,8 +65,8 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   const settings = await getSettings(sql);
   const freq = settings.autorun_frequency;
   const result: ScheduledJobsResult = { frequency: freq, ran: [], skipped: [], reports: [], taskIds: [] };
-  {
-    // ライフインテリジェンス：質問づくりはAIを使わないので、緊急停止中でも行う（分析は中で緊急停止を確認する）
+  if (settings.life_enabled) {
+    // ライフインテリジェンス（いまは使っていない。設定でオンにしたときだけ）
     const { date, weekday } = jstDateParts(now);
     result.life = await runLifeJobs(sql, date, weekday, now, (col) => claim(sql, col, date));
     if (result.life.questions?.created) result.ran.push("life_questions");
@@ -92,6 +95,15 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   if (settings.emergency_stop) {
     result.skipped.push("緊急停止中のため");
     return result;
+  }
+  if (settings.media_enabled) {
+    // AI Media Company：市場調査・記事づくり・Xの投稿案・分析などを、次にやるべき順に進める（1回の実行で最大4つ）
+    try {
+      result.media = await runMediaEngine(sql, { now, maxSteps: 4, deadlineMs: 120_000, trigger: "scheduled" });
+      if (result.media.steps.length) result.ran.push("media");
+    } catch (err) {
+      log.fail("media engine", err);
+    }
   }
   {
     // 作り続けるシリーズ：予定日になったら次の回を作り始める（毎回確認・AIはここでは使わない）

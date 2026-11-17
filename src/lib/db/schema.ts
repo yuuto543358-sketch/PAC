@@ -1176,4 +1176,226 @@ begin
 end $$;
 `,
   },
+  {
+    version: 17,
+    name: "ai_media_company",
+    sql: /* sql */ `
+-- ===== AI Media Company：note と X を中心にしたメディア事業（経営者の方針 2026年11月） =====
+
+-- 市場調査の実行（初回の調査・毎週の更新）
+create table if not exists media_research_runs (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('initial','weekly','rerun')),
+  status text not null default 'screening' check (status in ('screening','deep','selected','done','failed')),
+  summary text not null default '',
+  selected_genre_id uuid,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+
+-- ジャンルごとの評価（100点満点）
+create table if not exists media_genres (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references media_research_runs(id),
+  name text not null,
+  demand_evidence text not null default '',
+  reader_pains text not null default '',
+  competitors text not null default '',
+  paid_demand text not null default '',
+  monetization text not null default '',
+  sustainability text not null default '',
+  ai_fit text not null default '',
+  scores jsonb not null default '{}',
+  total int not null default 0 check (total between 0 and 100),
+  facts text not null default '',
+  guesses text not null default '',
+  sources jsonb not null default '[]',
+  researched_on date not null default (now() at time zone 'Asia/Tokyo')::date,
+  stage text not null default 'screened' check (stage in ('screened','deep')),
+  selected boolean not null default false,
+  reason text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists media_genres_run_idx on media_genres(run_id, total desc);
+
+-- メディアブランド
+create table if not exists media_brands (
+  id uuid primary key default gen_random_uuid(),
+  genre_id uuid references media_genres(id),
+  genre text not null default '',
+  name text not null,
+  concept text not null default '',
+  target_reader text not null default '',
+  themes jsonb not null default '[]',
+  tone text not null default '',
+  profile text not null default '',
+  icon_prompt text not null default '',
+  note_bio text not null default '',
+  x_bio text not null default '',
+  note_url text not null default '',
+  x_handle text not null default '',
+  products jsonb not null default '[]',
+  status text not null default 'active' check (status in ('active','archived')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 記事（企画 → 情報源の調査 → 執筆 → 品質検査 → 修正 → 完成 → あなたが公開）
+create table if not exists media_articles (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid not null references media_brands(id),
+  genre text not null default '',
+  theme text not null,
+  target text not null default '',
+  reader_pain text not null default '',
+  kind text not null default 'free' check (kind in ('free','paid')),
+  price_jpy int not null default 0 check (price_jpy between 0 and 100000),
+  profit_score int not null default 0,
+  title text not null default '',
+  body text not null default '',
+  research_notes text not null default '',
+  sources jsonb not null default '[]',
+  quality jsonb not null default '{}',
+  quality_score int,
+  status text not null default 'planned'
+    check (status in ('planned','researched','drafted','checked','ready','published','rejected','failed')),
+  revisions int not null default 0,
+  failures int not null default 0,
+  last_error text not null default '',
+  published_url text not null default '',
+  published_at timestamptz,
+  views int not null default 0 check (views >= 0),
+  likes int not null default 0 check (likes >= 0),
+  sales int not null default 0 check (sales >= 0),
+  revenue_jpy int not null default 0 check (revenue_jpy >= 0),
+  metrics_updated_at timestamptz,
+  written_on date,
+  cost_jpy numeric(12,4) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists media_articles_brand_idx on media_articles(brand_id, created_at desc);
+create index if not exists media_articles_status_idx on media_articles(status);
+
+-- X の投稿（投稿は承認のあと経営者が自分で行う。将来 公式API につなげられるように、投稿先と方法を分けて持つ）
+create table if not exists media_posts (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid not null references media_brands(id),
+  article_id uuid references media_articles(id),
+  kind text not null default 'info' check (kind in ('info','summary','problem','solution','knowhow','promo')),
+  text text not null,
+  scheduled_for timestamptz,
+  approval_id uuid references approvals(id),
+  channel text not null default 'manual' check (channel in ('manual','x_api')),
+  status text not null default 'draft' check (status in ('draft','approved','posted','skipped')),
+  posted_at timestamptz,
+  post_url text not null default '',
+  impressions int not null default 0 check (impressions >= 0),
+  likes int not null default 0 check (likes >= 0),
+  reposts int not null default 0 check (reposts >= 0),
+  clicks int not null default 0 check (clicks >= 0),
+  metrics_updated_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists media_posts_brand_idx on media_posts(brand_id, created_at desc);
+
+-- 自動の仕事の記録（実行状態・開始・終了・エラー）。同じ仕事を二重に動かさないための鍵つき
+create table if not exists media_jobs (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null,
+  dedupe_key text unique,
+  department text not null default '',
+  employee_id text references employees(id),
+  status text not null default 'running' check (status in ('running','done','failed','skipped')),
+  summary text not null default '',
+  error text not null default '',
+  cost_jpy numeric(12,4) not null default 0,
+  ref_type text not null default '',
+  ref_id text not null default '',
+  started_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+create index if not exists media_jobs_started_idx on media_jobs(started_at desc);
+
+-- 週の分析・月の経営会議を報告書に残す
+alter table reports drop constraint if exists reports_report_type_check;
+alter table reports add constraint reports_report_type_check
+  check (report_type in ('daily','weekly','monthly','bizdev','employee','task','media_weekly','media_monthly'));
+
+-- 設定：メディア事業
+alter table company_settings add column if not exists media_enabled boolean not null default true;
+alter table company_settings add column if not exists media_articles_per_day int not null default 1 check (media_articles_per_day between 0 and 3);
+alter table company_settings add column if not exists media_posts_per_day int not null default 2 check (media_posts_per_day between 0 and 5);
+alter table company_settings add column if not exists media_lease_until timestamptz;
+alter table company_settings add column if not exists media_lease_owner text not null default '';
+alter table company_settings add column if not exists last_media_plan_on date;
+alter table company_settings add column if not exists last_media_posts_on date;
+alter table company_settings add column if not exists last_media_weekly_on date;
+alter table company_settings add column if not exists last_media_research_on date;
+alter table company_settings add column if not exists last_media_monthly_on text not null default '';
+alter table company_settings add column if not exists media_insights text not null default '';
+-- 事業全体の月の予算（AI以外もふくむ）と、その配分
+alter table company_settings add column if not exists business_budget_jpy int not null default 5000;
+alter table company_settings add column if not exists budget_allocation jsonb not null
+  default '{"ai":2500,"research":1000,"other":500,"reserve":1000}';
+-- ライフ機能は使わない（データは残す）
+alter table company_settings add column if not exists life_enabled boolean not null default false;
+update company_settings set life_enabled = false, life_question_frequency = 'off', life_review_enabled = false,
+  life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false,
+  sns_plan_frequency = 'off';
+
+-- AIの予算：月2,500円（全体5,000円のうちAIの分）・1日150円（経営者の指示）
+update budgets set monthly_limit_jpy = 2500, emergency_stop_jpy = 2500, monthly_target_jpy = 2000,
+  daily_limit_jpy = 150, updated_at = now() where id = 1;
+
+-- 部署と社員の役割を、メディア事業の組織に（経営者が書き換えていないものだけ）
+update departments set name = 'CEO室', description = '事業全体の統括・予算・戦略・成果評価' where id = 'executive' and name = '経営本部';
+update departments set name = '市場調査部', description = 'ジャンル・需要・読者の悩み・競合・有料需要の調査' where id = 'research' and name = '調査部';
+update departments set description = 'ジャンルの評価と選定・ブランド設計・価格と収益モデル' where id = 'bizdev' and name = '事業開発部';
+update departments set name = '編集制作部', description = '記事の企画・執筆・校正・ファクトチェック' where id = 'creative' and name = '企画制作部';
+update departments set name = 'マーケティング部', description = 'Xの投稿企画・note記事への誘導・集客の分析' where id = 'secretary' and name = '秘書室';
+update departments set name = '監査・品質管理部', description = '事実確認・引用元・著作権・誇大表現・規約の確認' where id = 'finance' and name = '財務監査部';
+update departments set name = '経営分析部', description = '売上・経費・利益・記事の成績・API利用料の分析' where id = 'life' and name = 'ライフインテリジェンス部';
+
+update employees set role_title = 'CEO（最高経営責任者）',
+  expertise = '{事業戦略,予算管理,売上目標の管理,各部署の成果評価,経営判断}'
+  where id = 'president' and role_title = '代表取締役社長';
+update employees set role_title = '市場調査担当',
+  expertise = '{市場調査,検索需要・読者の悩みの調査,競合メディアの調査,有料コンテンツの需要調査,情報源の確認}'
+  where id = 'research' and role_title = '調査担当';
+update employees set expertise = '{市場の評価（100点満点）,ジャンル選定,メディアブランド設計,価格設計,収益モデル}'
+  where id = 'bizdev' and role_title = '事業開発担当';
+update employees set role_title = '編集・ライター',
+  expertise = '{記事の企画,構成づくり,本文の執筆,タイトル・見出し,校正}'
+  where id = 'creative' and role_title = '企画・制作担当';
+update employees set role_title = 'マーケティング担当',
+  expertise = '{Xの投稿企画,投稿文の作成,投稿スケジュール,note記事への誘導,集客の分析}'
+  where id = 'secretary' and role_title = '秘書';
+update employees set role_title = '品質管理・監査担当',
+  expertise = '{記事の事実確認,引用元の確認,著作権・転載リスク,誇大表現の検出,プラットフォーム規約}'
+  where id = 'finance' and role_title = '財務・監査担当';
+update employees set role_title = '経営分析担当',
+  expertise = '{売上・経費の集計,記事ごとの成績分析,集客効果の分析,API利用料の監視,改善提案}'
+  where id = 'life' and role_title = 'ライフインテリジェンス担当';
+
+-- 新しい表も、Supabase の公開用の役割（anon / authenticated）からは触れないようにする
+do $$
+declare
+  t text;
+  has_anon boolean := exists (select 1 from pg_roles where rolname = 'anon');
+  has_auth boolean := exists (select 1 from pg_roles where rolname = 'authenticated');
+begin
+  foreach t in array array['media_research_runs', 'media_genres', 'media_brands', 'media_articles', 'media_posts', 'media_jobs'] loop
+    execute format('alter table public.%I enable row level security', t);
+    if has_anon then execute format('revoke all on table public.%I from anon', t); end if;
+    if has_auth then execute format('revoke all on table public.%I from authenticated', t); end if;
+    if has_anon and has_auth then
+      execute format('drop policy if exists pac_deny_client_roles on public.%I', t);
+      execute format(
+        'create policy pac_deny_client_roles on public.%I as restrictive for all to anon, authenticated using (false) with check (false)', t);
+    end if;
+  end loop;
+end $$;
+`,
+  },
 ];

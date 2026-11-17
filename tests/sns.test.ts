@@ -17,7 +17,7 @@ beforeEach(async () => {
   const sql = await getDb();
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,
     daily_limit_jpy = 100000, max_calls_per_day = 2000, max_calls_per_minute = 60`;
-  await sql`update company_settings set emergency_stop = false, sns_plan_frequency = 'off', sns_posts_per_plan = 2,
+  await sql`update company_settings set media_enabled = false, emergency_stop = false, sns_plan_frequency = 'off', sns_posts_per_plan = 2,
     sns_platforms = '{x}', last_sns_plan_on = null, autorun_frequency = 'off'`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
   await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31', life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false, last_ops_review_on = '2099-12-31'`;
@@ -109,7 +109,7 @@ describe("SNS担当の投稿案づくり", () => {
       const a = (await getApproval(sql, id))!;
       expect(a.action_type).toBe("sns_post");
       expect(a.status).toBe("pending");
-      expect(a.requested_by_employee_id).toBe("creative");
+      expect(a.requested_by_employee_id).toBe("secretary");
       expect(a.payload.platform).toBe("x");
     }
     await sql`update company_settings set sns_platforms = '{bluesky}'`;

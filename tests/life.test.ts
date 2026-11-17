@@ -37,7 +37,7 @@ export async function resetLife() {
   await sql`delete from life_records`;
   await sql`delete from life_fields where created_by <> 'system'`;
   await sql`update life_categories set is_active = true, ai_allowed = true`;
-  await sql`update company_settings set life_question_frequency = 'normal', life_questions_per_batch = 3,
+  await sql`update company_settings set media_enabled = false, life_enabled = true, life_question_frequency = 'normal', life_questions_per_batch = 3,
     life_auto_task = true, last_life_question_on = null, last_life_analysis_on = null, emergency_stop = false`;
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,
     daily_limit_jpy = 100000, max_calls_per_day = 2000, max_calls_per_minute = 60, max_calls_per_task = 20`;

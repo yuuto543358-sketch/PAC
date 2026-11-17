@@ -149,7 +149,7 @@ export async function sendChatMessage(
   const phases = await sql<{ task_id: string; phase: string }[]>`
     select task_id, phase from task_workflows where task_id in ${sql(openTasks.length ? openTasks.map((t) => t.id) : ["00000000-0000-0000-0000-000000000000"])}`;
   const phaseOf = new Map(phases.map((p) => [p.task_id, p.phase]));
-  const lifeSnapshot = employee.role_key === "life" ? await buildLifeSnapshot(sql) : null;
+  const lifeSnapshot = employee.role_key === "life" && settings.life_enabled ? await buildLifeSnapshot(sql) : null;
   const system = buildChatSystemPrompt({
     lifeSnapshot,
     settings,

@@ -23,7 +23,7 @@ beforeEach(async () => {
   const sql = await getDb();
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,
     daily_limit_jpy = 100000, max_calls_per_day = 2000, max_calls_per_minute = 60, max_calls_per_task = 20, per_task_limit_jpy = 30`;
-  await sql`update company_settings set emergency_stop = false, notify_approvals = true, notify_budget = true,
+  await sql`update company_settings set media_enabled = false, emergency_stop = false, notify_approvals = true, notify_budget = true,
     autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null,
     last_monthly_report_on = null, discovery_auto_start = false`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）

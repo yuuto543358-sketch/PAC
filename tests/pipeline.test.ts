@@ -15,7 +15,7 @@ import { OWNER_DOES_AFTER_EFFECT } from "@/lib/constants";
 async function reset() {
   const sql = await getDb();
   await sql`update tasks set status = 'completed', completed_at = now() where status not in ('completed','rejected','failed')`;
-  await sql`update company_settings set emergency_stop = false, autorun_frequency = 'off', sns_plan_frequency = 'off',
+  await sql`update company_settings set media_enabled = false, emergency_stop = false, autorun_frequency = 'off', sns_plan_frequency = 'off',
     life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31',
     life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false, last_ops_review_on = null`;
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,

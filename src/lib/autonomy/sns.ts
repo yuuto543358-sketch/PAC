@@ -17,7 +17,7 @@ import { SNS_STYLE_RULES } from "@/lib/sns/style";
 // SNS担当（企画制作の春野 創太）が、会社のSNSの投稿案を作る仕組み。
 // 投稿案は1件ずつ「承認依頼」になります。投稿は、承認したあと経営者が自分で行います（アプリは投稿しません）。
 
-const SNS_MANAGER_ID = "creative";
+const SNS_MANAGER_ID = "secretary"; // マーケティング部
 
 
 export function buildSnsSchema(platforms: [SnsPlatform, ...SnsPlatform[]]) {

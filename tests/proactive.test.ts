@@ -22,7 +22,7 @@ async function reset() {
   await sql`delete from life_habits`;
   await sql`delete from life_checkins`;
   await sql`update tasks set status = 'completed', completed_at = now() where status not in ('completed','rejected','failed')`;
-  await sql`update company_settings set emergency_stop = false, life_prep_enabled = true, life_nudge_enabled = true,
+  await sql`update company_settings set media_enabled = false, life_enabled = true, emergency_stop = false, life_prep_enabled = true, life_nudge_enabled = true,
     life_research_enabled = true, web_research_enabled = true, last_life_nudge_on = null, last_life_prep_on = null,
     last_life_research_on = null, life_question_frequency = 'off', last_life_analysis_on = '2099-12-31',
     last_life_review_on = '2099-12-31', autorun_frequency = 'off', sns_plan_frequency = 'off'`;

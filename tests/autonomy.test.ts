@@ -15,7 +15,7 @@ async function resetState() {
   const sql = await getDb();
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, daily_limit_jpy = 100000,
     max_calls_per_day = 2000, max_calls_per_minute = 60, max_calls_per_task = 20, per_task_limit_jpy = 30`;
-  await sql`update company_settings set emergency_stop = false, web_research_enabled = true, discovery_auto_start = true,
+  await sql`update company_settings set media_enabled = false, emergency_stop = false, web_research_enabled = true, discovery_auto_start = true,
     autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
   await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31', life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false, last_ops_review_on = '2099-12-31'`;
