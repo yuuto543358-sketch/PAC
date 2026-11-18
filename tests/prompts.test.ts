@@ -152,11 +152,18 @@ describe("自然で親しみやすい話し方", () => {
     expect(buildStepInstruction("discussion", ctx)).toContain("自由に話して");
   });
 
-  it("社員の話し方の説明に、そのまま真似される決まり文句（「」の例）がない", () => {
+  it("社員の話し方は、一人称・語尾・口癖だけを短く決める（長い決まり文句の例文は書かない。経営者の指示 2026年11月）", () => {
     for (const e of EMPLOYEES) {
-      expect(e.speaking_style).not.toMatch(/「/);
-      expect(e.speaking_style.length).toBeLessThanOrEqual(30);
+      // 「」の中は一人称・語尾・口癖だけ（短い言葉）。そのまま真似される長い例文は入れない
+      const quoted = [...e.speaking_style.matchAll(/「([^」]*)」/g)].map((m) => m[1]);
+      expect(quoted.length).toBeGreaterThan(0);
+      for (const q of quoted) expect(q.length).toBeLessThanOrEqual(12);
+      expect(e.speaking_style).toMatch(/^一人称は「/);
+      expect(e.speaking_style).toContain("口癖は「");
+      expect(e.speaking_style.length).toBeLessThanOrEqual(80);
     }
+    // 口癖を毎回くり返さないルールがある
+    expect(CONVERSATION_STYLE).toContain("毎回入れなくてよい");
   });
 
   it("監査役への指示：差し戻しは1回だけ・大事な点だけ・前の監査コメントは監査しない", () => {

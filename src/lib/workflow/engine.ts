@@ -604,7 +604,7 @@ async function handleFailure(sql: Sql, wf: Workflow, members: Member[], speaker:
         authorType: "employee",
         employeeId: "president",
         kind: "decision",
-        content: "失敗が続いたため、いったんチームを止めます。業務画面の「再開」で、もう一度進められます。",
+        content: "失敗が続いたから、いったんチームを止めよう。業務画面の「再開」を押せば、もう一度進められるよ。",
       });
       return;
     }
@@ -618,7 +618,7 @@ async function handleFailure(sql: Sql, wf: Workflow, members: Member[], speaker:
         authorType: "employee",
         employeeId: "president",
         kind: "decision",
-        content: `${speaker.name}さんの発言は飛ばして、次に進めましょう。`,
+        content: `${speaker.name}さんの発言は飛ばして、次に進めよう！`,
       });
     } else if (wf.phase === "drafting" || wf.phase === "rework") {
       const alt = members.find((m) => m.role === "member" && m.employee_id !== wf.lead_id);
@@ -633,7 +633,7 @@ async function handleFailure(sql: Sql, wf: Workflow, members: Member[], speaker:
           authorType: "employee",
           employeeId: "president",
           kind: "decision",
-          content: `作業がうまく進まないため、リーダーを${speaker.name}さんから${alt.name}さんに交代します。`,
+          content: `作業がうまく進まないから、リーダーを${speaker.name}さんから${alt.name}さんに交代しよう。`,
         });
       }
     } else if (wf.phase === "media") {
@@ -652,7 +652,7 @@ async function handleFailure(sql: Sql, wf: Workflow, members: Member[], speaker:
         authorType: "employee",
         employeeId: "president",
         kind: "decision",
-        content: "監査は私（社長）が代わりに行います。",
+        content: "監査は俺が代わりにやるね。",
       });
     }
   });

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { chatGreeting } from "@/lib/greetings";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getEmployee } from "@/lib/repo/employees";
@@ -132,9 +133,7 @@ export default async function ChatPage({
             <p className="mt-3 text-[18px] font-bold">{e.name}</p>
             <p className="text-[13px] text-muted">{e.role_title}・{e.department_name}</p>
             <p className="mt-4 max-w-sm rounded-[18px] bg-surface px-4 py-3 text-[14px] leading-relaxed text-ink/85 shadow-card ring-1 ring-line/60">
-              {e.role_key === "president"
-                ? "お疲れさまです。社長の天城です。お任せいただきたい仕事があれば、遠慮なくお申し付けください。必要な社員に割り当てて進めます。"
-                : `${e.role_title}の${e.name}です。ご用件をどうぞ。`}
+              {chatGreeting(e.id, e.name, e.role_title)}
             </p>
             <p className="mt-2 text-[11px] text-faint">※ この挨拶は固定文です（AIは呼び出していません）</p>
           </div>

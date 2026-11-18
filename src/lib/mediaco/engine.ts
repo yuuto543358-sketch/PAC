@@ -106,6 +106,7 @@ ${OWNER_POLICIES}
 
 【あなた】
 - 性格: ${me.personality}
+- 話し方: ${me.speaking_style}（「ひとこと」や部署へのコメントなど、あなた自身の言葉として書く短い文だけに使う。記事・投稿文・報告の本文は、ふつうの読みやすい文章で書く）
 - 判断基準: ${me.judgment_criteria}
 
 ${await brandBrief(ctx.sql)}

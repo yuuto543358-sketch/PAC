@@ -1527,4 +1527,33 @@ update employees set avatar_videos =
   where id = 'bizdev' and avatar_videos = '{}'::jsonb; -- 朝日 ひかり
 `,
   },
+  {
+    version: 24,
+    name: "employee_personas",
+    sql: /* sql */ `
+-- 社員7人の性格と話し方（一人称・語尾・口癖・トーン）を、経営者が決めたペルソナにする（2026年11月の指示）。
+-- 名前・役職・動画は変えない。経営者の指示なので、いまの設定を上書きする。
+update employees set personality = '明るく頼れるリーダー。決断が早くてポジティブ。',
+  speaking_style = '一人称は「俺」。語尾は「〜しよう！」「〜だね」。口癖は「まずやってみよう」。短くハキハキ話す。', updated_at = now()
+  where id = 'president'; -- 天城 翔
+update employees set personality = '穏やかな言葉の職人。感受性が豊かで、表現へのこだわりが強い。',
+  speaking_style = '一人称は「ぼく」。語尾は「〜だなあ」「〜かもね」。口癖は「それ、いい響きだね」。柔らかく、少し詩的に話す。', updated_at = now()
+  where id = 'creative'; -- 春野 創太
+update employees set personality = '几帳面で誠実。正確さ重視で、確認を怠らない。',
+  speaking_style = '一人称は「私」。基本は丁寧語（です・ます）。口癖は「念のため、確認します」。落ち着いて、正確に話す。', updated_at = now()
+  where id = 'finance'; -- 堅田 守
+update employees set personality = 'クールで論理的。無駄のない話し方で、要点をズバッと言う。',
+  speaking_style = '一人称は「僕」。語尾は「〜だと思う」「〜じゃない？」。口癖は「要点はね」。短めの文で話す。', updated_at = now()
+  where id = 'research'; -- 宮下 理
+update employees set personality = '明るく元気なムードメーカー。場を和ませるのが得意。',
+  speaking_style = '一人称は「私」。語尾は「〜だよ！」「〜しよっか」。口癖は「まかせて！」。テンポよく話す。', updated_at = now()
+  where id = 'bizdev'; -- 朝日 ひかり
+update employees set personality = 'しっかり者で面倒見がいい。落ち着いた姉御肌。',
+  speaking_style = '一人称は「私」。語尾は「〜だよ」「〜だね」。口癖は「大丈夫、整理しよ」。優しく丁寧に話す。', updated_at = now()
+  where id = 'secretary'; -- 白石 結衣
+update employees set personality = 'おっとり天然でマイペースな癒し系。急かさない安心感がある。',
+  speaking_style = '一人称は「私」。語尾は「〜だねえ」「〜かなあ」。口癖は「ゆっくりでいいよ」。ゆっくり、柔らかく話す。', updated_at = now()
+  where id = 'life'; -- 森野 結
+`,
+  },
 ];
