@@ -270,7 +270,7 @@ await page.fill("input[name=emergency_stop_jpy]", "3000");
 await page.getByRole("button", { name: "予算設定を保存" }).click();
 await page.getByText("緊急停止ラインは月間上限以下にしてください").waitFor();
 check("予算の不正な値は拒否", true);
-await page.fill("input[name=emergency_stop_jpy]", "1800");
+await page.fill("input[name=emergency_stop_jpy]", "2400");
 await page.getByRole("button", { name: "予算設定を保存" }).click();
 await page.getByText("予算設定を保存しました").waitFor();
 check("予算設定を保存", true);
@@ -428,6 +428,14 @@ async function runMediaUntil(path, text, tries = 5) {
   }
   return false;
 }
+// このテストはここまでにAIを何度も使っているので、1日の上限（はじめは150円）を上げてからメディア事業を確かめる
+await page.goto(`${BASE}/settings`);
+check("AIの1日の上限のはじめの値は150円（メディア事業の予算）", (await page.locator("input[name=daily_limit_jpy]").inputValue()) === "150");
+await page.fill("input[name=daily_limit_jpy]", "2000");
+await page.fill("input[name=monthly_limit_jpy]", "5000");
+await page.fill("input[name=emergency_stop_jpy]", "5000");
+await page.getByRole("button", { name: "予算設定を保存" }).click();
+await page.getByText("予算設定を保存しました").waitFor();
 check("タブに「記事」がある（ライフはメニューから外した）",
   (await page.locator("nav[aria-label=メインメニュー] a[href='/media/articles']").count()) === 1 &&
   (await page.locator("nav[aria-label=メインメニュー] a[href='/life']").count()) === 0);

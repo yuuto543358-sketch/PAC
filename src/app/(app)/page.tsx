@@ -50,6 +50,11 @@ export default async function HomePage() {
       </header>
 
       <Page className="-mt-12 relative" tight>
+        {settings.emergency_stop && (
+          <Link href="/settings" className="press block">
+            <Alert tone="error">緊急停止中：AIの呼び出しをすべて止めています（AI社員は動きません）。設定で解除できます。</Alert>
+          </Link>
+        )}
         {/* ===== 今月の売上と目標 ===== */}
         <Link href="/media/management" className="card press block p-4 shadow-float">
           <div className="flex items-baseline justify-between gap-2">

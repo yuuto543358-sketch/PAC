@@ -1398,4 +1398,18 @@ begin
 end $$;
 `,
   },
+  {
+    version: 18,
+    name: "media_budget_defaults",
+    sql: /* sql */ `
+-- AIの予算のはじめの値を、メディア事業の予算（月2,500円・1日150円）にする（新しく作るときのため）
+alter table budgets alter column monthly_limit_jpy set default 2500;
+alter table budgets alter column emergency_stop_jpy set default 2500;
+alter table budgets alter column monthly_target_jpy set default 2000;
+alter table budgets alter column daily_limit_jpy set default 150;
+-- まだ以前のはじめの値のまま（経営者が変えていない）なら、メディア事業の予算にする
+update budgets set monthly_limit_jpy = 2500, emergency_stop_jpy = 2500, monthly_target_jpy = 2000, daily_limit_jpy = 150, updated_at = now()
+  where id = 1 and monthly_limit_jpy = 2000 and daily_limit_jpy = 50;
+`,
+  },
 ];

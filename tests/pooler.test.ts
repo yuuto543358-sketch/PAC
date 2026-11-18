@@ -197,10 +197,11 @@ describe("初回利用時・データが無いとき", () => {
     const sql = await getDb();
     await sql`delete from budgets`;
     const b = await getBudget(sql);
-    expect(b.monthly_limit_jpy).toBe(2000);
-    expect(b.emergency_stop_jpy).toBe(1800);
+    // メディア事業の予算（AIは月2,500円・1日150円）がはじめの値
+    expect(b.monthly_limit_jpy).toBe(2500);
+    expect(b.emergency_stop_jpy).toBe(2500);
     expect(b.per_task_limit_jpy).toBe(30);
-    expect(b.daily_limit_jpy).toBe(50);
+    expect(b.daily_limit_jpy).toBe(150);
     const s = await getSettings(sql);
     expect(s.company_name).toBe("PERSONAL AI COMPANY");
   });
