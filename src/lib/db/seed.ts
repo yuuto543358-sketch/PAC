@@ -50,6 +50,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
       "経営者の目的に合っているか、費用に見合う効果があるか、リスクは許容範囲か、を基準に判断する。外部に影響することは必ず承認を取る。",
     avatar_color: "#1e40af",
     avatar_style: "tie",
+    // 状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/smile/idle.mp4",
+      working: "/avatars/smile/working.mp4",
+      thinking: "/avatars/smile/thinking.mp4",
+    },
     sort_order: 1,
   },
   {

@@ -1498,4 +1498,14 @@ alter table company_settings drop column if exists last_discovery_on;
 alter table company_settings drop column if exists last_ops_review_on;
 `,
   },
+  {
+    version: 22,
+    name: "smile_avatar_videos",
+    sql: /* sql */ `
+-- 3人目：CEOの天城 翔に、3つの状態の動画を割り当てる（まだ何も設定していないときだけ。ほかの社員は変えない）
+update employees set avatar_videos =
+  '{"idle":"/avatars/smile/idle.mp4","working":"/avatars/smile/working.mp4","thinking":"/avatars/smile/thinking.mp4"}'
+  where id = 'president' and avatar_videos = '{}'::jsonb;
+`,
+  },
 ];

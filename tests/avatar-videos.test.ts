@@ -39,7 +39,7 @@ describe("状態 → 動画の対応（社員ごとのデータ）", () => {
     expect(videoForStatus(v, undefined)).toBeNull();
   });
 
-  it("春野 創太（編集制作部）と堅田 守（監査・品質管理部）に、3つの状態の動画が割り当てられている（ほかの社員はまだ静止画）", async () => {
+  it("春野 創太（編集制作部）・堅田 守（監査・品質管理部）・天城 翔（CEO）に、3つの状態の動画が割り当てられている（ほかの社員はまだ静止画）", async () => {
     const sql = await getDb();
     const e = (await getEmployee(sql, "creative"))!;
     expect(e.name).toBe("春野 創太");
@@ -55,10 +55,17 @@ describe("状態 → 動画の対応（社員ごとのデータ）", () => {
       working: "/avatars/employee2/working.mp4",
       thinking: "/avatars/employee2/thinking.mp4",
     });
-    const others = await sql<{ id: string }[]>`select id from employees where id not in ('creative','finance') and avatar_videos <> '{}'::jsonb`;
+    const sho = (await getEmployee(sql, "president"))!;
+    expect(sho.name).toBe("天城 翔");
+    expect(parseAvatarVideos(sho.avatar_videos)).toEqual({
+      idle: "/avatars/smile/idle.mp4",
+      working: "/avatars/smile/working.mp4",
+      thinking: "/avatars/smile/thinking.mp4",
+    });
+    const others = await sql<{ id: string }[]>`select id from employees where id not in ('creative','finance','president') and avatar_videos <> '{}'::jsonb`;
     expect(others).toEqual([]);
     // 動画のファイルが実際にある
-    for (const dir of ["student2", "employee2"]) {
+    for (const dir of ["student2", "employee2", "smile"]) {
       for (const f of ["idle", "working", "thinking"]) {
         expect(fs.existsSync(path.join(process.cwd(), "public/avatars", dir, `${f}.mp4`))).toBe(true);
       }

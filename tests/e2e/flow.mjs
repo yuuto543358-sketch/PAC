@@ -47,20 +47,26 @@ await page.getByText("7名が在籍しています").waitFor();
 check("社員一覧に7名（ライフ担当を含む）", (await page.locator("main li").count()) === 7);
 await shot("02-employees");
 
-// 社員アイコンの動画（春野 創太・堅田 守）
+// 社員アイコンの動画（天城 翔・春野 創太・堅田 守）
 {
   const vid = page.locator("video[data-avatar-video]");
-  check("動画を割り当てた2人（春野 創太・堅田 守）だけが動画で、ほかの社員は静止画のアイコンのまま", (await vid.count()) === 2);
-  // 画面の外にあるアイコンの動画は、見えるまで読み込まない
-  const before = await vid.first().evaluate((el) => ({ src: el.getAttribute("src"), top: el.getBoundingClientRect().top, vh: innerHeight }));
+  const vidOf = (name) => page.locator(`.avatar-wrap:has(svg[aria-label="${name}"]) video[data-avatar-video]`).first();
+  check("動画を割り当てた3人（天城 翔・春野 創太・堅田 守）だけが動画で、ほかの社員は静止画のアイコンのまま",
+    (await vid.count()) === 3 && (await vidOf("天城 翔").count()) === 1 && (await vidOf("春野 創太").count()) === 1 && (await vidOf("堅田 守").count()) === 1);
+  // 画面の外にあるアイコンの動画は、見えるまで読み込まない（春野 創太のカードは最初は画面の外）
+  const haruno = vidOf("春野 創太");
+  const before = await haruno.evaluate((el) => ({ src: el.getAttribute("src"), top: el.getBoundingClientRect().top, vh: innerHeight }));
   check("画面の外にあるアイコンの動画は、見えるまで読み込まない", before.top > before.vh + 120 ? before.src === null : true, JSON.stringify(before));
-  await vid.first().scrollIntoViewIfNeeded();
+  // いちばん上の天城 翔は、開いてすぐ待機中の動画を流す
+  await page.locator('video[src="/avatars/smile/idle.mp4"][data-avatar-video="playing"]').waitFor({ state: "attached", timeout: 15000 });
+  check("天城 翔のアイコンで、待機中の動画（smile）がループ再生される", true);
+  await haruno.scrollIntoViewIfNeeded();
   await page.locator('video[src="/avatars/student2/idle.mp4"][data-avatar-video="playing"]').waitFor({ state: "attached", timeout: 15000 });
   // 堅田 守のアイコンも、待機中の動画を流す
-  await vid.nth(1).scrollIntoViewIfNeeded();
+  await vidOf("堅田 守").scrollIntoViewIfNeeded();
   await page.locator('video[src="/avatars/employee2/idle.mp4"][data-avatar-video="playing"]').waitFor({ state: "attached", timeout: 15000 });
   check("堅田 守のアイコンで、待機中の動画（employee2）がループ再生される", true);
-  const info = await vid.first().evaluate((v) => ({ muted: v.muted, loop: v.loop, playsInline: v.playsInline, autoplay: v.autoplay, paused: v.paused }));
+  const info = await haruno.evaluate((v) => ({ muted: v.muted, loop: v.loop, playsInline: v.playsInline, autoplay: v.autoplay, paused: v.paused }));
   check("見える所に来たら、待機中の動画をループ再生する（muted / loop / playsInline / autoplay）",
     info.muted && info.loop && info.playsInline && info.autoplay && !info.paused, JSON.stringify(info));
 }
@@ -75,13 +81,14 @@ await shot("02-employees");
   await p2.waitForURL(`${BASE}/`);
   await p2.goto(`${BASE}/employees`);
   // 見える所までスクロールして、動画を読み込ませる（ここでは読み込みに失敗させている）
-  // 動画のある社員（春野 創太・堅田 守）を1人ずつ画面に出して確かめる
-  for (const name of ["春野 創太", "堅田 守"]) {
+  // 動画のある社員（天城 翔・春野 創太・堅田 守）を1人ずつ画面に出して確かめる
+  for (const name of ["天城 翔", "春野 創太", "堅田 守"]) {
     await p2.locator(`svg[aria-label="${name}"]`).first().scrollIntoViewIfNeeded();
     await p2.waitForTimeout(2500);
   }
-  check("動画が読み込めないときは、動画を出さずに静止画のアイコンを出す（春野 創太・堅田 守とも）",
+  check("動画が読み込めないときは、動画を出さずに静止画のアイコンを出す（3人とも）",
     (await p2.locator("video[data-avatar-video]").count()) === 0 &&
+      (await p2.locator('svg[aria-label="天城 翔"]').count()) > 0 &&
       (await p2.locator('svg[aria-label="春野 創太"]').count()) > 0 &&
       (await p2.locator('svg[aria-label="堅田 守"]').count()) > 0);
   await ctx2.close();
