@@ -80,6 +80,29 @@ async function gridFits(p) {
   const info = await vidOf("春野 創太").evaluate((v) => ({ muted: v.muted, loop: v.loop, playsInline: v.playsInline, autoplay: v.autoplay, paused: v.paused }));
   check("待機中の動画をループ再生する（muted / loop / playsInline / autoplay）",
     info.muted && info.loop && info.playsInline && info.autoplay && !info.paused, JSON.stringify(info));
+  // 待機中・考え中・作業中が、画面を開いたまま（読み直さずに）切り替わる。
+  // ここでは状態の返事を「宮下 理が考え中」に差しかえて、画面がその場で切り替わることを確かめる
+  {
+    const api = await page.request.get(`${BASE}/api/employees/status`);
+    const body = await api.json();
+    check("社員の状態を返す窓口（ログインした人だけ）が、7人分の状態を返す", api.status() === 200 && body.employees?.length === 7, String(api.status()));
+    const anon = await (await browser.newContext()).request.get(`${BASE}/api/employees/status`, { maxRedirects: 0 });
+    check("ログインしていないと、社員の状態は見られない", anon.status() !== 200 || !(await anon.text()).includes("employees"), String(anon.status()));
+    await page.route("**/api/employees/status", async (route) => {
+      const res = await route.fetch();
+      const data = await res.json();
+      data.employees = data.employees.map((e) => (e.id === "research" ? { ...e, status: "thinking", running: "記事の企画", activity: "記事の企画" } : e));
+      await route.fulfill({ response: res, json: data });
+    });
+    const tile = page.locator('[data-employee-tile="research"]');
+    await page.locator('[data-employee-tile="research"][data-status="thinking"]').waitFor({ timeout: 15_000 });
+    await page.locator('video[src="/avatars/employee6/thinking.mp4"]').waitFor({ state: "attached", timeout: 15_000 });
+    check("画面を読み直さなくても、状態が「考え中」に切り替わり、考え中の動画になる（数秒ごとに最新にする）",
+      (await tile.innerText()).includes("考え中"));
+    await page.unroute("**/api/employees/status");
+    await page.locator('[data-employee-tile="research"][data-status="idle"]').waitFor({ timeout: 15_000 });
+    check("状態が戻ると、表示も待機中に戻る", (await tile.innerText()).includes("待機中"));
+  }
   // ホーム：社員のグリッドは画面の下のほうにあるので、見えるまで動画を読み込まない。スクロールして来たら全員が1画面に収まる
   await page.goto(`${BASE}/`);
   await page.locator("[data-employee-tile]").first().waitFor({ state: "attached" });

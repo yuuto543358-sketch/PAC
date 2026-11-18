@@ -4,9 +4,8 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getEmployee, listRatings } from "@/lib/repo/employees";
 import { listTasks } from "@/lib/repo/tasks";
-import { EMPLOYEE_STATUS_LABEL } from "@/lib/constants";
 import { dateTime, relativeTime } from "@/lib/format";
-import { Avatar } from "@/components/Avatar";
+import { LiveAvatar, LiveRunningLine, LiveStatusLabel } from "@/components/LiveAvatar";
 import { Icon } from "@/components/Icon";
 import { Empty, List, ListRow, Page, PageHeader, Section, SegmentedLinks, TaskStatusBadge } from "@/components/ui";
 import { DirectInstructionForm, RatingForm } from "./forms";
@@ -53,7 +52,7 @@ export default async function EmployeeDetailPage({
           <div className="-mt-10 px-5 pb-5">
             <div className="flex items-end justify-between">
               <span className="rounded-full bg-surface p-1 shadow-card">
-                <Avatar color={e.avatar_color} styleId={e.avatar_style} size={80} status={e.status} label={e.name} videos={e.avatar_videos} />
+                <LiveAvatar employeeId={e.id} color={e.avatar_color} styleId={e.avatar_style} size={80} status={e.status} label={e.name} videos={e.avatar_videos} />
               </span>
               <Link
                 href={`/settings/employees/${e.id}`}
@@ -69,7 +68,7 @@ export default async function EmployeeDetailPage({
               {e.role_title}・{e.department_name}
             </div>
             <div className="mt-1 text-[12px] text-muted">
-              {EMPLOYEE_STATUS_LABEL[e.status]} ／ 最近の活動 {relativeTime(e.last_activity_at)}
+              <LiveStatusLabel employeeId={e.id} status={e.status} /> ／ 最近の活動 {relativeTime(e.last_activity_at)}
             </div>
             <div className="mt-4 grid grid-cols-3 divide-x divide-separator rounded-[14px] bg-surface-2 py-2.5 text-center">
               <div>
@@ -106,7 +105,7 @@ export default async function EmployeeDetailPage({
             <Section title="メディア事業での仕事">
               <div className="card p-4">
                 <p className="text-[14px]">
-                  {running ? <>いま：<b>{JOB_KIND_LABEL[running.kind] ?? running.kind}</b></> : "いまは待機中です。"}
+                  <LiveRunningLine employeeId={e.id} running={running ? (JOB_KIND_LABEL[running.kind] ?? running.kind) : null} />
                   <span className="ml-1 text-[12px] text-muted">（最近の{jobs.length}件のうち完了 {doneCount}件）</span>
                 </p>
                 {jobs.length > 0 && (

@@ -14,6 +14,7 @@ export default async function EmployeesPage() {
       <Page>
         <EmployeeGrid
           fit="below"
+          detail="tasks"
           employees={employees.map((e) => ({ ...e, detail: `担当 ${e.active_tasks}件` }))}
         />
         <p className="px-1 text-center text-xs text-muted">{employees.length}名が在籍しています。タップすると、性格・得意なこと・チャットが見られます</p>

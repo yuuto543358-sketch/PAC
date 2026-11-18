@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { Avatar } from "./Avatar";
 import { EMPLOYEE_STATUS_LABEL } from "@/lib/constants";
+import { useLiveEmployees } from "@/lib/live-status";
 import type { EmployeeStatus } from "@/lib/avatar-videos";
 
 // 社員を「アイコン（動画）が主役」のグリッドで並べる（ホーム・社員一覧）。
@@ -40,13 +41,18 @@ function bottomLimit(): number {
 export function EmployeeGrid({
   employees,
   fit,
+  detail,
   label = "社員",
 }: {
   employees: EmployeeGridItem[];
   fit: "below" | "screen";
+  /** 状態のあとに出すひとこと（tasks：担当している業務の数／activity：いまの仕事・最後の仕事）。数秒ごとに最新にする */
+  detail: "tasks" | "activity";
   label?: string;
 }) {
   const ref = useRef<HTMLUListElement>(null);
+  // 待機中・考え中・作業中を、画面を開いたまま数秒ごとに最新にする（ページ全体は読み直さない）
+  const live = useLiveEmployees();
 
   useEffect(() => {
     const ul = ref.current;
@@ -71,11 +77,19 @@ export function EmployeeGrid({
 
   return (
     <ul ref={ref} aria-label={label} className="emp-grid flex flex-wrap justify-center gap-2">
-      {employees.map((e) => {
+      {employees.map((initial) => {
+        const now = live?.get(initial.id);
+        const e = now
+          ? {
+              ...initial,
+              status: now.status,
+              detail: detail === "tasks" ? `担当 ${now.activeTasks}件` : (now.activity ?? undefined),
+            }
+          : initial;
         const status = EMPLOYEE_STATUS_LABEL[e.status] ?? e.status;
         const line = e.detail ? `${status}・${e.detail}` : status;
         return (
-          <li key={e.id} className="w-[calc((100%-1rem)/3)]" data-employee-tile={e.id}>
+          <li key={e.id} className="w-[calc((100%-1rem)/3)]" data-employee-tile={e.id} data-status={e.status}>
             <Link
               href={`/employees/${e.id}`}
               className="card press flex h-full flex-col items-center px-1.5 py-1.5 text-center"

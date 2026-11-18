@@ -7,6 +7,7 @@ import { greeting, longDate, relativeTime, yen } from "@/lib/format";
 import { dashboardNumbers, getActiveBrand, JOB_KIND_LABEL, listJobs } from "@/lib/mediaco/repo";
 import { getBudgetTier, TIER_LABEL } from "@/lib/mediaco/budget";
 import { EmployeeGrid } from "@/components/EmployeeGrid";
+import { employeeLiveStates } from "@/lib/repo/employee-live";
 import { Icon } from "@/components/Icon";
 import { Alert, ChevronRight, Meter, Page, Section } from "@/components/ui";
 import { RunNowButton } from "./media/MediaForms";
@@ -31,9 +32,7 @@ export default async function HomePage() {
   ]);
   const goal = GOALS.find((g) => n.monthRevenue < g) ?? GOALS[GOALS.length - 1];
   const yourTurn = pending + n.articles.ready;
-  const runningByEmployee = new Map(jobs.filter((j) => j.status === "running").map((j) => [j.employee_id, j]));
-  const lastByEmployee = new Map<string, (typeof jobs)[number]>();
-  for (const j of jobs) if (j.employee_id && !lastByEmployee.has(j.employee_id)) lastByEmployee.set(j.employee_id, j);
+  const activity = new Map((await employeeLiveStates(sql)).map((s) => [s.id, s.activity]));
 
   return (
     <>
@@ -149,18 +148,8 @@ export default async function HomePage() {
           <EmployeeGrid
             label="部署の稼働状況"
             fit="screen"
-            employees={employees.map((e) => {
-              const running = runningByEmployee.get(e.id);
-              const last = lastByEmployee.get(e.id);
-              return {
-                ...e,
-                detail: running
-                  ? JOB_KIND_LABEL[running.kind] ?? running.kind
-                  : last
-                    ? `最後：${JOB_KIND_LABEL[last.kind] ?? last.kind}（${relativeTime(last.started_at)}）`
-                    : undefined,
-              };
-            })}
+            detail="activity"
+            employees={employees.map((e) => ({ ...e, detail: activity.get(e.id) ?? undefined }))}
           />
         </Section>
 

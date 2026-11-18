@@ -9,6 +9,7 @@ import { isAiConfigured } from "@/lib/ai/client";
 import { modelName } from "@/lib/constants";
 import { dayLabel, timeOnly, yenPrecise } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
+import { LiveAvatar } from "@/components/LiveAvatar";
 import { Icon, type IconName } from "@/components/Icon";
 import { ChatComposer, ScrollToBottom } from "./ChatComposer";
 
@@ -94,7 +95,7 @@ export default async function ChatPage({
             <Icon name="chevronLeft" size={28} stroke={2.4} />
           </Link>
           <Link href={`/employees/${e.id}`} className="flex min-h-11 min-w-0 items-center justify-center gap-2">
-            <Avatar color={e.avatar_color} styleId={e.avatar_style} size={34} status={e.status} label={e.name} videos={e.avatar_videos} />
+            <LiveAvatar employeeId={e.id} color={e.avatar_color} styleId={e.avatar_style} size={34} status={e.status} label={e.name} videos={e.avatar_videos} />
             <div className="min-w-0 text-left">
               <h1 className="truncate text-[15px] leading-tight font-semibold">{e.name}</h1>
               <p className="truncate text-[11px] text-muted">{e.role_title}</p>
@@ -129,7 +130,7 @@ export default async function ChatPage({
       <main className="mx-auto w-full max-w-2xl flex-1 space-y-2.5 px-3 pt-4 pb-48">
         {messages.length === 0 && (
           <div className="fade-up flex flex-col items-center px-4 pt-6 pb-2 text-center">
-            <Avatar color={e.avatar_color} styleId={e.avatar_style} size={84} label={e.name} videos={e.avatar_videos} status={e.status} />
+            <LiveAvatar employeeId={e.id} color={e.avatar_color} styleId={e.avatar_style} size={84} label={e.name} videos={e.avatar_videos} status={e.status} />
             <p className="mt-3 text-[18px] font-bold">{e.name}</p>
             <p className="text-[13px] text-muted">{e.role_title}・{e.department_name}</p>
             <p className="mt-4 max-w-sm rounded-[18px] bg-surface px-4 py-3 text-[14px] leading-relaxed text-ink/85 shadow-card ring-1 ring-line/60">
