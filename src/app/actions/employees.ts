@@ -1,5 +1,6 @@
 "use server";
 
+import { EMPLOYEE_STATUSES, isSafeVideoPath, VIDEO_STATES } from "@/lib/avatar-videos";
 import { refresh } from "next/cache";
 import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
@@ -49,7 +50,15 @@ export async function updateEmployeeAction(_p: ActionState, fd: FormData): Promi
     const style = String(fd.get("avatar_style") ?? "");
     if (!AVATAR_STYLES.some((s) => s.id === style)) throw new Error("アバターの種類が正しくありません");
     const status = String(fd.get("status") ?? "idle");
-    if (!["idle", "working", "offline"].includes(status)) throw new Error("稼働状態が正しくありません");
+    if (!(EMPLOYEE_STATUSES as readonly string[]).includes(status)) throw new Error("稼働状態が正しくありません");
+    // 状態ごとの動画（空なら、その状態はイラストのアイコン）
+    const videos: Record<string, string> = {};
+    for (const st of VIDEO_STATES) {
+      const v = String(fd.get(`avatar_video_${st}`) ?? "").trim();
+      if (!v) continue;
+      if (!isSafeVideoPath(v)) throw new Error("動画の場所は、アプリの中のファイル（/ から始まる .mp4 か .webm）にしてください");
+      videos[st] = v;
+    }
     const t = (k: string, max = 1000) => String(fd.get(k) ?? "").trim().slice(0, max);
     const sql = await getDb();
     const res = await sql`
@@ -57,7 +66,7 @@ export async function updateEmployeeAction(_p: ActionState, fd: FormData): Promi
         personality = ${t("personality")}, speaking_style = ${t("speaking_style")},
         expertise = ${lines(fd.get("expertise"))}::text[], strengths = ${lines(fd.get("strengths"))}::text[],
         weaknesses = ${lines(fd.get("weaknesses"))}::text[], judgment_criteria = ${t("judgment_criteria")},
-        avatar_color = ${color}, avatar_style = ${style}, status = ${status}, updated_at = now()
+        avatar_color = ${color}, avatar_style = ${style}, status = ${status}, avatar_videos = ${sql.json(videos)}, updated_at = now()
       where id = ${id}`;
     if (res.count === 0) throw new Error("社員が見つかりません");
     await audit(sql, "user", "update_employee", "employee", id, { name });

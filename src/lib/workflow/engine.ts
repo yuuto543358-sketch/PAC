@@ -10,6 +10,7 @@ import { listEmployees, type EmployeeWithStats } from "@/lib/repo/employees";
 import { addTaskLog, getTask } from "@/lib/repo/tasks";
 import { createApprovalTx } from "@/lib/repo/approvals";
 import { createStepLogger } from "@/lib/log";
+import { activityStatusFor } from "@/lib/employee-status";
 import { todayJst } from "@/lib/format";
 import {
   acquireLease,
@@ -225,7 +226,8 @@ async function doStep(sql: Sql, wf: Workflow): Promise<StepResult> {
   const cfg = CONFIG[phase];
   log.step("call", { task: wf.task_id, phase, speaker: speaker.id });
 
-  await sql`update employees set status = 'working' where id = ${speaker.id}`;
+  // 話し合い・計画・監査は「考え中」、成果物づくりは「作業中」（アイコンの動画が切り替わる）
+  await sql`update employees set status = ${activityStatusFor(`team.${wf.phase}`)} where id = ${speaker.id}`;
   let result;
   try {
     result = await callStructured(sql, {
@@ -541,7 +543,7 @@ export function phaseAfterCheck(product: RequestedProduct | null, format: string
 async function doMediaStep(sql: Sql, wf: Workflow, ctx: PromptContext, members: Member[]): Promise<StepResult> {
   const log = createStepLogger("media");
   const speaker = ctx.speaker;
-  await sql`update employees set status = 'working' where id = ${speaker.id}`;
+  await sql`update employees set status = ${activityStatusFor("team.media")} where id = ${speaker.id}`;
   try {
     const r = await produceMediaStep(sql, wf.task_id, speaker.id);
     if (r.status === "progress") {

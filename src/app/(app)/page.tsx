@@ -153,14 +153,14 @@ export default async function HomePage() {
               return (
                 <li key={e.id}>
                   <Link href={`/employees/${e.id}`} className="press flex min-h-11 items-center gap-3 px-3.5 py-2.5">
-                    <Avatar color={e.avatar_color} styleId={e.avatar_style} size={34} status={running ? "working" : e.status} label={e.name} />
+                    <Avatar color={e.avatar_color} styleId={e.avatar_style} size={34} status={e.status} label={e.name} videos={e.avatar_videos} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] font-semibold">
                         {e.department_name}
                         <span className="ml-1.5 text-[12px] font-normal text-muted">{e.name}</span>
                       </span>
                       <span className="block truncate text-[12px] text-muted">
-                        {running ? `作業中：${JOB_KIND_LABEL[running.kind] ?? running.kind}` : last ? `最後：${JOB_KIND_LABEL[last.kind] ?? last.kind}（${relativeTime(last.started_at)}）` : "待機中"}
+                        {running ? `${e.status === "thinking" ? "考え中" : "作業中"}：${JOB_KIND_LABEL[running.kind] ?? running.kind}` : last ? `最後：${JOB_KIND_LABEL[last.kind] ?? last.kind}（${relativeTime(last.started_at)}）` : "待機中"}
                       </span>
                     </span>
                   </Link>

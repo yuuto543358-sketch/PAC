@@ -1,5 +1,6 @@
 import "server-only";
 import type { Db } from "@/lib/db";
+import { activityStatusFor } from "@/lib/employee-status";
 
 // 自動の仕事の記録（実行状態・開始時刻・終了時刻・エラー）。
 // dedupe_key があるときは、同じ仕事を二重に記録・実行しない（すでにあれば null を返す）。
@@ -27,7 +28,8 @@ export async function startJob(
     on conflict (dedupe_key) do nothing
     returning id`;
   if (!rows[0]) return null;
-  await db`update employees set status = 'working' where id = ${d.employeeId}`;
+  // 調べる・考える仕事は「考え中」、形にする仕事は「作業中」（アイコンの動画が切り替わる）
+  await db`update employees set status = ${activityStatusFor(j.kind)} where id = ${d.employeeId}`;
   return rows[0];
 }
 

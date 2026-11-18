@@ -53,7 +53,7 @@ export default async function EmployeeDetailPage({
           <div className="-mt-10 px-5 pb-5">
             <div className="flex items-end justify-between">
               <span className="rounded-full bg-surface p-1 shadow-card">
-                <Avatar color={e.avatar_color} styleId={e.avatar_style} size={80} status={e.status} label={e.name} />
+                <Avatar color={e.avatar_color} styleId={e.avatar_style} size={80} status={e.status} label={e.name} videos={e.avatar_videos} />
               </span>
               <Link
                 href={`/settings/employees/${e.id}`}

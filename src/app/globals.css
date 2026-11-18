@@ -104,6 +104,11 @@ body {
   font-feature-settings: "palt" 1;
 }
 
+/* 社員アイコンの動画が流れているあいだは、下のイラストを隠す（動画が止まる・読み込めないときは、イラストが見える） */
+.avatar-wrap:has(> video[data-avatar-video="playing"]) > svg {
+  visibility: hidden;
+}
+
 /* チェックボックスを包むラベル（文字を押しても切り替わる）は、押せる高さを44px以上にする */
 label:has(input[type="checkbox"]:not(.sr-only)) {
   min-height: 44px;

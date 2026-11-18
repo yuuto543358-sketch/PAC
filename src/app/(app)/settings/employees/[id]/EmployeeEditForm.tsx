@@ -19,12 +19,19 @@ type E = {
   avatar_color: string;
   avatar_style: string;
   status: string;
+  avatar_videos: Record<string, string>;
 };
+
+const VIDEO_FIELDS = [
+  { state: "idle", label: "待機中の動画" },
+  { state: "working", label: "作業中の動画" },
+  { state: "thinking", label: "考え中の動画" },
+] as const;
 
 export function EmployeeEditForm({ e, department, roleKey }: { e: E; department: string; roleKey: string }) {
   const [color, setColor] = useState(e.avatar_color);
   const [style, setStyle] = useState(e.avatar_style);
-  const area = (name: keyof E, label: string, rows = 3, hint?: string) => (
+  const area = (name: Exclude<keyof E, "avatar_videos">, label: string, rows = 3, hint?: string) => (
     <label className="block">
       <span className="label">{label}</span>
       <textarea name={name} defaultValue={e[name]} rows={rows} maxLength={1000} className="field" />
@@ -68,6 +75,7 @@ export function EmployeeEditForm({ e, department, roleKey }: { e: E; department:
           <select name="status" defaultValue={e.status} className="field">
             <option value="idle">待機中</option>
             <option value="working">業務中</option>
+            <option value="thinking">考え中</option>
             <option value="offline">休止中</option>
           </select>
         </label>
@@ -81,6 +89,18 @@ export function EmployeeEditForm({ e, department, roleKey }: { e: E; department:
       {area("strengths", "得意な業務", 2, "1行に1つずつ")}
       {area("weaknesses", "苦手な業務", 2, "1行に1つずつ")}
       {area("judgment_criteria", "判断基準")}
+      <fieldset className="space-y-2 rounded-xl bg-surface-2 p-3">
+        <legend className="px-1 text-[13px] font-semibold">アイコンの動画（状態ごと）</legend>
+        <p className="text-xs text-muted">
+          アプリの中にある動画ファイルの場所を入れます（例：/avatars/student2/idle.mp4）。空にすると、その状態ではイラストのアイコンになります。動画が読み込めない端末でも、イラストのアイコンが出ます。
+        </p>
+        {VIDEO_FIELDS.map((f) => (
+          <label key={f.state} className="block">
+            <span className="label">{f.label}</span>
+            <input name={`avatar_video_${f.state}`} defaultValue={e.avatar_videos?.[f.state] ?? ""} placeholder="/avatars/…/….mp4" className="field" />
+          </label>
+        ))}
+      </fieldset>
       <SubmitButton>保存する</SubmitButton>
     </ActionForm>
   );

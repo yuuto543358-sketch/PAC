@@ -1,3 +1,4 @@
+import { parseAvatarVideos } from "@/lib/avatar-videos";
 import { notFound } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { getEmployee } from "@/lib/repo/employees";
@@ -28,6 +29,7 @@ export default async function EmployeeEditPage({ params }: { params: Promise<{ i
             avatar_color: e.avatar_color,
             avatar_style: e.avatar_style,
             status: e.status,
+            avatar_videos: parseAvatarVideos(e.avatar_videos) as Record<string, string>,
           }}
           department={e.department_name}
           roleKey={e.role_key}

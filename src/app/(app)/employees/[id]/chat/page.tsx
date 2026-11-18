@@ -93,7 +93,7 @@ export default async function ChatPage({
             <Icon name="chevronLeft" size={28} stroke={2.4} />
           </Link>
           <Link href={`/employees/${e.id}`} className="flex min-h-11 min-w-0 items-center justify-center gap-2">
-            <Avatar color={e.avatar_color} styleId={e.avatar_style} size={34} status={e.status} label={e.name} />
+            <Avatar color={e.avatar_color} styleId={e.avatar_style} size={34} status={e.status} label={e.name} videos={e.avatar_videos} />
             <div className="min-w-0 text-left">
               <h1 className="truncate text-[15px] leading-tight font-semibold">{e.name}</h1>
               <p className="truncate text-[11px] text-muted">{e.role_title}</p>

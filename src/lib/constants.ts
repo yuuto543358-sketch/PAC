@@ -151,6 +151,7 @@ export const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
 export const EMPLOYEE_STATUS_LABEL: Record<string, string> = {
   idle: "待機中",
   working: "業務中",
+  thinking: "考え中",
   offline: "休止中",
 };
 

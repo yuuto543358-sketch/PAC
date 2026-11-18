@@ -1,4 +1,5 @@
 import "server-only";
+import { activityStatusFor } from "@/lib/employee-status";
 import { enqueueNotification } from "@/lib/notify";
 import { z } from "zod";
 import type { Sql } from "@/lib/db";
@@ -162,7 +163,7 @@ export async function runDiscovery(sql: Sql, trigger: "manual" | "scheduled"): P
   const today = todayJst();
 
   let result;
-  await sql`update employees set status = 'working' where id = ${DISCOVERER_ID}`;
+  await sql`update employees set status = ${activityStatusFor("discovery")} where id = ${DISCOVERER_ID}`;
   try {
     result = await callStructured(sql, {
       model: settings.model_standard,

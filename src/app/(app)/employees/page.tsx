@@ -22,7 +22,7 @@ export default async function EmployeesPage() {
               <Link href={`/employees/${e.id}`} className="card press relative block overflow-hidden p-4">
                 <span className="absolute inset-x-0 top-0 h-1" style={{ background: e.avatar_color }} aria-hidden />
                 <div className="flex items-center gap-3.5">
-                  <Avatar color={e.avatar_color} styleId={e.avatar_style} size={60} status={e.status} label={e.name} />
+                  <Avatar color={e.avatar_color} styleId={e.avatar_style} size={60} status={e.status} label={e.name} videos={e.avatar_videos} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[12px] font-semibold" style={{ color: e.avatar_color }}>
                       {e.role_title}・{e.department_name}
@@ -30,7 +30,7 @@ export default async function EmployeesPage() {
                     <div className="text-[19px] leading-tight font-bold tracking-tight">{e.name}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-muted">
                       <span className="inline-flex items-center gap-1">
-                        <span className={`h-1.5 w-1.5 rounded-full ${e.status === "working" ? "bg-success" : "bg-faint"}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full ${e.status === "working" ? "bg-success" : e.status === "thinking" ? "bg-accent" : "bg-faint"}`} />
                         {EMPLOYEE_STATUS_LABEL[e.status]}
                       </span>
                       <span>担当中 {e.active_tasks}件</span>

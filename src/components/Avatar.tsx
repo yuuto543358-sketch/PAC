@@ -1,4 +1,8 @@
+import { AvatarVideo } from "./AvatarVideo";
+import { parseAvatarVideos, videoForStatus, type EmployeeStatus } from "@/lib/avatar-videos";
+
 // 社員のアバター（イラスト）。画像ファイルを使わず、色と髪型の組み合わせで描きます。
+// 社員に状態ごとの動画が設定されていれば、その状態の動画を上に重ねて流します（読み込めなければイラストのまま）。
 
 export const AVATAR_STYLES = [
   { id: "tie", label: "短髪・ネクタイ" },
@@ -9,13 +13,22 @@ export const AVATAR_STYLES = [
   { id: "elder", label: "グレーヘア・メガネ" },
 ] as const;
 
-type Props = { color: string; styleId: string; size?: number; status?: "idle" | "working" | "offline"; label?: string };
+type Props = {
+  color: string;
+  styleId: string;
+  size?: number;
+  status?: EmployeeStatus;
+  label?: string;
+  /** 状態ごとの動画（社員ごとの設定）。その状態の動画があれば、静止画の上に重ねてループ再生する */
+  videos?: unknown;
+};
 
-export function Avatar({ color, styleId, size = 48, status, label }: Props) {
+export function Avatar({ color, styleId, size = 48, status, label, videos }: Props) {
+  const videoSrc = videoForStatus(parseAvatarVideos(videos), status);
   const hair = styleId === "elder" ? "#a3a9b5" : "#2a2733";
   const skin = "#f4d2b5";
   return (
-    <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
+    <span className="avatar-wrap relative inline-block shrink-0" style={{ width: size, height: size }}>
       <svg viewBox="0 0 64 64" width={size} height={size} role="img" aria-label={label ?? "アバター"}>
         <circle cx="32" cy="32" r="32" fill={color} opacity="0.18" />
         {/* 後ろ髪 */}
@@ -48,13 +61,14 @@ export function Avatar({ color, styleId, size = 48, status, label }: Props) {
           </g>
         )}
       </svg>
+      {videoSrc && <AvatarVideo key={videoSrc} src={videoSrc} size={size} />}
       {status && (
         <span
           className="absolute right-0 bottom-0 block rounded-full border-2 border-surface"
           style={{
             width: Math.max(10, size / 5),
             height: Math.max(10, size / 5),
-            background: status === "working" ? "#22c55e" : status === "idle" ? "#94a3b8" : "#475569",
+            background: status === "working" ? "#22c55e" : status === "thinking" ? "#f59e0b" : status === "idle" ? "#94a3b8" : "#475569",
           }}
           aria-hidden
         />

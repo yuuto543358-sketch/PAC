@@ -1412,4 +1412,19 @@ update budgets set monthly_limit_jpy = 2500, emergency_stop_jpy = 2500, monthly_
   where id = 1 and monthly_limit_jpy = 2000 and daily_limit_jpy = 50;
 `,
   },
+  {
+    version: 19,
+    name: "employee_avatar_videos",
+    sql: /* sql */ `
+-- 社員の状態に「考え中（thinking）」を足す（アイコンの動画の切り替えに使う）
+alter table employees drop constraint if exists employees_status_check;
+alter table employees add constraint employees_status_check check (status in ('idle','working','thinking','offline'));
+-- 社員アイコンの「状態ごとの動画」（社員ごとに差し替えられる。空なら静止画のアイコン）
+alter table employees add column if not exists avatar_videos jsonb not null default '{}';
+-- 試作：編集制作部の春野 創太に、3つの状態の動画を割り当てる（まだ何も設定していないときだけ）
+update employees set avatar_videos =
+  '{"idle":"/avatars/student2/idle.mp4","working":"/avatars/student2/working.mp4","thinking":"/avatars/student2/thinking.mp4"}'
+  where id = 'creative' and avatar_videos = '{}'::jsonb;
+`,
+  },
 ];

@@ -26,6 +26,8 @@ export type SeedEmployee = {
   judgment_criteria: string;
   avatar_color: string;
   avatar_style: string;
+  /** 状態ごとの動画（なければ静止画のアイコン） */
+  avatar_videos?: Record<string, string>;
   sort_order: number;
 };
 
@@ -101,6 +103,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
     judgment_criteria: "使う人にとって分かりやすいか、少ない手間で作れるか、品質は十分か。",
     avatar_color: "#7c3aed",
     avatar_style: "messy",
+    // 試作：状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/student2/idle.mp4",
+      working: "/avatars/student2/working.mp4",
+      thinking: "/avatars/student2/thinking.mp4",
+    },
     sort_order: 4,
   },
   {

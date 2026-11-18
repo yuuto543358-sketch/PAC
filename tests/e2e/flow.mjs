@@ -46,6 +46,36 @@ await page.click("nav >> text=社員");
 await page.getByText("7名が在籍しています").waitFor();
 check("社員一覧に7名（ライフ担当を含む）", (await page.locator("main li").count()) === 7);
 await shot("02-employees");
+
+// 社員アイコンの動画（試作：編集制作部の春野 創太）
+{
+  const vid = page.locator("video[data-avatar-video]");
+  check("動画を割り当てていない社員は、これまでの静止画のアイコンのまま（動画は春野 創太の1つだけ）", (await vid.count()) === 1);
+  // 画面の外にあるアイコンの動画は、見えるまで読み込まない
+  const before = await vid.first().evaluate((el) => ({ src: el.getAttribute("src"), top: el.getBoundingClientRect().top, vh: innerHeight }));
+  check("画面の外にあるアイコンの動画は、見えるまで読み込まない", before.top > before.vh + 120 ? before.src === null : true, JSON.stringify(before));
+  await vid.first().scrollIntoViewIfNeeded();
+  await page.locator('video[src="/avatars/student2/idle.mp4"][data-avatar-video="playing"]').waitFor({ state: "attached", timeout: 15000 });
+  const info = await vid.first().evaluate((v) => ({ muted: v.muted, loop: v.loop, playsInline: v.playsInline, autoplay: v.autoplay, paused: v.paused }));
+  check("見える所に来たら、待機中の動画をループ再生する（muted / loop / playsInline / autoplay）",
+    info.muted && info.loop && info.playsInline && info.autoplay && !info.paused, JSON.stringify(info));
+}
+// 動画が読み込めない環境では、静止画のアイコンにもどる
+{
+  const ctx2 = await browser.newContext({ ...devices["iPhone 15"], locale: "ja-JP" });
+  const p2 = await ctx2.newPage();
+  await p2.route("**/avatars/**", (r) => r.abort());
+  await p2.goto(`${BASE}/login`);
+  await p2.fill("#password", PASSWORD);
+  await p2.click("button[type=submit]");
+  await p2.waitForURL(`${BASE}/`);
+  await p2.goto(`${BASE}/employees`);
+  await p2.waitForTimeout(2500);
+  check("動画が読み込めないときは、動画を出さずに静止画のアイコンを出す",
+    (await p2.locator("video[data-avatar-video]").count()) === 0 && (await p2.locator('svg[aria-label="春野 創太"]').count()) > 0);
+  await ctx2.close();
+}
+await page.goto(`${BASE}/employees`);
 await page.getByText("天城 翔").click();
 await page.getByText("直接指示を出す").waitFor();
 await shot("03-employee-detail");

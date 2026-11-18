@@ -17,7 +17,9 @@ export type Employee = {
   judgment_criteria: string;
   avatar_color: string;
   avatar_style: string;
-  status: "idle" | "working" | "offline";
+  /** 状態ごとの動画（社員ごとの設定） */
+  avatar_videos: Record<string, string>;
+  status: "idle" | "working" | "thinking" | "offline";
   experience_points: number;
   is_active: boolean;
   sort_order: number;

@@ -228,10 +228,10 @@ async function seed(tx: Tx) {
   for (const e of SEED_EMPLOYEES) {
     await tx`
       insert into employees (id, role_key, name, name_kana, role_title, department_id, personality,
-        speaking_style, expertise, strengths, weaknesses, judgment_criteria, avatar_color, avatar_style, sort_order)
+        speaking_style, expertise, strengths, weaknesses, judgment_criteria, avatar_color, avatar_style, avatar_videos, sort_order)
       values (${e.id}, ${e.role_key}, ${e.name}, ${e.name_kana}, ${e.role_title}, ${e.department_id},
         ${e.personality}, ${e.speaking_style}, ${e.expertise}::text[], ${e.strengths}::text[],
-        ${e.weaknesses}::text[], ${e.judgment_criteria}, ${e.avatar_color}, ${e.avatar_style}, ${e.sort_order})
+        ${e.weaknesses}::text[], ${e.judgment_criteria}, ${e.avatar_color}, ${e.avatar_style}, ${tx.json(e.avatar_videos ?? {})}, ${e.sort_order})
       on conflict (id) do nothing`;
   }
 }

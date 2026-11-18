@@ -171,6 +171,8 @@ export async function sendChatMessage(
   const model = useAdvanced ? settings.model_advanced : settings.model_standard;
 
   let result;
+  // 返事を考えているあいだは「考え中」（ほかの仕事中なら、その状態のまま）
+  await sql`update employees set status = 'thinking' where id = ${employeeId} and status = 'idle'`;
   try {
     result = await callStructured(sql, {
       model,
@@ -194,6 +196,8 @@ export async function sendChatMessage(
     const msg = "エラーが発生しました。時間をおいてもう一度お試しください。";
     await addMessage(sql, convId, "notice", msg, { tone: "error", kind: "error" });
     return { conversationId: convId, ok: false, error: msg };
+  } finally {
+    await sql`update employees set status = 'idle' where id = ${employeeId} and status = 'thinking'`;
   }
 
   if (!result.ok) {
