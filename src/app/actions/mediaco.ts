@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { audit } from "@/lib/repo/audit";
 import { runMediaEngine } from "@/lib/mediaco/engine";
+import { dispatchNotifications } from "@/lib/notify";
 import { markArticlePublished, recordArticleMetrics, recordPost, updateBrandAccounts } from "@/lib/mediaco/repo";
 import type { ActionState } from "@/components/forms";
 
@@ -26,6 +27,8 @@ export async function runMediaNowAction(): Promise<ActionState> {
       try {
         const sql = await getDb();
         await runMediaEngine(sql, { maxSteps: 6, deadlineMs: 240_000, trigger: "manual" });
+        // 記事ができた・承認のお願いなどの通知を送る
+        await dispatchNotifications(sql);
       } catch (err) {
         createStepLogger("media").fail("manual run", err);
       }

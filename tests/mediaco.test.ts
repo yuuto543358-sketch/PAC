@@ -22,7 +22,7 @@ async function resetMedia() {
   await sql`delete from media_brands`;
   await sql`delete from media_genres`;
   await sql`delete from media_research_runs`;
-  await sql`update company_settings set media_enabled = true, emergency_stop = false, web_research_enabled = true,
+  await sql`update company_settings set media_enabled = true, notify_approvals = true, emergency_stop = false, web_research_enabled = true,
     media_articles_per_day = 1, media_posts_per_day = 2, media_lease_until = null, media_lease_owner = '',
     last_media_plan_on = null, last_media_posts_on = null, last_media_weekly_on = null, last_media_research_on = null,
     last_media_monthly_on = '', media_insights = ''`;
@@ -105,6 +105,10 @@ describe("フェーズ1〜5：市場調査 → ジャンル選定 → ブラン�
     const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from api_usage where purpose like 'media:%'`;
     expect(n).toBeGreaterThanOrEqual(10);
 
+    // 記事ができたら、経営者に通知する（タップすると記事が開く）
+    const notes = await sql<{ title: string; url: string }[]>`select title, url from notifications where dedupe_key = ${`article-ready:${a.id}`}`;
+    expect(notes).toEqual([{ title: "記事ができました", url: `/media/articles/${a.id}` }]);
+
     // 同じ日にもう一度動かしても、二重には作らない
     const r2 = await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 10 });
     expect(r2.steps).toEqual([]);
@@ -124,6 +128,8 @@ describe("フェーズ1〜5：市場調査 → ジャンル選定 → ブラン�
     expect(a.body).toContain("修正版");
     const checks = await sql`select 1 from media_jobs where ref_id = ${row.id} and kind = 'article.check'`;
     expect(checks).toHaveLength(1);
+    // 直して完成したときも通知する（1回だけ）
+    expect(await sql`select 1 from notifications where dedupe_key = ${`article-ready:${row.id}`}`).toHaveLength(1);
   });
 
   it("AIが失敗しても止まらない：記録にエラーを残し、次の実行で続きから進める", async () => {

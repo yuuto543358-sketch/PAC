@@ -8,7 +8,7 @@ import { createStepLogger } from "@/lib/log";
 // 2. あとで dispatchNotifications がまとめて送る
 // 通知の中身は短いお知らせだけで、会社の詳しい情報は入れません（タップするとアプリが開きます）。
 
-export type NotificationKind = "approval" | "question" | "budget" | "report" | "test";
+export type NotificationKind = "approval" | "question" | "budget" | "report" | "article" | "test";
 
 /** 通知の鍵（VAPID）が設定されているか */
 export function isPushConfigured(): boolean {

@@ -12,6 +12,7 @@ import { getSettings, type CompanySettings } from "@/lib/repo/settings";
 import { checkPostLength } from "@/lib/sns/post";
 import { SNS_STYLE_RULES } from "@/lib/sns/style";
 import { createStepLogger } from "@/lib/log";
+import { enqueueNotification } from "@/lib/notify";
 import { getBudgetTier, isLowPriority, modelForTier, type BudgetTier } from "./budget";
 import { cleanupStaleJobs, DEPARTMENT_OF, finishJob, startJob } from "./jobs";
 import {
@@ -401,6 +402,7 @@ ${clampText(a.body, 20000)}`,
   await ctx.sql`
     update media_articles set quality = ${ctx.sql.json(q as unknown as Record<string, never>)}, quality_score = ${score}, status = ${status},
       cost_jpy = cost_jpy + ${costJpy}, updated_at = now() where id = ${a.id}`;
+  if (pass) await notifyArticleReady(ctx.sql, a.id, a.title);
   return {
     summary: reject
       ? `記事「${clampText(a.title, 40)}」は公開できない問題があったため、取りやめました（${clampText(q.comment, 80)}）。`
@@ -428,7 +430,19 @@ async function reviseArticle(ctx: StepCtx, a: ArticleRow) {
     update media_articles set title = ${clampText(w.title, 200)}, body = ${clampText(w.body, 40000)}, revisions = revisions + 1,
       quality = quality || ${ctx.sql.json({ revised: true })}, status = 'ready', cost_jpy = cost_jpy + ${costJpy}, updated_at = now()
     where id = ${a.id}`;
+  await notifyArticleReady(ctx.sql, a.id, w.title);
   return { summary: `記事「${clampText(w.title, 40)}」を直して、完成にしました（あなたが note に公開できます）。`, costJpy };
+}
+
+/** 記事ができたら、経営者に通知する（同じ記事で2回は送らない） */
+async function notifyArticleReady(sql: Sql, articleId: string, title: string) {
+  await enqueueNotification(sql, {
+    kind: "article",
+    title: "記事ができました",
+    body: `「${clampText(title, 60)}」を note に公開できます`,
+    url: `/media/articles/${articleId}`,
+    dedupeKey: `article-ready:${articleId}`,
+  });
 }
 
 // ===== フェーズ5：X の投稿案 =====
