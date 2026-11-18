@@ -139,7 +139,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                 <li key={t.id}>
                   <Link href={`/tasks/${t.id}`} className="card press flex items-center gap-3 p-4">
                     {emp ? (
-                      <Avatar color={emp.avatar_color} styleId={emp.avatar_style} size={40} label={emp.name} />
+                      <Avatar color={emp.avatar_color} styleId={emp.avatar_style} size={40} label={emp.name} videos={emp.avatar_videos} still />
                     ) : (
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-faint">
                         <Icon name="users" size={20} />

@@ -129,7 +129,7 @@ export default async function ChatPage({
       <main className="mx-auto w-full max-w-2xl flex-1 space-y-2.5 px-3 pt-4 pb-48">
         {messages.length === 0 && (
           <div className="fade-up flex flex-col items-center px-4 pt-6 pb-2 text-center">
-            <Avatar color={e.avatar_color} styleId={e.avatar_style} size={84} label={e.name} />
+            <Avatar color={e.avatar_color} styleId={e.avatar_style} size={84} label={e.name} videos={e.avatar_videos} status={e.status} />
             <p className="mt-3 text-[18px] font-bold">{e.name}</p>
             <p className="text-[13px] text-muted">{e.role_title}・{e.department_name}</p>
             <p className="mt-4 max-w-sm rounded-[18px] bg-surface px-4 py-3 text-[14px] leading-relaxed text-ink/85 shadow-card ring-1 ring-line/60">
@@ -159,7 +159,7 @@ export default async function ChatPage({
                 </div>
               ) : m.role === "assistant" ? (
                 <div className="flex items-end gap-2">
-                  <Avatar color={e.avatar_color} styleId={e.avatar_style} size={30} label={e.name} />
+                  <Avatar color={e.avatar_color} styleId={e.avatar_style} size={30} label={e.name} videos={e.avatar_videos} still />
                   <div className="flex max-w-[82%] min-w-0 flex-col items-start">
                     <div className="rounded-[20px] rounded-bl-[6px] bg-surface px-3.5 py-2.5 text-[16px] leading-relaxed whitespace-pre-wrap shadow-card ring-1 ring-line/60">
                       {m.content}
@@ -182,7 +182,7 @@ export default async function ChatPage({
       <ChatComposer
         employeeId={e.id}
         conversationId={conv?.id ?? null}
-        employee={{ name: e.name, color: e.avatar_color, style: e.avatar_style }}
+        employee={{ name: e.name, color: e.avatar_color, style: e.avatar_style, videos: e.avatar_videos }}
         suggestions={messages.length === 0 ? (SUGGESTIONS[e.role_key] ?? []) : []}
         disabledReason={
           !aiReady

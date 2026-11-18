@@ -42,7 +42,15 @@ export function EmployeeEditForm({ e, department, roleKey }: { e: E; department:
     <ActionForm action={updateEmployeeAction} className="card space-y-4 p-4">
       <input type="hidden" name="id" value={e.id} />
       <div className="flex items-center gap-4">
-        <Avatar color={color} styleId={style} size={72} label="プレビュー" />
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <Avatar color={color} styleId={style} size={72} label="プレビュー" videos={e.avatar_videos} status="idle" />
+          {Object.keys(e.avatar_videos ?? {}).length > 0 && (
+            <span className="flex items-center gap-1 text-[10px] text-muted" title="動画が読み込めないときに出るイラスト（色と髪型はここで変えられます）">
+              <Avatar color={color} styleId={style} size={22} label="動画が出ないときのイラスト" />
+              動画がないとき
+            </span>
+          )}
+        </div>
         <div className="flex-1 space-y-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted">色</span>

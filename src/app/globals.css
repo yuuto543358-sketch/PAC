@@ -105,7 +105,8 @@ body {
 }
 
 /* 社員アイコンの動画が流れているあいだは、下のイラストを隠す（動画が止まる・読み込めないときは、イラストが見える） */
-.avatar-wrap:has(> video[data-avatar-video="playing"]) > svg {
+.avatar-wrap:has(> video[data-avatar-video="playing"]) > svg,
+.avatar-wrap:has(> img[data-avatar-still="loaded"]) > svg {
   visibility: hidden;
 }
 

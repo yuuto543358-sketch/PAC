@@ -1,5 +1,6 @@
 import { AvatarVideo } from "./AvatarVideo";
-import { parseAvatarVideos, videoForStatus, type EmployeeStatus } from "@/lib/avatar-videos";
+import { AvatarStill } from "./AvatarStill";
+import { parseAvatarVideos, posterFor, videoForStatus, type EmployeeStatus } from "@/lib/avatar-videos";
 
 // 社員のアバター（イラスト）。画像ファイルを使わず、色と髪型の組み合わせで描きます。
 // 社員に状態ごとの動画が設定されていれば、その状態の動画を上に重ねて流します（読み込めなければイラストのまま）。
@@ -23,10 +24,17 @@ type Props = {
   videos?: unknown;
   /** true なら、まわりの枠いっぱいの大きさで表示する（グリッドで大きく見せるとき。size は使わない） */
   fluid?: boolean;
+  /**
+   * true なら、動画のかわりに静止画（動画の1コマ）を出す。小さいアイコンをたくさん並べる場所（チャットの発言の横・一覧など）で使う。
+   * status がなくても、動画が設定されていれば静止画を出す。
+   */
+  still?: boolean;
 };
 
-export function Avatar({ color, styleId, size = 48, status, label, videos, fluid = false }: Props) {
-  const videoSrc = videoForStatus(parseAvatarVideos(videos), status);
+export function Avatar({ color, styleId, size = 48, status, label, videos, fluid = false, still = false }: Props) {
+  const parsed = parseAvatarVideos(videos);
+  const videoSrc = still ? null : videoForStatus(parsed, status ?? "idle");
+  const stillSrc = still ? posterFor(parsed) : null;
   const hair = styleId === "elder" ? "#a3a9b5" : "#2a2733";
   const skin = "#f4d2b5";
   return (
@@ -74,6 +82,7 @@ export function Avatar({ color, styleId, size = 48, status, label, videos, fluid
         )}
       </svg>
       {videoSrc && <AvatarVideo key={videoSrc} src={videoSrc} size={fluid ? undefined : size} />}
+      {stillSrc && <AvatarStill key={stillSrc} src={stillSrc} size={fluid ? undefined : size} />}
       {status && (
         <span
           className={`absolute block rounded-full border-2 border-surface ${fluid ? "right-[6%] bottom-[6%] h-[16%] min-h-3 w-[16%] min-w-3" : "right-0 bottom-0"}`}

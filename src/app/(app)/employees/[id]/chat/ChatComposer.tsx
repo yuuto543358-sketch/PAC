@@ -25,7 +25,7 @@ export function ChatComposer({
 }: {
   employeeId: string;
   conversationId: string | null;
-  employee: { name: string; color: string; style: string };
+  employee: { name: string; color: string; style: string; videos?: unknown };
   suggestions: string[];
   disabledReason: string | null;
   advancedAllowed: boolean;
@@ -70,7 +70,7 @@ export function ChatComposer({
             </div>
           </div>
           <div className="flex items-end gap-2" role="status" aria-label="考えています">
-            <Avatar color={employee.color} styleId={employee.style} size={30} label={employee.name} />
+            <Avatar color={employee.color} styleId={employee.style} size={30} label={employee.name} videos={employee.videos} status="thinking" />
             <div className="flex items-center gap-1 rounded-[20px] rounded-bl-[6px] bg-surface px-4 py-3.5 shadow-card ring-1 ring-line/60">
               <span className="typing-dot h-2 w-2 rounded-full bg-faint" />
               <span className="typing-dot h-2 w-2 rounded-full bg-faint" />

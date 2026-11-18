@@ -90,7 +90,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
     const del = m.meta.deliverableVersion ? deliverables.find((d) => d.version === m.meta.deliverableVersion) : undefined;
     return (
       <div className="flex items-start gap-2">
-        <Avatar color={m.avatar_color ?? "#64748b"} styleId={m.avatar_style ?? "short"} size={34} label={m.employee_name ?? "社員"} />
+        <Avatar color={m.avatar_color ?? "#64748b"} styleId={m.avatar_style ?? "short"} size={34} label={m.employee_name ?? "社員"} videos={m.avatar_videos} still />
         <div className="flex max-w-[84%] min-w-0 flex-col items-start">
           <div className="mb-1 flex flex-wrap items-center gap-1.5 pl-1">
             <span className="text-[12px] font-semibold" style={{ color: m.avatar_color ?? undefined }}>
@@ -154,7 +154,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
               .slice(0, 3)
               .map((m) => (
                 <span key={m.employee_id} className="rounded-full ring-2 ring-[var(--surface)]">
-                  <Avatar color={m.avatar_color} styleId={m.avatar_style} size={28} label={m.name} />
+                  <Avatar color={m.avatar_color} styleId={m.avatar_style} size={28} label={m.name} videos={m.avatar_videos} still />
                 </span>
               ))}
           </div>
@@ -181,7 +181,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
               <div className="flex flex-wrap justify-center gap-1.5 pb-1">
                 {members.map((m) => (
                   <span key={m.employee_id} className="inline-flex items-center gap-1.5 rounded-full bg-surface py-0.5 pr-2.5 pl-0.5 text-[12px] shadow-card ring-1 ring-line/60">
-                    <Avatar color={m.avatar_color} styleId={m.avatar_style} size={22} label={m.name} />
+                    <Avatar color={m.avatar_color} styleId={m.avatar_style} size={22} label={m.name} videos={m.avatar_videos} still />
                     <span className="font-medium">{m.name}</span>
                     <span className="text-muted">{MEMBER_ROLE_LABEL[m.role]}</span>
                   </span>
@@ -234,7 +234,7 @@ export default async function RoomPage({ params }: { params: Promise<{ id: strin
           lastMessageId={lastId}
           phase={wf.phase}
           autopilot={wf.autopilot}
-          speaker={speaker ? { name: speaker.name, color: speaker.avatar_color, style: speaker.avatar_style } : null}
+          speaker={speaker ? { name: speaker.name, color: speaker.avatar_color, style: speaker.avatar_style, videos: speaker.avatar_videos } : null}
           canResume={!wf.autopilot || wf.phase === "stopped"}
           modelLabel={modelName(settings.model_standard)}
         />

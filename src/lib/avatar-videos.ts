@@ -38,3 +38,13 @@ export function videoForStatus(videos: AvatarVideos | null | undefined, status: 
   if (!videos || !status || status === "offline") return null;
   return videos[status] ?? null;
 }
+
+/**
+ * 小さいアイコン（チャットの発言の横・一覧など）に使う静止画（動画の1コマ）。
+ * 待機中の動画と同じフォルダの poster.jpg（なければ null。読み込めなければイラストのまま）。
+ */
+export function posterFor(videos: AvatarVideos | null | undefined): string | null {
+  const idle = videos?.idle;
+  if (!idle) return null;
+  return idle.replace(/\/[^/]+\.(mp4|webm)$/, "/poster.jpg");
+}

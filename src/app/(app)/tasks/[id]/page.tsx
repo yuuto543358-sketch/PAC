@@ -125,7 +125,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                         href={`/employees/${m.employee_id}`}
                         className="tap press inline-flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 text-[13px]"
                       >
-                        <Avatar color={m.avatar_color} styleId={m.avatar_style} size={26} label={m.name} />
+                        <Avatar color={m.avatar_color} styleId={m.avatar_style} size={26} label={m.name} videos={m.avatar_videos} still />
                         <span className="font-medium">{m.name}</span>
                         <span className="text-[11px] text-muted">{MEMBER_ROLE_LABEL[m.role]}</span>
                       </Link>

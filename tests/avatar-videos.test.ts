@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, getDb } from "@/lib/db";
-import { isSafeVideoPath, parseAvatarVideos, videoForStatus } from "@/lib/avatar-videos";
+import { isSafeVideoPath, parseAvatarVideos, posterFor, videoForStatus } from "@/lib/avatar-videos";
 import { activityStatusFor } from "@/lib/employee-status";
 import { finishJob, startJob } from "@/lib/mediaco/jobs";
 import { getEmployee } from "@/lib/repo/employees";
@@ -58,16 +58,28 @@ describe("状態 → 動画の対応（社員ごとのデータ）", () => {
         working: `/avatars/${dir}/working.mp4`,
         thinking: `/avatars/${dir}/thinking.mp4`,
       });
-      // 動画のファイルが実際にある
+      // 動画のファイルと、小さいアイコン用の写真（動画の1コマ）が実際にある
       for (const f of ["idle", "working", "thinking"]) {
         expect(fs.existsSync(path.join(process.cwd(), "public/avatars", dir, `${f}.mp4`))).toBe(true);
       }
+      expect(posterFor(parseAvatarVideos(e.avatar_videos))).toBe(`/avatars/${dir}/poster.jpg`);
+      expect(fs.existsSync(path.join(process.cwd(), "public/avatars", dir, "poster.jpg"))).toBe(true);
     }
     // 同じ動画を2人に使っていない／動画のない社員はいない
     const dirs = new Set(expected.map(([, , d]) => d));
     expect(dirs.size).toBe(expected.length);
     const without = await sql<{ id: string }[]>`select id from employees where is_active and avatar_videos = '{}'::jsonb`;
     expect(without).toEqual([]);
+  });
+});
+
+describe("小さいアイコン用の写真（動画の1コマ）", () => {
+  it("待機中の動画と同じフォルダの poster.jpg を使う。動画がなければ使わない", () => {
+    expect(posterFor({ idle: "/avatars/x/idle.mp4" })).toBe("/avatars/x/poster.jpg");
+    expect(posterFor({ idle: "/v/a.webm" })).toBe("/v/poster.jpg");
+    expect(posterFor({ working: "/avatars/x/working.mp4" })).toBeNull();
+    expect(posterFor({})).toBeNull();
+    expect(posterFor(null)).toBeNull();
   });
 });
 

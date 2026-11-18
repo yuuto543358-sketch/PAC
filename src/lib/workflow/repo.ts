@@ -43,6 +43,7 @@ export type Member = {
   role_key: string;
   avatar_color: string;
   avatar_style: string;
+  avatar_videos: unknown;
 };
 
 export type RoomMessage = {
@@ -54,6 +55,7 @@ export type RoomMessage = {
   role_title: string | null;
   avatar_color: string | null;
   avatar_style: string | null;
+  avatar_videos: unknown;
   kind: string;
   content: string;
   meta: {
@@ -123,7 +125,7 @@ export async function updateWorkflow(db: Db, taskId: string, fields: Partial<Omi
 
 export async function listMembers(db: Db, taskId: string): Promise<Member[]> {
   return db<Member[]>`
-    select m.task_id, m.employee_id, m.role, e.name, e.role_title, e.role_key, e.avatar_color, e.avatar_style
+    select m.task_id, m.employee_id, m.role, e.name, e.role_title, e.role_key, e.avatar_color, e.avatar_style, e.avatar_videos
     from task_members m join employees e on e.id = m.employee_id
     where m.task_id = ${taskId}
     order by case m.role when 'ceo' then 0 when 'lead' then 1 when 'member' then 2 else 3 end, e.sort_order`;
@@ -138,7 +140,7 @@ export async function setMember(db: Db, taskId: string, employeeId: string, role
 export async function listRoomMessages(db: Db, taskId: string, limit = 200): Promise<RoomMessage[]> {
   return db<RoomMessage[]>`
     select * from (
-      select m.*, e.name as employee_name, e.role_title, e.avatar_color, e.avatar_style
+      select m.*, e.name as employee_name, e.role_title, e.avatar_color, e.avatar_style, e.avatar_videos
       from task_messages m left join employees e on e.id = m.employee_id
       where m.task_id = ${taskId} order by m.id desc limit ${limit}
     ) x order by id`;

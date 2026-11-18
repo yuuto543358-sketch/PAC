@@ -146,6 +146,9 @@ check("社員の評価を記録", true);
 // --- チャット ---
 await page.getByRole("link", { name: /チャットする/ }).click();
 await page.waitForURL(/\/chat/);
+// まだ会話がないときの大きいアイコンも、動画（待機中）になっている
+await page.locator('main video[src="/avatars/smile/idle.mp4"][data-avatar-video="playing"]').waitFor({ state: "attached", timeout: 15000 });
+check("チャット画面の大きいアイコンが動画になっている（イラストではない）", true);
 await page.fill("textarea[name=message]", "競合サービスを調べる業務をお願いします。まとめたら取引先にメールで送信してください。");
 await page.click("button[aria-label=送信]");
 await page.getByText("業務を登録しました").waitFor({ timeout: 20000 });
@@ -154,6 +157,9 @@ await page.getByText("承認依頼を提出しました").waitFor();
 check("チャットから承認依頼が提出される", true);
 await page.waitForURL(/\?c=/, { timeout: 5000 }).catch(() => {});
 check("会話URLに会話IDが付く", /\?c=/.test(page.url()));
+// 発言の横の小さいアイコンは、動画の1コマ（写真）になっている
+await page.locator('main img[data-avatar-still="loaded"][src="/avatars/smile/poster.jpg"]').first().waitFor({ state: "attached", timeout: 15000 });
+check("チャットの発言の横のアイコンが、その社員の写真（動画の1コマ）になっている", (await page.locator('main .avatar-wrap:has(> img[data-avatar-still="loaded"]) > svg').first().isHidden()));
 await shot("04-chat");
 
 // 同じ依頼をもう一度 → 重複防止
@@ -175,6 +181,11 @@ for (const kind of ["計画", "調査メモ", "意見", "監査"]) {
   check(`グループチャットに「${kind}」の発言`, (await page.locator("main span", { hasText: new RegExp(`^${kind}$`) }).count()) > 0);
 }
 check("グループチャット画面では下のメニューを隠す", (await page.locator("nav[aria-label=メインメニュー]").count()) === 0);
+await page.locator('main img[data-avatar-still="loaded"]').first().waitFor({ state: "attached", timeout: 15000 });
+{
+  const stills = await page.locator('main img[data-avatar-still="loaded"]').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute("src")))]);
+  check("グループチャットの社員のアイコンが、それぞれの写真（動画の1コマ）になっている", stills.length >= 2 && stills.every((s) => /^\/avatars\/[a-z0-9]+\/poster\.jpg$/.test(s)), stills.join(", "));
+}
 await shot("15-room");
 
 // 経営者の指示 → チームが修正版を作り、もう一度確認待ちになる

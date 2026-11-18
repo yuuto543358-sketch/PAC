@@ -36,7 +36,7 @@ export function RoomClient({
   lastMessageId: number;
   phase: string;
   autopilot: boolean;
-  speaker: { name: string; color: string; style: string } | null;
+  speaker: { name: string; color: string; style: string; videos?: unknown } | null;
   canResume: boolean;
   modelLabel: string;
 }) {
@@ -112,7 +112,7 @@ export function RoomClient({
     <div className="pb-safe fixed inset-x-0 bottom-0 z-20">
       {active && working && speaker && (
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 pb-3" role="status" aria-label={`${speaker.name}が作業中`}>
-          <Avatar color={speaker.color} styleId={speaker.style} size={30} label={speaker.name} />
+          <Avatar color={speaker.color} styleId={speaker.style} size={30} label={speaker.name} videos={speaker.videos} status="thinking" />
           <div className="flex items-center gap-2 rounded-[20px] rounded-tl-[6px] bg-surface px-4 py-3 shadow-card ring-1 ring-line/60">
             <span className="flex items-center gap-1">
               <span className="typing-dot h-2 w-2 rounded-full bg-faint" />
