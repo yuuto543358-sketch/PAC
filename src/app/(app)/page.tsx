@@ -6,7 +6,7 @@ import { listEmployees } from "@/lib/repo/employees";
 import { greeting, longDate, relativeTime, yen } from "@/lib/format";
 import { dashboardNumbers, getActiveBrand, JOB_KIND_LABEL, listJobs } from "@/lib/mediaco/repo";
 import { getBudgetTier, TIER_LABEL } from "@/lib/mediaco/budget";
-import { Avatar } from "@/components/Avatar";
+import { EmployeeGrid } from "@/components/EmployeeGrid";
 import { Icon } from "@/components/Icon";
 import { Alert, ChevronRight, Meter, Page, Section } from "@/components/ui";
 import { RunNowButton } from "./media/MediaForms";
@@ -146,28 +146,22 @@ export default async function HomePage() {
 
         {/* ===== 部署の稼働状況 ===== */}
         <Section title="部署の稼働状況" action={<Link href="/employees" className="font-medium text-brand">社員</Link>}>
-          <ul className="card divide-y divide-separator overflow-hidden">
-            {employees.map((e) => {
+          <EmployeeGrid
+            label="部署の稼働状況"
+            fit="screen"
+            employees={employees.map((e) => {
               const running = runningByEmployee.get(e.id);
               const last = lastByEmployee.get(e.id);
-              return (
-                <li key={e.id}>
-                  <Link href={`/employees/${e.id}`} className="press flex min-h-11 items-center gap-3 px-3.5 py-2.5">
-                    <Avatar color={e.avatar_color} styleId={e.avatar_style} size={34} status={e.status} label={e.name} videos={e.avatar_videos} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-semibold">
-                        {e.department_name}
-                        <span className="ml-1.5 text-[12px] font-normal text-muted">{e.name}</span>
-                      </span>
-                      <span className="block truncate text-[12px] text-muted">
-                        {running ? `${e.status === "thinking" ? "考え中" : "作業中"}：${JOB_KIND_LABEL[running.kind] ?? running.kind}` : last ? `最後：${JOB_KIND_LABEL[last.kind] ?? last.kind}（${relativeTime(last.started_at)}）` : "待機中"}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              );
+              return {
+                ...e,
+                detail: running
+                  ? JOB_KIND_LABEL[running.kind] ?? running.kind
+                  : last
+                    ? `最後：${JOB_KIND_LABEL[last.kind] ?? last.kind}（${relativeTime(last.started_at)}）`
+                    : undefined,
+              };
             })}
-          </ul>
+          />
         </Section>
 
         {/* ===== 直近の活動 ===== */}

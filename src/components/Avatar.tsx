@@ -21,15 +21,27 @@ type Props = {
   label?: string;
   /** 状態ごとの動画（社員ごとの設定）。その状態の動画があれば、静止画の上に重ねてループ再生する */
   videos?: unknown;
+  /** true なら、まわりの枠いっぱいの大きさで表示する（グリッドで大きく見せるとき。size は使わない） */
+  fluid?: boolean;
 };
 
-export function Avatar({ color, styleId, size = 48, status, label, videos }: Props) {
+export function Avatar({ color, styleId, size = 48, status, label, videos, fluid = false }: Props) {
   const videoSrc = videoForStatus(parseAvatarVideos(videos), status);
   const hair = styleId === "elder" ? "#a3a9b5" : "#2a2733";
   const skin = "#f4d2b5";
   return (
-    <span className="avatar-wrap relative inline-block shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 64 64" width={size} height={size} role="img" aria-label={label ?? "アバター"}>
+    <span
+      className={`avatar-wrap relative shrink-0 ${fluid ? "block aspect-square w-full" : "inline-block"}`}
+      style={fluid ? undefined : { width: size, height: size }}
+    >
+      <svg
+        viewBox="0 0 64 64"
+        width={fluid ? "100%" : size}
+        height={fluid ? "100%" : size}
+        className={fluid ? "block" : undefined}
+        role="img"
+        aria-label={label ?? "アバター"}
+      >
         <circle cx="32" cy="32" r="32" fill={color} opacity="0.18" />
         {/* 後ろ髪 */}
         {styleId === "bob" && <path d="M15 30c0-12 7-19 17-19s17 7 17 19v12H15z" fill={hair} />}
@@ -61,13 +73,12 @@ export function Avatar({ color, styleId, size = 48, status, label, videos }: Pro
           </g>
         )}
       </svg>
-      {videoSrc && <AvatarVideo key={videoSrc} src={videoSrc} size={size} />}
+      {videoSrc && <AvatarVideo key={videoSrc} src={videoSrc} size={fluid ? undefined : size} />}
       {status && (
         <span
-          className="absolute right-0 bottom-0 block rounded-full border-2 border-surface"
+          className={`absolute block rounded-full border-2 border-surface ${fluid ? "right-[6%] bottom-[6%] h-[16%] min-h-3 w-[16%] min-w-3" : "right-0 bottom-0"}`}
           style={{
-            width: Math.max(10, size / 5),
-            height: Math.max(10, size / 5),
+            ...(fluid ? {} : { width: Math.max(10, size / 5), height: Math.max(10, size / 5) }),
             background: status === "working" ? "#22c55e" : status === "thinking" ? "#f59e0b" : status === "idle" ? "#94a3b8" : "#475569",
           }}
           aria-hidden

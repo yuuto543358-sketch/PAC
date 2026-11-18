@@ -308,3 +308,9 @@ summary::-webkit-details-marker {
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* 社員のグリッド：アイコンの大きさは、列の幅と「空いている高さから計算した大きさ」（EmployeeGrid が --emp-av-px に入れる）の小さいほう */
+.emp-grid .emp-av {
+  display: block;
+  width: min(100%, var(--emp-av-px, 96px));
+}

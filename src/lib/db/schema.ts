@@ -1508,4 +1508,23 @@ update employees set avatar_videos =
   where id = 'president' and avatar_videos = '{}'::jsonb;
 `,
   },
+  {
+    version: 23,
+    name: "remaining_avatar_videos",
+    sql: /* sql */ `
+-- 残りの4人に、3つの状態の動画を割り当てる（まだ何も設定していないときだけ。春野・堅田・天城は変えない）
+update employees set avatar_videos =
+  '{"idle":"/avatars/employee4/idle.mp4","working":"/avatars/employee4/working.mp4","thinking":"/avatars/employee4/thinking.mp4"}'
+  where id = 'secretary' and avatar_videos = '{}'::jsonb; -- 白石 結衣
+update employees set avatar_videos =
+  '{"idle":"/avatars/employee5/idle.mp4","working":"/avatars/employee5/working.mp4","thinking":"/avatars/employee5/thinking.mp4"}'
+  where id = 'life' and avatar_videos = '{}'::jsonb; -- 森野 結
+update employees set avatar_videos =
+  '{"idle":"/avatars/employee6/idle.mp4","working":"/avatars/employee6/working.mp4","thinking":"/avatars/employee6/thinking.mp4"}'
+  where id = 'research' and avatar_videos = '{}'::jsonb; -- 宮下 理
+update employees set avatar_videos =
+  '{"idle":"/avatars/employee7/idle.mp4","working":"/avatars/employee7/working.mp4","thinking":"/avatars/employee7/thinking.mp4"}'
+  where id = 'bizdev' and avatar_videos = '{}'::jsonb; -- 朝日 ひかり
+`,
+  },
 ];

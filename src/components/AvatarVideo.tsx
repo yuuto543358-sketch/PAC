@@ -12,7 +12,7 @@ function prefersReducedMotion() {
   return typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 }
 
-export function AvatarVideo({ src, size }: { src: string; size: number }) {
+export function AvatarVideo({ src, size }: { src: string; size?: number }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [visible, setVisible] = useState(false);
   const [ready, setReady] = useState(false);
@@ -57,7 +57,7 @@ export function AvatarVideo({ src, size }: { src: string; size: number }) {
       onPlaying={() => setReady(true)}
       onError={() => setFailed(true)}
       className="pointer-events-none absolute inset-0 rounded-full object-cover transition-opacity duration-300"
-      style={{ width: size, height: size, opacity: ready ? 1 : 0 }}
+      style={{ width: size ?? "100%", height: size ?? "100%", opacity: ready ? 1 : 0 }}
     />
   );
 }

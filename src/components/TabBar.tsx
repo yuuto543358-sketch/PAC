@@ -29,6 +29,7 @@ export function TabBar({ pendingApprovals }: { pendingApprovals: number }) {
   };
   return (
     <nav
+      data-tabbar
       className="pb-safe fixed inset-x-0 bottom-0 z-30 bg-[var(--tabbar)] shadow-[0_-0.5px_0_var(--separator)] backdrop-blur-xl backdrop-saturate-150"
       aria-label="メインメニュー"
     >

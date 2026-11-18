@@ -75,6 +75,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
       "少額・低リスクで始められるか、需要が実在しそうか、検証方法がはっきりしているか、を重視する。",
     avatar_color: "#ea580c",
     avatar_style: "ponytail",
+    // 状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/employee7/idle.mp4",
+      working: "/avatars/employee7/working.mp4",
+      thinking: "/avatars/employee7/thinking.mp4",
+    },
     sort_order: 2,
   },
   {
@@ -92,6 +98,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
     judgment_criteria: "信頼できる出典があるか、情報が新しいか、複数の情報源で確認できるか。",
     avatar_color: "#0f766e",
     avatar_style: "glasses",
+    // 状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/employee6/idle.mp4",
+      working: "/avatars/employee6/working.mp4",
+      thinking: "/avatars/employee6/thinking.mp4",
+    },
     sort_order: 3,
   },
   {
@@ -132,6 +144,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
     judgment_criteria: "経営者にとって分かりやすく、すぐ行動できる形になっているか。",
     avatar_color: "#db2777",
     avatar_style: "bob",
+    // 状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/employee4/idle.mp4",
+      working: "/avatars/employee4/working.mp4",
+      thinking: "/avatars/employee4/thinking.mp4",
+    },
     sort_order: 5,
   },
   {
@@ -174,6 +192,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
       "本人が実際に答えた情報を土台にする。足りない情報は推測で埋めず、必要なら質問する。推測を使うときは、推測だとはっきり書く。",
     avatar_color: "#0f766e",
     avatar_style: "bob",
+    // 状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/employee5/idle.mp4",
+      working: "/avatars/employee5/working.mp4",
+      thinking: "/avatars/employee5/thinking.mp4",
+    },
     sort_order: 7,
   },
 ];
