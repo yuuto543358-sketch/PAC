@@ -11,10 +11,11 @@ import { audit } from "@/lib/repo/audit";
 import { getSettings, type CompanySettings } from "@/lib/repo/settings";
 import { checkPostLength } from "@/lib/sns/post";
 import { SNS_STYLE_RULES } from "@/lib/sns/style";
+import { ARTICLE_STYLE_RULES, POST_STYLE_RULES } from "./style";
 import { createStepLogger } from "@/lib/log";
 import { enqueueNotification } from "@/lib/notify";
 import { getBudgetTier, isLowPriority, modelForTier, type BudgetTier } from "./budget";
-import { cleanupStaleJobs, DEPARTMENT_OF, finishJob, startJob } from "./jobs";
+import { cleanupStaleJobs, DEPARTMENT_OF, finishJob, STALE_JOB_MESSAGE, startJob } from "./jobs";
 import {
   BrandSchema,
   DeepSchema,
@@ -251,7 +252,7 @@ async function designBrand(ctx: StepCtx, runId: string) {
 
 // ===== フェーズ3：記事づくり =====
 
-type ArticleRow = {
+export type ArticleRow = {
   id: string;
   brand_id: string;
   theme: string;
@@ -341,7 +342,7 @@ async function researchArticle(ctx: StepCtx, a: ArticleRow) {
   return { summary: `記事「${clampText(a.theme, 40)}」の情報源を調べました（${srcs.length}件）。`, costJpy };
 }
 
-function writeTask(a: ArticleRow, extra = "") {
+export function writeTask(a: ArticleRow, extra = "") {
   return `次の記事を、note にそのまま貼れる完成品として書いてください。
 - テーマ: ${a.theme}
 - 想定読者: ${a.target}
@@ -350,7 +351,9 @@ function writeTask(a: ArticleRow, extra = "") {
 - 読者の問題を解決することを最優先にする。一般論を並べない。独自の分析・具体的な手順・実践例・比較・読者のメリットを入れる。
 - 下の「調べた情報」にない数字や事実を作らない。体験談は書かない（書くなら「例」「想定」と明記する）。
 - 「## 参考にした情報」に、使った情報源（題名とURL）を載せる。
-- 読者に読みやすい日本語で。誇大な表現（必ず稼げる、など）をしない。
+- 誇大な表現（必ず稼げる、など）をしない。
+
+${ARTICLE_STYLE_RULES}
 
 【調べた情報】
 ${a.research_notes || "（なし）"}${extra}`;
@@ -382,6 +385,7 @@ async function checkArticle(ctx: StepCtx, a: ArticleRow) {
 - 著作権・転載：他の記事の言い換えや丸写しになっていないか。
 - 誇大な表現・note と X の規約に触れそうな表現がないか。
 - 読者の問題を本当に解決できるか（一般論だけになっていないか）。
+- 文章がAIっぽくないか（決まり文句・同じ語尾のくり返し・中身のない前置きやまとめ・箇条書きの多用）。初心者に分からない言葉が、説明なしで使われていないか。あれば issues に「どこを・どう直すか」を書く。
 - 大きな問題がなければ pass。直せば良くなるなら revise（直す点は大事なものだけ）。公開してはいけない問題（著作権・誤情報など）は reject。
 
 【調べた情報】
@@ -462,6 +466,7 @@ async function createPosts(ctx: StepCtx, brandId: string) {
 - これまでの投稿と同じ文章・同じ内容にしない。
 - リンク（URL）は書かない。記事を紹介するときは article_title に記事のタイトルを書けば、アプリがURLを足す。
 ${SNS_STYLE_RULES}
+${POST_STYLE_RULES}
 
 【公開済みの記事（紹介できるもの）】
 ${published.length ? published.map((p) => `- ${p.title}`).join("\n") : "（まだありません。記事の紹介はしない）"}
@@ -770,6 +775,33 @@ export async function decideNext(sql: Sql, settings: CompanySettings, tier: Budg
   return null;
 }
 
+// ===== 失敗したときの扱い =====
+
+/** 時間のかかる仕事（1回で1〜2分かかることがある） */
+const HEAVY_KINDS = new Set(["article.write", "article.revise", "article.research", "research.screen", "research.deep", "brand.design", "article.plan"]);
+const HEAVY_STEP_MS = 100_000;
+const LIGHT_STEP_MS = 30_000;
+
+/**
+ * 記事の仕事が失敗したときに数える。3回失敗したら：
+ * - 修正待ち（checked）なら、修正はあきらめて「完成（公開待ち）」にする。直しきれなかった指摘は記事の画面に出す（止まったままにしない）
+ * - それ以外は「失敗」にする
+ */
+export async function recordArticleFailure(sql: Sql, articleId: string, message: string) {
+  const [row] = await sql<{ status: string; title: string }[]>`
+    update media_articles set failures = failures + 1, last_error = ${message.slice(0, 500)},
+      quality = case when failures + 1 >= ${MAX_ARTICLE_FAILURES} and status = 'checked'
+        then quality || ${sql.json({ unrevised: true })} else quality end,
+      status = case
+        when failures + 1 >= ${MAX_ARTICLE_FAILURES} and status = 'checked' then 'ready'
+        when failures + 1 >= ${MAX_ARTICLE_FAILURES} and status in ('planned','researched','drafted') then 'failed'
+        else status end,
+      updated_at = now()
+    where id = ${articleId}
+    returning status, title`;
+  if (row?.status === "ready") await notifyArticleReady(sql, articleId, row.title);
+}
+
 // ===== まとめて進める =====
 
 export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: number; deadlineMs?: number; trigger?: string } = {}): Promise<EngineResult> {
@@ -786,7 +818,8 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
   const maxSteps = opts.maxSteps ?? 6;
   const deadline = Date.now() + (opts.deadlineMs ?? 150_000);
   try {
-    await cleanupStaleJobs(sql);
+    // 途中で止まった仕事（サーバーの時間切れなど）は失敗として数え、次は別の回としてやり直す（同じ所で止まり続けないように）
+    for (const articleId of await cleanupStaleJobs(sql)) await recordArticleFailure(sql, articleId, STALE_JOB_MESSAGE);
     for (let i = 0; i < maxSteps && Date.now() < deadline; i++) {
       const now = opts.now ?? new Date();
       const s = await getSettings(sql);
@@ -797,6 +830,8 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
       }
       const action = await decideNext(sql, s, tier, now);
       if (!action) break;
+      // 残り時間が足りないときは、時間のかかる仕事を始めない（途中で切れないように。次の実行で行う）
+      if (deadline - Date.now() < (HEAVY_KINDS.has(action.kind) ? HEAVY_STEP_MS : LIGHT_STEP_MS)) break;
       const job = await startJob(sql, { kind: action.kind, dept: action.dept, dedupeKey: action.dedupeKey, refType: action.refType, refId: action.refId });
       if (!job) break; // 同じ仕事がすでに記録されている（ほかの場所で動いた）
       await sql`update company_settings set media_lease_until = now() + interval '5 minutes' where id = 1 and media_lease_owner = ${owner}`;
@@ -809,12 +844,7 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
         const message = err instanceof Error ? err.message : String(err);
         await finishJob(sql, job, { status: "failed", error: message });
         steps.push({ kind: action.kind, status: "failed", summary: message });
-        if (action.refType === "article") {
-          await sql`
-            update media_articles set failures = failures + 1, last_error = ${message.slice(0, 500)},
-              status = case when failures + 1 >= ${MAX_ARTICLE_FAILURES} then 'failed' else status end, updated_at = now()
-            where id = ${action.refId}`;
-        }
+        if (action.refType === "article") await recordArticleFailure(sql, action.refId, message);
         if (err instanceof BudgetBlockedError) {
           stoppedReason = message;
           break;

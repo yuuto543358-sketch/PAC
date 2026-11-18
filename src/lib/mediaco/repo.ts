@@ -65,7 +65,7 @@ export type Article = {
   body: string;
   research_notes: string;
   sources: { url: string; title: string }[];
-  quality: Partial<QualityOutput> & { revised?: boolean };
+  quality: Partial<QualityOutput> & { revised?: boolean; unrevised?: boolean };
   quality_score: number | null;
   status: string;
   revisions: number;

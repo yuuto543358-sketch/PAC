@@ -31,7 +31,8 @@ export async function GET(request: Request) {
       // 自主的な仕事に失敗しても、チームの作業は続ける
       log.fail("scheduled jobs", err);
     }
-    const r = await runWorkflows(sql, { maxSteps: 30, deadlineMs: Math.max(30_000, 240_000 - (Date.now() - started)) });
+    // 1回の実行は5分（300秒）で打ち切られるため、AIの1回の呼び出し（最大90秒）がはみ出しても間に合うように残す
+    const r = await runWorkflows(sql, { maxSteps: 30, deadlineMs: Math.max(20_000, 190_000 - (Date.now() - started)) });
     let push = null;
     try {
       push = await dispatchNotifications(sql);

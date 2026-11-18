@@ -99,7 +99,7 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
   if (settings.media_enabled) {
     // AI Media Company：市場調査・記事づくり・Xの投稿案・分析などを、次にやるべき順に進める（1回の実行で最大4つ）
     try {
-      result.media = await runMediaEngine(sql, { now, maxSteps: 4, deadlineMs: 120_000, trigger: "scheduled" });
+      result.media = await runMediaEngine(sql, { now, maxSteps: 4, deadlineMs: 150_000, trigger: "scheduled" });
       if (result.media.steps.length) result.ran.push("media");
     } catch (err) {
       log.fail("media engine", err);

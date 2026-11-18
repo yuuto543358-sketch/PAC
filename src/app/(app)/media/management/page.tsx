@@ -7,6 +7,9 @@ import { dateTime, yen } from "@/lib/format";
 import { Alert, Meter, Page, PageHeader, Section } from "@/components/ui";
 import { MediaSettingsForm, RunNowButton } from "../MediaForms";
 
+// 「今すぐAI社員を動かす」のあと、裏で仕事を進める時間（最大5分）
+export const maxDuration = 300;
+
 export default async function ManagementPage() {
   const sql = await getDb();
   const [settings, budget, n, tier, jobs, reports, byPurpose] = await Promise.all([

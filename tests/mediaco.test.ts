@@ -2,7 +2,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb, getDb } from "@/lib/db";
 import { mockHooks } from "@/lib/ai/client";
-import { decideNext, runMediaEngine, QUALITY_PASS } from "@/lib/mediaco/engine";
+import { decideNext, runMediaEngine, QUALITY_PASS, writeTask, type ArticleRow } from "@/lib/mediaco/engine";
+import { ARTICLE_STYLE_RULES } from "@/lib/mediaco/style";
 import { modelForTier, tierFor, CHEAP_MODEL } from "@/lib/mediaco/budget";
 import { startJob, finishJob } from "@/lib/mediaco/jobs";
 import { normalizeScores } from "@/lib/mediaco/schemas";
@@ -147,6 +148,64 @@ describe("フェーズ1〜5：市場調査 → ジャンル選定 → ブラン�
     await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 4 });
     const [a2] = await sql<{ status: string }[]>`select status from media_articles where id = ${row.id}`;
     expect(a2.status).toBe("ready");
+  });
+});
+
+describe("修正待ちで止まらない", () => {
+  it("修正の途中でサーバーが止まっても（時間切れなど）、次の実行でやり直して完成させる", async () => {
+    const sql = await getDb();
+    const brand = (await getActiveBrand(sql))!;
+    const [row] = await sql<{ id: string }[]>`
+      insert into media_articles (brand_id, theme, status, title, body, research_notes, quality)
+      values (${brand.id}, '途中で止まったテスト', 'checked', '途中で止まったテスト', '# 途中で止まったテスト', '調べた情報',
+        ${sql.json({ score: 60, verdict: "revise", issues: ["具体例を足す"] })})
+      returning id`;
+    // 前の実行が「修正」の途中で切れて、記録が「実行中」のまま残っている
+    await sql`insert into media_jobs (kind, dedupe_key, department, employee_id, status, ref_type, ref_id, started_at)
+      values ('article.revise', ${`article.revise:${row.id}:0:0`}, '編集制作部', 'creative', 'running', 'article', ${row.id}, now() - interval '20 minutes')`;
+    const r = await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 2 });
+    expect(r.steps[0]).toMatchObject({ kind: "article.revise", status: "done" });
+    const [a] = await sql<{ status: string; failures: number }[]>`select status, failures from media_articles where id = ${row.id}`;
+    expect(a).toEqual({ status: "ready", failures: 1 });
+    const [stale] = await sql<{ status: string; error: string }[]>`select status, error from media_jobs where dedupe_key = ${`article.revise:${row.id}:0:0`}`;
+    expect(stale.status).toBe("failed");
+    expect(stale.error).toMatch(/途中で止まりました/);
+  });
+
+  it("修正が3回続けて失敗したら、修正はあきらめて「公開待ち」にし、直せなかった指摘を残して通知する", async () => {
+    const sql = await getDb();
+    const brand = (await getActiveBrand(sql))!;
+    const [row] = await sql<{ id: string }[]>`
+      insert into media_articles (brand_id, theme, status, title, body, research_notes, quality)
+      values (${brand.id}, '直せないテスト', 'checked', '直せないテスト', '# 直せないテスト', '調べた情報',
+        ${sql.json({ score: 60, verdict: "revise", issues: ["具体例を足す"] })})
+      returning id`;
+    for (let i = 0; i < 3; i++) {
+      mockHooks.failNext = 1;
+      await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 1 });
+    }
+    const [a] = await sql<{ status: string; quality: { unrevised?: boolean; issues?: string[] } }[]>`select status, quality from media_articles where id = ${row.id}`;
+    expect(a.status).toBe("ready");
+    expect(a.quality.unrevised).toBe(true);
+    expect(a.quality.issues).toEqual(["具体例を足す"]);
+    expect(await sql`select 1 from notifications where dedupe_key = ${`article-ready:${row.id}`}`).toHaveLength(1);
+  });
+
+  it("残り時間が足りないときは、時間のかかる仕事を始めない（途中で切れないように）", async () => {
+    const sql = await getDb();
+    const brand = (await getActiveBrand(sql))!;
+    const [row] = await sql<{ id: string }[]>`insert into media_articles (brand_id, theme, status) values (${brand.id}, '時間のテスト', 'planned') returning id`;
+    const r = await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 3, deadlineMs: 50_000 });
+    expect(r.steps).toEqual([]);
+    expect(await sql`select 1 from media_jobs where ref_id = ${row.id}`).toHaveLength(0);
+    await sql`update media_articles set status = 'rejected' where id = ${row.id}`;
+  });
+
+  it("記事を書く指示に、AIっぽさのない自然な文章・初心者に分かる言葉のルールが入っている", () => {
+    expect(ARTICLE_STYLE_RULES).toContain("AIの文章によくある書き方をしない");
+    expect(ARTICLE_STYLE_RULES).toContain("初心者");
+    const task = writeTask({ theme: "t", target: "x", reader_pain: "y", kind: "free", price_jpy: 0, research_notes: "" } as ArticleRow);
+    expect(task).toContain(ARTICLE_STYLE_RULES);
   });
 });
 

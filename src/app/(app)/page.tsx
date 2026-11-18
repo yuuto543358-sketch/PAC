@@ -15,6 +15,9 @@ import { RunNowButton } from "./media/MediaForms";
 
 const GOALS = [10_000, 30_000, 50_000];
 
+// 「今すぐAI社員を動かす」のあと、裏で仕事を進める時間（最大5分）
+export const maxDuration = 300;
+
 export default async function HomePage() {
   const sql = await getDb();
   const [settings, n, budget, brand, pending, employees, jobs] = await Promise.all([

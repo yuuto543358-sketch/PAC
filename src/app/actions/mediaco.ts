@@ -26,7 +26,7 @@ export async function runMediaNowAction(): Promise<ActionState> {
     after(async () => {
       try {
         const sql = await getDb();
-        await runMediaEngine(sql, { maxSteps: 6, deadlineMs: 240_000, trigger: "manual" });
+        await runMediaEngine(sql, { maxSteps: 6, deadlineMs: 190_000, trigger: "manual" });
         // 記事ができた・承認のお願いなどの通知を送る
         await dispatchNotifications(sql);
       } catch (err) {

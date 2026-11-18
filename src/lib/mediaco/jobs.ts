@@ -47,9 +47,15 @@ export async function finishJob(
   }
 }
 
-/** 途中で止まったまま（10分以上）の記録を「失敗」にする（次の実行に影響させない） */
-export async function cleanupStaleJobs(db: Db) {
-  await db`
-    update media_jobs set status = 'failed', error = '時間内に終わりませんでした（次の実行で続きから進めます）', finished_at = now()
-    where status = 'running' and started_at < now() - interval '10 minutes'`;
+/** 途中で止まったまま（6分以上）の記録を「失敗」にする（次の実行に影響させない）。止まっていた記事のIDを返す */
+export const STALE_JOB_MESSAGE = "途中で止まりました（サーバーの時間切れなど）。次の実行でやり直します";
+export async function cleanupStaleJobs(db: Db): Promise<string[]> {
+  const rows = await db<{ ref_type: string; ref_id: string; employee_id: string | null }[]>`
+    update media_jobs set status = 'failed', error = ${STALE_JOB_MESSAGE}, finished_at = now()
+    where status = 'running' and started_at < now() - interval '6 minutes'
+    returning ref_type, ref_id, employee_id`;
+  for (const r of rows) {
+    if (r.employee_id) await db`update employees set status = 'idle' where id = ${r.employee_id}`;
+  }
+  return rows.filter((r) => r.ref_type === "article").map((r) => r.ref_id);
 }

@@ -33,6 +33,11 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           <h2 className="mt-2 text-[20px] leading-snug font-bold">{a.title || a.theme}</h2>
           {a.status === "failed" && <div className="mt-3"><Alert tone="error">作れませんでした：{a.last_error}</Alert></div>}
           {a.status === "rejected" && <div className="mt-3"><Alert tone="warn">品質検査で公開できない問題が見つかったため、取りやめました：{q.comment}</Alert></div>}
+          {q.unrevised && (
+            <div className="mt-3">
+              <Alert tone="warn">品質検査の指摘を、AIが自動で直しきれませんでした（{a.last_error}）。下の「品質検査」の指摘を読んで、note に公開する前に直すか、公開してよいかを確かめてください。</Alert>
+            </div>
+          )}
           {a.body && (
             <div className="mt-4 space-y-2.5">
               <OutputButtons content={a.body} filename={`${(a.title || "article").slice(0, 40)}.md`} mime="text/markdown" />
@@ -71,7 +76,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
             <div className="card space-y-2 p-4 text-[14px]">
               <p>
                 <b className="tabular text-[18px]">{a.quality_score}点</b>
-                <span className="ml-2 text-muted">{q.revised ? "（指摘を1回直して完成）" : ""}</span>
+                <span className="ml-2 text-muted">{q.revised ? "（指摘を1回直して完成）" : q.unrevised ? "（指摘は直せていません）" : ""}</span>
               </p>
               {q.comment && <p>{q.comment}</p>}
               {[...(q.issues ?? []), ...(q.fact_issues ?? []), ...(q.hype ?? [])].length > 0 && (

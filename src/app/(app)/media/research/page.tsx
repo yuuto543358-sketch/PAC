@@ -9,6 +9,9 @@ import { RunNowButton } from "../MediaForms";
 const RUN_KIND: Record<string, string> = { initial: "はじめの市場調査", weekly: "毎週の更新", rerun: "ジャンルの見直し" };
 const RUN_STATUS: Record<string, string> = { screening: "調査中", deep: "深掘り中", selected: "ジャンル決定", done: "完了", failed: "失敗" };
 
+// 「今すぐAI社員を動かす」のあと、裏で仕事を進める時間（最大5分）
+export const maxDuration = 300;
+
 export default async function ResearchPage() {
   const sql = await getDb();
   const runs = await listResearchRuns(sql, 10);
