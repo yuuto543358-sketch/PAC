@@ -70,6 +70,8 @@ await shot("02-employees");
   await p2.click("button[type=submit]");
   await p2.waitForURL(`${BASE}/`);
   await p2.goto(`${BASE}/employees`);
+  // 見える所までスクロールして、動画を読み込ませる（ここでは読み込みに失敗させている）
+  await p2.locator("video[data-avatar-video]").first().scrollIntoViewIfNeeded();
   await p2.waitForTimeout(2500);
   check("動画が読み込めないときは、動画を出さずに静止画のアイコンを出す",
     (await p2.locator("video[data-avatar-video]").count()) === 0 && (await p2.locator('svg[aria-label="春野 創太"]').count()) > 0);
