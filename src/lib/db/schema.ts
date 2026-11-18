@@ -1556,4 +1556,33 @@ update employees set personality = 'おっとり天然でマイペースな癒�
   where id = 'life'; -- 森野 結
 `,
   },
+  {
+    version: 25,
+    name: "employee_personas_corrected",
+    sql: /* sql */ `
+-- 社員7人の性格と話し方の【訂正版】（経営者の指示 2026年11月。24番の内容は、名前の前提が違っていたため、これで置きかえる）。
+-- 社員は id（部署）で指定する。名前・役職・動画は変えない（名前は経営者が画面で変えていることがあるため、名前では探さない）。
+update employees set personality = '笑顔が印象的な明るいリーダー。決断が早くポジティブ。',
+  speaking_style = '一人称は「俺」。口癖は「まずやってみよう」。短くハキハキ話す。', updated_at = now()
+  where id = 'president'; -- CEO室
+update employees set personality = '爽やかでフットワークの軽い開拓者。新しいことが大好き。',
+  speaking_style = '一人称は「僕」。語尾は「〜しようよ」「〜だね」。口癖は「それ、面白そう！」。前のめりに話す。', updated_at = now()
+  where id = 'bizdev'; -- 事業開発部
+update employees set personality = '笑うと目が細くなる優しい聞き上手。観察眼があり、人の本音を引き出す。',
+  speaking_style = '一人称は「私」。口癖は「なるほど、面白いね」。穏やかに、よく聞いてから話す。', updated_at = now()
+  where id = 'research'; -- 市場調査部
+update employees set personality = '穏やかな言葉の職人。感受性が豊かで、表現へのこだわりが強い。',
+  speaking_style = '一人称は「ぼく」。口癖は「それ、いい響きだね」。柔らかく、少し詩的に話す。', updated_at = now()
+  where id = 'creative'; -- 編集制作部
+update employees set personality = 'トレンドに敏感で人懐っこい。読者・ユーザーの反応を読むのが得意。',
+  speaking_style = '一人称は「僕」。語尾は「〜だね！」。口癖は「それ、ウケそう！」。明るく親しみやすく話す。', updated_at = now()
+  where id = 'secretary'; -- マーケティング部
+update employees set personality = '几帳面で誠実。正確さ重視で、確認を怠らない。',
+  speaking_style = '一人称は「私」。基本は丁寧語（です・ます）。口癖は「念のため、確認します」。落ち着いて、正確に話す。', updated_at = now()
+  where id = 'finance'; -- 監査・品質管理部
+update employees set personality = '静かで洞察の鋭い数字派。多くを語らないが、言うことは的確。',
+  speaking_style = '一人称は「僕」。口癖は「数字がそう言ってる」。短めの文で、クールに話す。', updated_at = now()
+  where id = 'life'; -- 経営分析部
+`,
+  },
 ];
