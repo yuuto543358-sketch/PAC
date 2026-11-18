@@ -171,12 +171,6 @@ export function modelName(id: string): string {
 export const DEFAULT_MODEL_STANDARD = "gpt-5-mini";
 export const DEFAULT_MODEL_ADVANCED = "gpt-5";
 
-export const AUTORUN_OPTIONS = [
-  { id: "off", label: "停止（初期設定）" },
-  { id: "weekly", label: "週1回" },
-  { id: "daily", label: "1日1回" },
-] as const;
-
 // ===== Phase 2: チームでの自動進行 =====
 
 export const WORKFLOW_PHASES = [
@@ -268,41 +262,16 @@ export const ROOM_MESSAGE_KIND_LABEL: Record<string, string> = {
   system: "お知らせ",
 };
 
-// ===== Phase 3: 自主的な仕事・事業候補・自動報告 =====
-
-export const BUSINESS_STATUSES = ["idea", "validating", "promising", "adopted", "rejected", "on_hold"] as const;
-export type BusinessStatus = (typeof BUSINESS_STATUSES)[number];
-export const BUSINESS_STATUS_LABEL: Record<BusinessStatus, string> = {
-  idea: "アイデア",
-  validating: "調査中",
-  promising: "有望",
-  adopted: "採用",
-  rejected: "見送り",
-  on_hold: "保留",
-};
-/** 経営者が選べる状態（「調査中」はチームで調べ始めたときに自動で付く） */
-export const OWNER_BUSINESS_STATUSES: BusinessStatus[] = ["idea", "promising", "adopted", "on_hold", "rejected"];
+// ===== 報告書 =====
 
 export const REPORT_TYPE_LABEL: Record<string, string> = {
   daily: "日報",
   weekly: "週報",
   monthly: "月報",
-  bizdev: "事業開発",
   employee: "社員の自主研究",
   task: "業務の完了報告",
   media_weekly: "週の分析",
   media_monthly: "月の経営会議",
-};
-
-/** 自動で仕事を探したとき、同時に進める「AIが見つけた業務」の上限（費用を抑えるため） */
-export const MAX_ACTIVE_DISCOVERED_TASKS = 2;
-export const BUSINESS_STATUS_TONE: Record<BusinessStatus, string> = {
-  idea: "bg-info-soft text-brand",
-  validating: "bg-accent-soft text-accent",
-  promising: "bg-success-soft text-success",
-  adopted: "bg-success text-white",
-  rejected: "bg-surface-3 text-muted",
-  on_hold: "bg-surface-3 text-muted",
 };
 
 // ===== Phase 4: 収益・費用・通知 =====
@@ -356,18 +325,3 @@ export const LIFE_SUGGESTION_STATUS_LABEL: Record<LifeSuggestionStatus, string> 
 export const LIFE_PRIORITY_LABEL: Record<string, string> = { high: "高", medium: "中", low: "低" };
 /** 生活の改善提案から、同時に進める「業務」の上限（費用を抑えるため） */
 export const MAX_ACTIVE_LIFE_TASKS = 2;
-
-// ===== 販売までの段階 =====
-export const BUSINESS_STAGES = ["idea", "research", "product", "listing", "launch", "selling", "paused"] as const;
-export type BusinessStage = (typeof BUSINESS_STAGES)[number];
-export const BUSINESS_STAGE_LABEL: Record<BusinessStage, string> = {
-  idea: "アイデア",
-  research: "調査",
-  product: "商品づくり",
-  listing: "出品の準備",
-  launch: "出品",
-  selling: "販売中",
-  paused: "止めている",
-};
-/** 画面の段階表示（止めている、は除く） */
-export const BUSINESS_STAGE_STEPS: BusinessStage[] = ["research", "product", "listing", "launch", "selling"];

@@ -61,7 +61,7 @@ describe("やさしい言葉のルール", () => {
     expect(buildStepInstruction("review", ctx)).toContain("言葉づかい・書き方・好みの問題・細かい表現は指摘しない");
   });
 
-  it("事業・販売に関係する業務だけ、売る場所の選び方（経営者の方針）が入る", () => {
+  it("販売に関係する業務だけ、売る場所の選び方（経営者の方針）が入る", () => {
     const base = {
       settings,
       workflow: { phase: "drafting", plan: {}, lead_id: "bizdev", rework_count: 0 },
@@ -75,13 +75,13 @@ describe("やさしい言葉のルール", () => {
     };
     const sales = buildTeamContext({
       ...base,
-      task: { title: "販売の準備：テスト", description: "", priority: "medium", due_date: null, business_project_id: "x" },
+      task: { title: "販売の準備：テスト", description: "", priority: "medium", due_date: null },
     } as never);
     expect(sales).toContain("売る場所の選び方（経営者の方針）");
     expect(sales).toContain("無料で始められること");
     const other = buildTeamContext({
       ...base,
-      task: { title: "今週の予定を整理", description: "", priority: "medium", due_date: null, business_project_id: null },
+      task: { title: "今週の予定を整理", description: "", priority: "medium", due_date: null },
     } as never);
     expect(other).not.toContain("売る場所の選び方");
   });

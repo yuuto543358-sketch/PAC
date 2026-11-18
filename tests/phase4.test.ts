@@ -3,8 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb, getDb } from "@/lib/db";
 import { OWNER_DOES_AFTER_EFFECT } from "@/lib/constants";
 import { createApproval, getApproval, resubmitApproval } from "@/lib/repo/approvals";
-import { addLedgerEntry, businessMoney, ledgerTotals, monthlyMoney, voidLedgerEntry } from "@/lib/repo/ledger";
-import { insertBusinessProject } from "@/lib/repo/business";
+import { addLedgerEntry, ledgerTotals, monthlyMoney, voidLedgerEntry } from "@/lib/repo/ledger";
 import { dispatchNotifications, enqueueNotification, savePushSubscription } from "@/lib/notify";
 import { finalizeApiCall, reserveApiCall } from "@/lib/budget";
 import { generateCompanyReport } from "@/lib/autonomy/reports";
@@ -24,10 +23,9 @@ beforeEach(async () => {
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,
     daily_limit_jpy = 100000, max_calls_per_day = 2000, max_calls_per_minute = 60, max_calls_per_task = 20, per_task_limit_jpy = 30`;
   await sql`update company_settings set media_enabled = false, emergency_stop = false, notify_approvals = true, notify_budget = true,
-    autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null,
-    last_monthly_report_on = null, discovery_auto_start = false`;
+    last_daily_report_on = null, last_weekly_report_on = null, last_monthly_report_on = null`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
-  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31', life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false, last_ops_review_on = '2099-12-31'`;
+  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31', life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false`;
   // 前のテストの通知・受け取り先を片づける（テスト用DBだけで行う操作）
   await sql`update notifications set status = 'skipped' where status = 'pending'`;
   await sql`delete from push_subscriptions`;
@@ -39,30 +37,10 @@ beforeEach(async () => {
 });
 afterAll(async () => {
   const sql = await getDb();
-  await sql`update company_settings set autorun_frequency = 'off', last_monthly_report_on = null`;
+  await sql`update company_settings set last_monthly_report_on = null`;
   await sql`delete from push_subscriptions`;
   await closeDb();
 });
-
-async function newBusiness() {
-  const sql = await getDb();
-  return insertBusinessProject(sql, {
-    name: `テスト事業 ${uniq()}`,
-    summary: "テスト",
-    target_customer: "",
-    customer_problem: "",
-    competitors: "",
-    price_jpy: 1000,
-    initial_cost_jpy: 0,
-    running_cost_jpy: 0,
-    monetization: "",
-    difficulty: "やさしい",
-    risks: "",
-    validation_method: "",
-    sources: [],
-    discoveredBy: "bizdev",
-  });
-}
 
 describe("収益・費用の記録", () => {
   it("記録すると合計に入り、取り消すと合計から外れる", async () => {
@@ -90,22 +68,6 @@ describe("収益・費用の記録", () => {
     await expect(sql`delete from ledger_entries where id = ${id}`).rejects.toThrow(/削除できません/);
     await expect(sql`update ledger_entries set voided_at = now() where id = ${id}`).rejects.toThrow(/理由が必要/);
     await expect(voidLedgerEntry(sql, id, "  ")).rejects.toThrow(/理由/);
-  });
-
-  it("事業ごとのもうけは、収益 − 費用 − その事業の業務で使ったAI利用料", async () => {
-    const sql = await getDb();
-    const b = await newBusiness();
-    await addLedgerEntry(sql, { kind: "income", amountJpy: 5000, occurredOn: today, category: "売上", description: "", businessProjectId: b.id });
-    await addLedgerEntry(sql, { kind: "expense", amountJpy: 1200, occurredOn: today, category: "材料・仕入れ", description: "", businessProjectId: b.id });
-    const t = await createTask(sql, { title: `商品づくり ${uniq()}`, source: "user", businessProjectId: b.id, createdBy: { type: "user" } });
-    if (!t.created) throw new Error("not created");
-    await initWorkflow(sql, t.task.id, true);
-    await runWorkflows(sql, { taskIds: [t.task.id], maxSteps: 3, deadlineMs: 30_000 });
-    const m = await businessMoney(sql, b.id);
-    expect(m.income).toBe(5000);
-    expect(m.expense).toBe(1200);
-    expect(m.api).toBeGreaterThan(0);
-    expect(m.profit).toBeCloseTo(5000 - 1200 - m.api, 6);
   });
 
   it("月ごとの一覧は、記録がない月も0円で並ぶ", async () => {
@@ -266,7 +228,6 @@ describe("月報", () => {
 
   it("毎月1日でも、月報は自動では作らない（必要なときにボタンで作る）", async () => {
     const sql = await getDb();
-    await sql`update company_settings set autorun_frequency = 'weekly'`;
     const firstOfMonth = new Date("2030-02-01T00:00:00Z"); // 金曜日
     const before = await sql<{ n: number }[]>`select count(*)::int as n from reports`;
     const r1 = await runScheduledJobs(sql, firstOfMonth);

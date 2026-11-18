@@ -4,8 +4,7 @@ import { getSpendSummary } from "@/lib/budget";
 import { getBudget, getSettings } from "@/lib/repo/settings";
 import { dailyUsageThisMonth, listUsage, usageByEmployeeThisMonth, usageByTaskThisMonth } from "@/lib/repo/usage";
 import { dateTime, yen, yenPrecise } from "@/lib/format";
-import { businessMoneyList, ledgerTotals, monthlyMoney } from "@/lib/repo/ledger";
-import { BUSINESS_STATUS_LABEL, type BusinessStatus } from "@/lib/constants";
+import { ledgerTotals, monthlyMoney } from "@/lib/repo/ledger";
 import { Meter, Page, PageHeader, Section, Stat } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
@@ -15,7 +14,7 @@ const STATUS_LABEL: Record<string, string> = { reserved: "処理中", completed:
 
 export default async function FinancePage() {
   const sql = await getDb();
-  const [settings, budget, spend, byEmp, byTask, daily, history, totals, months, perBusiness] = await Promise.all([
+  const [settings, budget, spend, byEmp, byTask, daily, history, totals, months] = await Promise.all([
     getSettings(sql),
     getBudget(sql),
     getSpendSummary(sql),
@@ -25,7 +24,6 @@ export default async function FinancePage() {
     listUsage(sql, 50),
     ledgerTotals(sql),
     monthlyMoney(sql, 6),
-    businessMoneyList(sql),
   ]);
   const hardLimit = Math.min(budget.monthly_limit_jpy, budget.emergency_stop_jpy);
   const remaining = Math.max(0, hardLimit - spend.monthJpy);
@@ -97,28 +95,6 @@ export default async function FinancePage() {
             </table>
           </div>
           <p className="mt-2 px-1 text-xs text-muted">「もうけ」は、運用料金（いまの設定 {yen(ops)}/月）も引いた金額です。</p>
-        </Section>
-
-        <Section title="事業ごとのお金（これまでの合計）">
-          {perBusiness.length === 0 ? (
-            <p className="card px-4 py-4 text-sm text-muted">まだありません。お金を記録するときに「どの事業のお金？」を選ぶと、ここに出ます。</p>
-          ) : (
-            <ul className="card divide-y divide-separator text-sm">
-              {perBusiness.map((b) => (
-                <li key={b.id}>
-                  <Link href={`/business/${b.id}`} className="block px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate font-medium text-brand">{b.name}</span>
-                      <span className={`shrink-0 font-bold ${b.profit < 0 ? "text-danger" : "text-success"}`}>{yen(b.profit)}</span>
-                    </div>
-                    <div className="text-xs text-muted">
-                      {BUSINESS_STATUS_LABEL[b.status as BusinessStatus] ?? b.status}・収益 {yen(b.income)}・費用 {yen(b.expense)}・AI {yenPrecise(b.api)}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
         </Section>
 
         <Section title="AI API 利用料">

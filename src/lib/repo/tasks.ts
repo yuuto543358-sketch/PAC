@@ -29,7 +29,6 @@ export type Task = {
   ai_call_count: number;
   spent_jpy: number;
   deliverable: string;
-  business_project_id: string | null;
   /** アプリが決めた成果品（シリーズの回など） */
   product_format: string | null;
   series_id: string | null;
@@ -149,8 +148,6 @@ export type CreateTaskInput = {
   assigneeId?: string | null;
   dueDate?: string | null;
   budgetLimitJpy?: number | null;
-  /** 関連する事業候補 */
-  businessProjectId?: string | null;
   /** 作る成果品（シリーズの回など） */
   productFormat?: string | null;
   seriesId?: string | null;
@@ -184,10 +181,10 @@ export async function createTask(sql: Sql, input: CreateTaskInput): Promise<Crea
     const dueDate = input.dueDate && DATE_RE.test(input.dueDate) ? input.dueDate : null;
     const [row] = await tx<{ id: string; title: string }[]>`
       insert into tasks (title, description, source, priority, assignee_id, created_by_employee_id, due_date,
-        budget_limit_jpy, dedupe_key, business_project_id, product_format, series_id, series_episode)
+        budget_limit_jpy, dedupe_key, product_format, series_id, series_episode)
       values (${title}, ${(input.description ?? "").slice(0, 5000)}, ${input.source}, ${input.priority ?? "medium"},
         ${input.assigneeId ?? null}, ${input.createdBy.type === "employee" ? input.createdBy.employeeId : null},
-        ${dueDate}, ${limit}, ${normalizeTitle(title)}, ${input.businessProjectId ?? null},
+        ${dueDate}, ${limit}, ${normalizeTitle(title)},
         ${input.productFormat ?? null}, ${input.seriesId ?? null}, ${input.seriesEpisode ?? null})
       returning id, title`;
     await addTaskLog(tx, row.id, input.createdBy, "created", `業務「${title}」を登録しました`, null, "discovered");

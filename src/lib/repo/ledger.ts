@@ -13,8 +13,6 @@ export type LedgerEntry = {
   occurred_on: string;
   category: string;
   description: string;
-  business_project_id: string | null;
-  business_name: string | null;
   voided_at: Date | null;
   void_reason: string;
   created_at: Date;
@@ -28,7 +26,6 @@ export type NewLedgerEntry = {
   occurredOn: string;
   category: string;
   description: string;
-  businessProjectId?: string | null;
 };
 
 export async function addLedgerEntry(sql: Sql, input: NewLedgerEntry): Promise<string> {
@@ -38,17 +35,12 @@ export async function addLedgerEntry(sql: Sql, input: NewLedgerEntry): Promise<s
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) throw new Error("金額は1円〜1億円で入力してください");
   if (!DATE_RE.test(input.occurredOn)) throw new Error("日付が正しくありません");
   const category = LEDGER_CATEGORIES[kind].includes(input.category) ? input.category : LEDGER_CATEGORIES[kind].at(-1)!;
-  const businessId = input.businessProjectId && /^[0-9a-f-]{36}$/i.test(input.businessProjectId) ? input.businessProjectId : null;
   return begin(sql, async (tx) => {
-    if (businessId) {
-      const [b] = await tx`select 1 from business_projects where id = ${businessId}`;
-      if (!b) throw new Error("事業の候補が見つかりません");
-    }
     const [row] = await tx<{ id: string }[]>`
-      insert into ledger_entries (kind, amount_jpy, occurred_on, category, description, business_project_id)
-      values (${kind}, ${amount}, ${input.occurredOn}::date, ${category}, ${input.description.trim().slice(0, 500)}, ${businessId})
+      insert into ledger_entries (kind, amount_jpy, occurred_on, category, description)
+      values (${kind}, ${amount}, ${input.occurredOn}::date, ${category}, ${input.description.trim().slice(0, 500)})
       returning id`;
-    await audit(tx, "owner", "ledger_added", "ledger_entry", row.id, { kind, amount, category, businessId });
+    await audit(tx, "owner", "ledger_added", "ledger_entry", row.id, { kind, amount, category });
     return row.id;
   });
 }
@@ -67,17 +59,13 @@ export async function voidLedgerEntry(sql: Sql, id: string, reason: string) {
 
 export async function listLedgerEntries(
   db: Db,
-  opts: { businessProjectId?: string; limit?: number } = {},
+  opts: { limit?: number } = {},
 ): Promise<LedgerEntry[]> {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 300);
-  const where = opts.businessProjectId ? `where l.business_project_id = $1` : "";
-  return db.unsafe<LedgerEntry[]>(
-    `select l.*, to_char(l.occurred_on, 'YYYY-MM-DD') as occurred_on, b.name as business_name
-     from ledger_entries l left join business_projects b on b.id = l.business_project_id
-     ${where} order by l.occurred_on desc, l.created_at desc limit ${limit}`,
-    opts.businessProjectId ? [opts.businessProjectId] : [],
-    { simple: false },
-  );
+  return db<LedgerEntry[]>`
+    select l.*, to_char(l.occurred_on, 'YYYY-MM-DD') as occurred_on
+    from ledger_entries l
+    order by l.occurred_on desc, l.created_at desc limit ${limit}`;
 }
 
 export type MoneySummary = { income: number; expense: number };
@@ -126,30 +114,4 @@ export async function monthlyMoney(db: Db, months = 6): Promise<MonthRow[]> {
     [],
     { simple: false },
   );
-}
-
-export type BusinessMoney = MoneySummary & { api: number; profit: number };
-
-/** 事業ごとのお金。AI利用料は、その事業に関係する業務で使った分 */
-export async function businessMoney(db: Db, businessProjectId: string): Promise<BusinessMoney> {
-  const [r] = await db<{ income: number; expense: number; api: number }[]>`
-    select
-      coalesce((select sum(amount_jpy) from ledger_entries where business_project_id = ${businessProjectId} and voided_at is null and kind = 'income'), 0)::float8 as income,
-      coalesce((select sum(amount_jpy) from ledger_entries where business_project_id = ${businessProjectId} and voided_at is null and kind = 'expense'), 0)::float8 as expense,
-      coalesce((select sum(coalesce(u.cost_jpy, u.estimated_cost_jpy)) from api_usage u join tasks t on t.id = u.task_id where t.business_project_id = ${businessProjectId}), 0)::float8 as api`;
-  return { ...r, profit: r.income - r.expense - r.api };
-}
-
-/** 事業ごとの収支の一覧（記録またはAI利用があるものだけ） */
-export async function businessMoneyList(db: Db): Promise<({ id: string; name: string; status: string } & BusinessMoney)[]> {
-  const rows = await db<{ id: string; name: string; status: string; income: number; expense: number; api: number }[]>`
-    select b.id, b.name, b.status,
-      coalesce((select sum(amount_jpy) from ledger_entries l where l.business_project_id = b.id and l.voided_at is null and l.kind = 'income'), 0)::float8 as income,
-      coalesce((select sum(amount_jpy) from ledger_entries l where l.business_project_id = b.id and l.voided_at is null and l.kind = 'expense'), 0)::float8 as expense,
-      coalesce((select sum(coalesce(u.cost_jpy, u.estimated_cost_jpy)) from api_usage u join tasks t on t.id = u.task_id where t.business_project_id = b.id), 0)::float8 as api
-    from business_projects b
-    order by b.created_at desc limit 100`;
-  return rows
-    .filter((r) => r.income > 0 || r.expense > 0 || r.api > 0)
-    .map((r) => ({ ...r, profit: r.income - r.expense - r.api }));
 }

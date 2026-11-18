@@ -336,48 +336,31 @@ await page.getByRole("button", { name: "保存する" }).click();
 await page.getByText("社員情報を保存しました").waitFor();
 check("社員の名前を変更できる", true);
 
-// 自動で動く設定（Phase 3）
+// Web検索の設定（自動で動く頻度・事業の候補探しは、事業開発機能を消したのでない）
 await page.goto(`${BASE}/settings#autorun`);
-await page.locator("select[name=autorun_frequency]").selectOption("daily");
-await page.getByRole("button", { name: "自動で動く設定を保存" }).click();
-await page.getByText("自動で動く設定を保存しました").waitFor();
-check("自動で動く頻度を保存", true);
+check("設定に「自動で動く頻度」「事業の候補を調べさせる」がない（事業開発機能は削除）",
+  (await page.locator("select[name=autorun_frequency]").count()) === 0 && (await page.locator("input[name=discovery_auto_start]").count()) === 0);
+await page.locator("input[name=web_research_enabled]").uncheck();
+await page.getByRole("button", { name: "Web検索の設定を保存" }).click();
+await page.getByText("Web検索の設定を保存しました").waitFor();
 await page.reload();
-check("保存した頻度が表示される", (await page.locator("select[name=autorun_frequency]").inputValue()) === "daily");
-await page.locator("select[name=autorun_frequency]").selectOption("off");
-await page.getByRole("button", { name: "自動で動く設定を保存" }).click();
-await page.getByText("自動で動く設定を保存しました").waitFor();
+check("Web検索の設定を保存できる", !(await page.locator("input[name=web_research_enabled]").isChecked()));
+await page.locator("input[name=web_research_enabled]").check();
+await page.getByRole("button", { name: "Web検索の設定を保存" }).click();
+await page.getByText("Web検索の設定を保存しました").waitFor();
 
-// 事業開発：今すぐ仕事を探す（Phase 3）
-await page.goto(`${BASE}/business`);
-await page.getByRole("button", { name: "今すぐ仕事を探す" }).click();
-await page.getByRole("status").filter({ hasText: /事業の候補を|似ていたため/ }).waitFor({ timeout: 60_000 });
-check("今すぐ仕事を探す", true);
-await page.reload();
-const firstCandidate = page.locator("main a[href^='/business/']").first();
-check("事業の候補が一覧に出る", (await firstCandidate.count()) > 0);
-await shot("18-business");
-await firstCandidate.click();
-await page.getByText("くわしい内容").waitFor();
-check("候補の詳細を表示", true);
-await page.locator("select[name=status]").selectOption("promising");
-await page.getByRole("button", { name: "状態を保存" }).click();
-await page.getByText("事業の候補の状態を変更しました").waitFor();
-check("候補の状態を変更", true);
-await page.waitForTimeout(800);
-check("保存後も選んだ状態が表示される", (await page.locator("select[name=status]").inputValue()) === "promising");
-await shot("19-business-detail");
-
-// 「採用」にすると、販売まで自動で進み始める（商品づくりのチームが動く）
-await page.locator("select[name=status]").selectOption("adopted");
-await page.getByRole("button", { name: "状態を保存" }).click();
-await page.getByRole("status").filter({ hasText: "採用しました。チームが商品づくりを始めました" }).waitFor({ timeout: 30_000 });
-await page.reload();
-check("採用すると「販売までの道のり」が商品づくりに進む", (await page.getByText("販売までの道のり").count()) === 1 && (await page.getByText(/チームが商品の完成品を作っています/).count()) === 1);
-const businessUrl = page.url();
+// 事業開発機能は消した：メニューにも出ず、画面も開けない
+await page.goto(`${BASE}/more`);
+check("メニューに「事業開発」がない", (await page.locator("a[href='/business']").count()) === 0 && (await page.getByText("AIが見つけた事業の候補").count()) === 0);
+{
+  // ブラウザで開くと「見つかりません」がエラーとして記録されるので、ログインしたままの通信で確かめる
+  const r = await page.request.get(`${BASE}/business`);
+  check("「事業開発」の画面は開けない（見つかりません）", r.status() === 404);
+}
 
 // お金の記録（Phase 4）
-await page.goto(`${BASE}/finance/ledger?business=${businessUrl.split("/").pop()}`);
+await page.goto(`${BASE}/finance/ledger`);
+check("お金の記録に「どの事業のお金？」の欄がない", (await page.locator("select[name=business_project_id]").count()) === 0);
 await page.fill("input[name=amount_jpy]", "3000");
 await page.fill("input[name=description]", "テストの売上");
 await page.getByRole("button", { name: "記録する" }).click();
@@ -399,10 +382,8 @@ check("記録を取り消せる（理由つきで残る）", (await page.getByTe
 await shot("21-ledger");
 await page.goto(`${BASE}/finance`);
 check("財務画面に「今月のもうけ」", (await page.getByText("今月のもうけ").count()) > 0);
-check("財務画面に事業ごとのお金", (await page.getByText("事業ごとのお金（これまでの合計）").count()) > 0);
+check("財務画面に「事業ごとのお金」がない（事業開発機能は削除）", (await page.getByText("事業ごとのお金（これまでの合計）").count()) === 0);
 await shot("22-finance");
-await page.goto(businessUrl);
-check("事業の画面にお金が出る", (await page.getByText("この事業のお金").count()) > 0);
 
 // 報告書：今すぐ日報を作る（Phase 3）
 await page.goto(`${BASE}/reports`);

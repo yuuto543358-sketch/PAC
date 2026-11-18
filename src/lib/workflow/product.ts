@@ -83,7 +83,7 @@ export function detectRequestedProduct(task: { title: string; description?: stri
 
 /**
  * この業務で作るべき成果品。
- * 経営者が頼んだ業務（事業の自動進行の段階の業務ではないもの）だけが対象です。
+ * 経営者が頼んだ業務が対象です。
  * あとから経営者がグループチャットで「動画にして」などと指示した場合は、新しい指示を優先します。
  */
 /** 形式から成果品を引く */
@@ -96,12 +96,10 @@ export function requestedProductFor(
     title: string;
     description?: string | null;
     source?: string | null;
-    business_project_id?: string | null;
     product_format?: string | null;
   },
   ownerMessages: string[] = [],
 ): RequestedProduct | null {
-  if (task.business_project_id) return null; // 事業の段階の業務は、段階ごとの決まった成果物を作る
   // 「動画にして」「記事を書いて」のように、作るものをはっきり頼んだ指示だけを見る
   for (const m of [...ownerMessages].reverse()) {
     if (!/作って|作成|にして|書いて|仕上げて|まで/.test(m)) continue;

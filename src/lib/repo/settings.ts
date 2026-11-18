@@ -9,7 +9,6 @@ export type CompanySettings = {
   model_advanced: string;
   advanced_model_allowed: boolean;
   usd_jpy_rate: number;
-  autorun_frequency: string;
   notify_approvals: boolean;
   notify_budget: boolean;
   emergency_stop: boolean;
@@ -17,10 +16,7 @@ export type CompanySettings = {
   session_version: number;
   /** 調査担当が議論のときにWeb検索を使ってよいか */
   web_research_enabled: boolean;
-  /** 見つけた事業候補を、自動でチームに調べさせるか */
-  discovery_auto_start: boolean;
-  /** 自動の仕事探し・報告書を最後に行った日（日本時間。二重実行を防ぐため） */
-  last_discovery_on: Date | null;
+  /** 報告書を最後に作った日（日本時間。二重実行を防ぐため） */
   last_daily_report_on: Date | null;
   last_weekly_report_on: Date | null;
   last_monthly_report_on: Date | null;
@@ -54,7 +50,6 @@ export type CompanySettings = {
   last_life_prep_on: Date | null;
   last_life_research_on: Date | null;
   last_cron_at: Date | null;
-  last_ops_review_on: Date | null;
   /** メディア事業（AI Media Company）を自動で動かすか */
   media_enabled: boolean;
   media_articles_per_day: number;

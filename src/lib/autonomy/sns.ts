@@ -57,13 +57,10 @@ export async function runSnsPlanning(sql: Sql, trigger: "manual" | "scheduled"):
   const platforms = (chosen.length ? chosen : (["x"] as SnsPlatform[])) as [SnsPlatform, ...SnsPlatform[]];
   const count = Math.min(7, Math.max(1, settings.sns_posts_per_plan));
 
-  const [recent, businesses, deliverables] = await Promise.all([
+  const [recent, deliverables] = await Promise.all([
     sql<{ content: string; status: string }[]>`
       select content, status from approvals where action_type = 'sns_post' and status <> 'superseded'
       order by created_at desc limit 30`,
-    sql<{ name: string; summary: string; monetization: string; status: string; stage: string; listing_url: string; platform: string }[]>`
-      select name, summary, monetization, status, stage, listing_url, platform from business_projects
-      where status in ('adopted','promising') order by updated_at desc limit 5`,
     sql<{ title: string; excerpt: string }[]>`
       select d.title, left(d.content, 300) as excerpt from deliverables d
       where d.status = 'accepted' order by d.created_at desc limit 5`,
@@ -93,10 +90,6 @@ ${SNS_STYLE_RULES}
 - うそ・大げさな表現・架空のお客さんの声・根拠のない数字は書かない。
 - ハッシュタグは2つまで。人を傷つける話題、政治や宗教の話題、ほかの人やお店の悪口は書かない。
 - これまでの投稿と同じ内容・よく似た内容は書かない。
-
-【会社の事業（有望・採用）】
-${businesses.length ? businesses.map((b) => `- ${b.name}（${b.stage === "selling" ? `販売中・${b.platform}${b.listing_url ? `・${b.listing_url}` : ""}` : b.status}）: ${b.summary}／売り方: ${b.monetization}`).join("\n") : "（まだありません。会社の考え方や、AIで仕事をする様子などを発信する）"}
-${businesses.some((b) => b.stage === "selling") ? "- 販売中の商品があれば、投稿案のうち1つはその商品にふれる（ネタの流れで軽く）。" : ""}
 
 【最近できた成果物】
 ${deliverables.length ? deliverables.map((d) => `- ${d.title}: ${d.excerpt.replace(/\s+/g, " ")}`).join("\n") : "（まだありません）"}

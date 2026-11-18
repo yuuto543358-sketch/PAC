@@ -12,7 +12,7 @@ const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: "/more", label: "メニュー", icon: "menu" },
 ];
 
-const MORE_PATHS = ["/more", "/business", "/reports", "/finance", "/settings", "/tasks", "/sns", "/series", "/media/research", "/media/brand", "/media/sns", "/media/management", "/life"];
+const MORE_PATHS = ["/more", "/reports", "/finance", "/settings", "/tasks", "/sns", "/series", "/media/research", "/media/brand", "/media/sns", "/media/management", "/life"];
 
 /** チャット画面では、メッセージアプリのように下のメニューを隠して全画面にする */
 function isFullScreen(pathname: string) {

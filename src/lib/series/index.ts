@@ -57,8 +57,8 @@ export function baseTitle(title: string) {
  * 承認の処理と同じトランザクションの中で呼ばれます。
  */
 export async function onEpisodeAccepted(tx: Tx, taskId: string, today: string): Promise<Series | null> {
-  const [task] = await tx<{ id: string; title: string; description: string; source: string; business_project_id: string | null; product_format: string | null; series_id: string | null }[]>`
-    select id, title, description, source, business_project_id, product_format, series_id from tasks where id = ${taskId}`;
+  const [task] = await tx<{ id: string; title: string; description: string; source: string; product_format: string | null; series_id: string | null }[]>`
+    select id, title, description, source, product_format, series_id from tasks where id = ${taskId}`;
   if (!task) return null;
   const owner = await tx<{ content: string }[]>`
     select content from task_messages where task_id = ${taskId} and author_type = 'owner' order by id`;

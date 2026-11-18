@@ -5,7 +5,6 @@ import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { audit } from "@/lib/repo/audit";
 import { isTextModel } from "@/lib/pricing";
-import { AUTORUN_OPTIONS } from "@/lib/constants";
 import type { ActionState } from "@/components/forms";
 
 const ok = (message: string): ActionState => ({ ok: true, message, ts: Date.now() });
@@ -85,18 +84,12 @@ export async function updateModelsAction(_p: ActionState, fd: FormData): Promise
 export async function updateAutorunAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   try {
     await assertAuth();
-    const freq = String(fd.get("autorun_frequency") ?? "off");
-    if (!AUTORUN_OPTIONS.some((o) => o.id === freq)) throw new Error("頻度が正しくありません");
     const web = fd.get("web_research_enabled") === "on";
-    const autoStart = fd.get("discovery_auto_start") === "on";
     const sql = await getDb();
-    await sql`
-      update company_settings set autorun_frequency = ${freq}, web_research_enabled = ${web},
-        discovery_auto_start = ${autoStart}, updated_at = now()
-      where id = 1`;
-    await audit(sql, "user", "update_autorun", "company_settings", "1", { freq, web, autoStart });
+    await sql`update company_settings set web_research_enabled = ${web}, updated_at = now() where id = 1`;
+    await audit(sql, "user", "update_autorun", "company_settings", "1", { web });
     refresh();
-    return ok("自動で動く設定を保存しました");
+    return ok("Web検索の設定を保存しました");
   } catch (e) {
     return fail(e);
   }

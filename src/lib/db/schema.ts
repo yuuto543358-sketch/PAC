@@ -1437,4 +1437,65 @@ update employees set avatar_videos =
   where id = 'finance' and avatar_videos = '{}'::jsonb;
 `,
   },
+  {
+    version: 21,
+    name: "remove_business_development",
+    sql: /* sql */ `
+-- ===== 事業開発機能（事業の候補探し・事業の段階・運営レポート・事業ごとのお金）を完全に削除する =====
+-- 経営者の判断（2026年11月）：データも消す。AIメディア会社の「事業開発部（朝日 ひかり）」は残す。
+
+-- 1) 事業の「出品の承認」でまだ決めていないものは、却下にして履歴を残す（承認記録は消さない決まり）
+do $$
+declare a record;
+begin
+  for a in select id, status from approvals
+    where status in ('pending','on_hold') and payload ? 'businessId' and payload->>'kind' = 'launch'
+  loop
+    update approvals set status = 'rejected', decision_note = '事業開発機能を削除したため、自動で却下しました', decided_at = now()
+      where id = a.id;
+    insert into approval_events (approval_id, event, from_status, to_status, note, actor_type)
+      values (a.id, 'rejected', a.status, 'rejected', '事業開発機能を削除したため', 'system');
+  end loop;
+end $$;
+
+-- 2) 事業の運営レポートと、事業の画面へのお知らせを消す
+delete from reports where report_type = 'bizdev';
+alter table reports drop constraint if exists reports_report_type_check;
+alter table reports add constraint reports_report_type_check
+  check (report_type in ('daily','weekly','monthly','employee','task','media_weekly','media_monthly'));
+delete from notifications where url like '/business%';
+
+-- 3) お金の記録から「どの事業のお金か」の紐づけを外す（記録そのものは残す）
+create or replace function pac_ledger_guard() returns trigger
+language plpgsql as $fn$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'PAC: 収益・費用の記録は削除できません（取り消しにしてください）';
+  end if;
+  if new.id <> old.id or new.kind <> old.kind or new.amount_jpy <> old.amount_jpy or new.occurred_on <> old.occurred_on
+     or new.category <> old.category or new.description <> old.description or new.created_at <> old.created_at then
+    raise exception 'PAC: 収益・費用の記録は変更できません（取り消して、新しく記録してください）';
+  end if;
+  if old.voided_at is not null then
+    raise exception 'PAC: 取り消した記録は元に戻せません';
+  end if;
+  if new.voided_at is null or length(trim(new.void_reason)) = 0 then
+    raise exception 'PAC: 取り消しには理由が必要です';
+  end if;
+  return new;
+end $fn$;
+drop index if exists ledger_entries_business_idx;
+alter table ledger_entries drop column if exists business_project_id;
+
+-- 4) 業務から事業の紐づけを外し（業務そのものは残す）、事業の候補の表を消す
+alter table tasks drop column if exists business_project_id;
+drop table if exists business_projects;
+
+-- 5) 事業開発だけに使っていた設定を消す（自動で動く頻度・候補の自動調査・実行した日の記録）
+alter table company_settings drop column if exists autorun_frequency;
+alter table company_settings drop column if exists discovery_auto_start;
+alter table company_settings drop column if exists last_discovery_on;
+alter table company_settings drop column if exists last_ops_review_on;
+`,
+  },
 ];

@@ -11,7 +11,7 @@ import {
 import { logoutAllDevices } from "@/app/actions/auth";
 import { updateNotifySettingsAction } from "@/app/actions/notify";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { AUTORUN_OPTIONS, MODEL_OPTIONS } from "@/lib/constants";
+import { MODEL_OPTIONS } from "@/lib/constants";
 
 export function EmergencyForm({ on }: { on: boolean }) {
   return (
@@ -133,20 +133,10 @@ export function ModelForm({ initial }: { initial: { model_standard: string; mode
 export function AutorunForm({
   initial,
 }: {
-  initial: { autorun_frequency: string; web_research_enabled: boolean; discovery_auto_start: boolean };
+  initial: { web_research_enabled: boolean };
 }) {
   return (
     <ActionForm action={updateAutorunAction}>
-      <label className="block">
-        <span className="label">自動で動く頻度</span>
-        <select name="autorun_frequency" defaultValue={initial.autorun_frequency} className="field">
-          {AUTORUN_OPTIONS.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
       <label className="flex items-start gap-2.5 text-sm">
         <input
           type="checkbox"
@@ -156,22 +146,10 @@ export function AutorunForm({
         />
         <span>
           Web検索を使ってよい
-          <span className="block text-xs text-muted">調査担当と事業開発担当が、インターネットで最新の情報を調べます（1回あたり数円かかります）</span>
+          <span className="block text-xs text-muted">調査担当が、インターネットで最新の情報を調べます（1回あたり数円かかります）</span>
         </span>
       </label>
-      <label className="flex items-start gap-2.5 text-sm">
-        <input
-          type="checkbox"
-          name="discovery_auto_start"
-          defaultChecked={initial.discovery_auto_start}
-          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
-        />
-        <span>
-          見つけた事業の候補を、チームに自動で調べさせる
-          <span className="block text-xs text-muted">同時に調べるのは2件までです。オフにすると、候補を保存するだけになります</span>
-        </span>
-      </label>
-      <SubmitButton className="btn-secondary w-full">自動で動く設定を保存</SubmitButton>
+      <SubmitButton className="btn-secondary w-full">Web検索の設定を保存</SubmitButton>
     </ActionForm>
   );
 }
@@ -183,7 +161,7 @@ export function NotifyForm({ initial }: { initial: { notify_approvals: boolean; 
         <input type="checkbox" name="notify_approvals" defaultChecked={initial.notify_approvals} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" />
         <span>
           承認のお願い・チームからの質問・自動の報告
-          <span className="block text-xs text-muted">あなたの返事が必要なとき・記事ができたとき・新しい事業の候補が届いたとき</span>
+          <span className="block text-xs text-muted">あなたの返事が必要なとき・記事ができたとき</span>
         </span>
       </label>
       <label className="flex items-start gap-2.5 text-sm">

@@ -25,7 +25,7 @@ async function reset() {
   await sql`update company_settings set media_enabled = false, life_enabled = true, emergency_stop = false, life_prep_enabled = true, life_nudge_enabled = true,
     life_research_enabled = true, web_research_enabled = true, last_life_nudge_on = null, last_life_prep_on = null,
     last_life_research_on = null, life_question_frequency = 'off', last_life_analysis_on = '2099-12-31',
-    last_life_review_on = '2099-12-31', autorun_frequency = 'off', sns_plan_frequency = 'off'`;
+    last_life_review_on = '2099-12-31', sns_plan_frequency = 'off'`;
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, monthly_target_jpy = 100000,
     daily_limit_jpy = 100000, max_calls_per_day = 2000, max_calls_per_minute = 60, max_calls_per_task = 20`;
   await sql.begin(async (tx) => {

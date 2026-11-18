@@ -4,7 +4,6 @@ import { z } from "zod";
 import type { Sql } from "@/lib/db";
 import { AiUnavailableError, BudgetBlockedError, callStructured } from "@/lib/ai/client";
 import { FIXED_COMPANY_PRINCIPLES, PLAIN_LANGUAGE_RULES, CONVERSATION_STYLE } from "@/lib/ai/prompts";
-import { BUSINESS_STATUS_LABEL, type BusinessStatus } from "@/lib/constants";
 import { createStepLogger } from "@/lib/log";
 import { audit } from "@/lib/repo/audit";
 import { getBudget, getSettings } from "@/lib/repo/settings";
@@ -30,8 +29,6 @@ export type CompanyStats = {
   monthlyTargetJpy: number;
   waitingTeams: { title: string; reason: string }[];
   stoppedTeams: { title: string }[];
-  newCandidates: { name: string; status: string }[];
-  candidatesByStatus: Record<string, number>;
   employeeActivity: { name: string; calls: number; cost_jpy: number; messages: number }[];
   webSearchCalls: number;
   /** 経営者が記録した、この期間の収益・費用（取り消したものは除く） */
@@ -69,13 +66,6 @@ export async function collectStats(sql: Sql, days: number): Promise<CompanyStats
     select t.title, w.phase, w.waiting_reason from task_workflows w join tasks t on t.id = w.task_id
     where w.phase in ('waiting_human','stopped') and t.status not in ('completed','rejected','failed')
     order by w.updated_at desc limit 20`;
-  const newCandidates = await sql.unsafe<{ name: string; status: string }[]>(
-    `select name, status from business_projects where created_at >= ${since} order by created_at desc limit 10`,
-    [],
-    { simple: false },
-  );
-  const byStatus = await sql<{ status: string; n: number }[]>`
-    select status, count(*)::int as n from business_projects group by status`;
   const activity = await sql.unsafe<{ name: string; calls: number; cost_jpy: number; messages: number }[]>(
     `select e.name,
       (select count(*) from api_usage u where u.employee_id = e.id and u.created_at >= ${since})::int as calls,
@@ -111,15 +101,12 @@ export async function collectStats(sql: Sql, days: number): Promise<CompanyStats
     monthlyTargetJpy: Number(budget.monthly_target_jpy),
     waitingTeams: teams.filter((t) => t.phase === "waiting_human").map((t) => ({ title: t.title, reason: t.waiting_reason ?? "" })),
     stoppedTeams: teams.filter((t) => t.phase === "stopped").map((t) => ({ title: t.title })),
-    newCandidates,
-    candidatesByStatus: Object.fromEntries(byStatus.map((r) => [r.status, r.n])),
     employeeActivity: activity,
     webSearchCalls: spend.searches,
   };
 }
 
 const yen = (n: number) => `${(Math.round(n * 10) / 10).toLocaleString("ja-JP")}円`;
-const statusLabel = (s: string) => BUSINESS_STATUS_LABEL[s as BusinessStatus] ?? s;
 
 /** 集計した数字を、読みやすい文章（箇条書き）にする。AIを使わない */
 export function formatStats(s: CompanyStats): string {
@@ -143,14 +130,6 @@ export function formatStats(s: CompanyStats): string {
     lines.push(`- 止まっているチーム: ${s.stoppedTeams.length}件`);
     for (const t of s.stoppedTeams.slice(0, 5)) lines.push(`  - ${t.title}`);
   }
-  if (s.newCandidates.length) {
-    lines.push(`- 新しい事業の候補: ${s.newCandidates.length}件`);
-    for (const c of s.newCandidates) lines.push(`  - ${c.name}（${statusLabel(c.status)}）`);
-  }
-  const statusSummary = Object.entries(s.candidatesByStatus)
-    .map(([k, v]) => `${statusLabel(k)} ${v}件`)
-    .join("・");
-  if (statusSummary) lines.push(`- 事業の候補の全体: ${statusSummary}`);
   const active = s.employeeActivity.filter((e) => e.calls > 0 || e.messages > 0);
   if (active.length) {
     lines.push(`- 社員の動き:`);

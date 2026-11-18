@@ -117,6 +117,6 @@ ${opts.webSearch ? "- Web検索ができるときは、選んだ場所の手数�
 }
 
 /** 販売の準備・商品づくりの業務かどうか */
-export function isSalesRelated(task: { title: string; description: string; business_project_id?: string | null }): boolean {
-  return Boolean(task.business_project_id) || /販売|売る|売り|出品|値段|価格|収益|副業/.test(`${task.title}${task.description}`);
+export function isSalesRelated(task: { title: string; description: string }): boolean {
+  return /販売|売る|売り|出品|値段|価格|収益|副業/.test(`${task.title}${task.description}`);
 }

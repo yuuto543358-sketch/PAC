@@ -49,7 +49,6 @@ export default async function MorePage() {
 
         <Section title="そのほかの機能">
           <List>
-            <ListRow href="/business" leading={<IconTile name="briefcase" color="#c2410c" />} title="事業開発" subtitle="AIが見つけた事業の候補" />
             <ListRow href="/series" leading={<IconTile name="history" color="#be185d" />} title="シリーズ" subtitle="動画・記事を作り続ける（次の回を自動で）" />
           </List>
         </Section>

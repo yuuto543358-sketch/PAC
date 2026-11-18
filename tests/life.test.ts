@@ -321,7 +321,7 @@ describe("Phase 4：集計・AIの分析・改善提案", () => {
 describe("Phase 5：サーバーの定期実行（アプリを開いていなくても動く）", () => {
   beforeEach(async () => {
     const sql = await getDb();
-    await sql`update company_settings set autorun_frequency = 'off', sns_plan_frequency = 'off'`;
+    await sql`update company_settings set sns_plan_frequency = 'off'`;
   });
 
   it("分析する期間：毎月1日は1か月、1・4・7・10月は3か月、1・7月は6か月、1月は12か月も", () => {

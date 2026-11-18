@@ -5,15 +5,7 @@ import { addLedgerEntryAction, voidLedgerEntryAction } from "@/app/actions/ledge
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LEDGER_CATEGORIES, type LedgerKind } from "@/lib/constants";
 
-export function LedgerEntryForm({
-  today,
-  businesses,
-  defaultBusinessId,
-}: {
-  today: string;
-  businesses: { id: string; name: string }[];
-  defaultBusinessId?: string;
-}) {
+export function LedgerEntryForm({ today }: { today: string }) {
   const [kind, setKind] = useState<LedgerKind>("income");
   return (
     <ActionForm action={addLedgerEntryAction} resetOnSuccess>
@@ -48,17 +40,6 @@ export function LedgerEntryForm({
           </select>
         </label>
       </div>
-      <label className="block">
-        <span className="label">どの事業のお金？（なくてもOK）</span>
-        <select name="business_project_id" defaultValue={defaultBusinessId ?? ""} className="field">
-          <option value="">事業に関係なし</option>
-          {businesses.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <label className="block">
         <span className="label">メモ（なくてもOK）</span>
         <input name="description" maxLength={500} className="field" placeholder="例：ココナラで翻訳の注文1件" />

@@ -19,7 +19,6 @@ export async function addLedgerEntryAction(_p: ActionState, fd: FormData): Promi
       occurredOn: String(fd.get("occurred_on") ?? ""),
       category: String(fd.get("category") ?? ""),
       description: String(fd.get("description") ?? ""),
-      businessProjectId: String(fd.get("business_project_id") ?? "") || null,
     });
     refresh();
     return { ok: true, message: "記録しました", ts: Date.now() };

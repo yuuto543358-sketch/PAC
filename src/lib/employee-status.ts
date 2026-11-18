@@ -21,7 +21,6 @@ const THINKING_KINDS = new Set([
   "team.review",
   // そのほか
   "chat.reply",
-  "discovery",
 ]);
 
 export function activityStatusFor(kind: string): Exclude<EmployeeStatus, "idle" | "offline"> {

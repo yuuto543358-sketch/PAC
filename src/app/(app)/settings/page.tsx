@@ -81,31 +81,13 @@ export default async function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="自動で動く仕事">
+        <Section title="Web検索と自動実行">
           <div id="autorun" className="card scroll-mt-20 space-y-3 p-4">
-            <AutorunForm
-              initial={{
-                autorun_frequency: settings.autorun_frequency,
-                web_research_enabled: settings.web_research_enabled,
-                discovery_auto_start: settings.discovery_auto_start,
-              }}
-            />
+            <AutorunForm initial={{ web_research_enabled: settings.web_research_enabled }} />
           </div>
           <div className="mt-2 space-y-1.5 px-1 text-xs leading-relaxed text-muted">
-            <p>毎日、朝（午前7時半ごろ）に自動で動きます。</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>
-                <b className="text-ink">1日1回</b>：事業開発担当が仕事（事業の候補）を探す。
-              </li>
-              <li>
-                <b className="text-ink">週1回</b>：月曜だけ、仕事を探す。
-              </li>
-              <li>
-                <b className="text-ink">停止</b>：自動では何もしません（「事業開発」の画面のボタンで、いつでも手動で動かせます）。
-              </li>
-            </ul>
             <p>
-              費用の目安：仕事探し1回 約3〜10円（Web検索を使うと高め）、報告書1回 約1円。どれも予算の上限を超えそうなときは自動で止まります。外部への送信・登録・購入は、必ずあなたの承認が必要です。
+              AI Media Company の仕事（市場調査・記事づくり・Xの投稿案・分析）は、メディアの設定で動きます。どれも予算の上限を超えそうなときは自動で止まります。外部への送信・登録・購入は、必ずあなたの承認が必要です。
             </p>
             <p>
               自動で動かすには、Vercel の環境変数 <code>CRON_SECRET</code> の設定が必要です（README 参照）。{" "}

@@ -267,8 +267,7 @@ describe("頼んだ成果品（note記事・動画など）まで作る", () => 
     expect(detectRequestedProduct({ title: "節約術の紹介", description: "YouTubeショート動画を作成" })?.format).toBe("video_script");
     expect(detectRequestedProduct({ title: "BOOTHに出品する商品ページ" })?.format).toBe("listing_package");
     expect(detectRequestedProduct({ title: "家計の見直し" })).toBeNull();
-    // 事業の自動進行の段階の業務や、AIが自分で見つけた業務には使わない
-    expect(requestedProductFor({ title: "note記事の商品づくり", source: "user", business_project_id: "x" })).toBeNull();
+    // AIが自分で見つけた業務には使わない
     expect(requestedProductFor({ title: "note記事を書く", source: "ai_discovered" })).toBeNull();
     // 経営者があとから「動画にして」と頼んだら、それを優先する
     expect(requestedProductFor({ title: "note記事を書く", source: "user" }, ["やっぱり動画にして"])?.format).toBe("video_script");

@@ -4,23 +4,21 @@ import { closeDb, getDb } from "@/lib/db";
 import { actualCostUsd, estimateCostJpy, WEB_SEARCH_CALL_USD } from "@/lib/pricing";
 import { reserveApiCall, failApiCall } from "@/lib/budget";
 import { extractWebSearch, webSearchMaxUsd } from "@/lib/ai/client";
-import { runDiscovery } from "@/lib/autonomy/discovery";
 import { collectStats, formatStats, generateCompanyReport } from "@/lib/autonomy/reports";
 import { jstDateParts, runScheduledJobs } from "@/lib/autonomy/scheduler";
-import { getBusinessProject, setBusinessStatus } from "@/lib/repo/business";
-import { getWorkflow, listRoomMessages } from "@/lib/workflow/repo";
+import { createTask } from "@/lib/repo/tasks";
+import { initWorkflow } from "@/lib/workflow/repo";
+import { listRoomMessages } from "@/lib/workflow/repo";
 import { runWorkflows, shouldUseWebSearch } from "@/lib/workflow/engine";
 
 async function resetState() {
   const sql = await getDb();
   await sql`update budgets set monthly_limit_jpy = 100000, emergency_stop_jpy = 100000, daily_limit_jpy = 100000,
     max_calls_per_day = 2000, max_calls_per_minute = 60, max_calls_per_task = 20, per_task_limit_jpy = 30`;
-  await sql`update company_settings set media_enabled = false, emergency_stop = false, web_research_enabled = true, discovery_auto_start = true,
-    autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null`;
+  await sql`update company_settings set media_enabled = false, emergency_stop = false, web_research_enabled = true,
+    sns_plan_frequency = 'off', last_sns_plan_on = null, last_daily_report_on = null, last_weekly_report_on = null`;
   // ライフの定期処理はこのテストの対象外（質問は停止、分析は実行済みの扱い）
-  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31', life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false, last_ops_review_on = '2099-12-31'`;
-  // これまでのテストで作られた候補と名前が重ならないようにする（テスト用DBでのみ行う操作）
-  await sql`update business_projects set name = name || '（過去のテスト ' || id::text || '）' where name not like '%（過去のテスト %'`;
+  await sql`update company_settings set life_question_frequency = 'off', last_life_analysis_on = '2099-12-31', last_life_review_on = '2099-12-31', life_nudge_enabled = false, life_prep_enabled = false, life_research_enabled = false`;
   // 「AIが見つけた業務」の同時進行の上限（2件）に掛からないよう、過去のテストの業務を終わらせる
   await sql`update tasks set status = 'completed', completed_at = now() where source = 'ai_discovered' and status not in ('completed','rejected','failed')`;
   await sql.begin(async (tx) => {
@@ -36,7 +34,7 @@ beforeAll(async () => {
 beforeEach(resetState);
 afterAll(async () => {
   const sql = await getDb();
-  await sql`update company_settings set autorun_frequency = 'off', last_discovery_on = null, last_daily_report_on = null, last_weekly_report_on = null`;
+  await sql`update company_settings set sns_plan_frequency = 'off', last_sns_plan_on = null, last_daily_report_on = null, last_weekly_report_on = null`;
   await closeDb();
 });
 
@@ -105,42 +103,19 @@ describe("Web検索の費用", () => {
   });
 });
 
-describe("仕事探し（事業の候補）", () => {
-  it("候補を保存し、調査の業務を作ってチームを動かす。2回目は似た候補として保存しない", async () => {
+describe("調査担当のWeb検索", () => {
+  it("業務のチームでは、調査担当がWeb検索して参照ページをグループチャットに残す", async () => {
     const sql = await getDb();
-    const r1 = await runDiscovery(sql, "manual");
-    expect(r1.ok).toBe(true);
-    expect(r1.created).toHaveLength(1);
-    expect(r1.taskIds).toHaveLength(1);
-    expect(r1.sources.length).toBeGreaterThan(0);
-
-    const b = await getBusinessProject(sql, r1.created[0].id);
-    expect(b?.status).toBe("validating");
-    expect(b?.validation_task_id).toBe(r1.taskIds[0]);
-    expect(b?.discovered_by).toBe("bizdev");
-    expect(b?.sources[0].url).toMatch(/^https:/);
-    const [task] = await sql<{ source: string; business_project_id: string; assignee_id: string }[]>`
-      select source, business_project_id, assignee_id from tasks where id = ${r1.taskIds[0]}`;
-    expect(task).toMatchObject({ source: "ai_discovered", business_project_id: b!.id, assignee_id: "research" });
-    expect(await getWorkflow(sql, r1.taskIds[0])).not.toBeNull();
-
-    // Web検索の回数が記録されている
-    const [usage] = await sql<{ web_search_calls: number }[]>`
-      select web_search_calls from api_usage where purpose = 'discovery' order by created_at desc limit 1`;
-    expect(usage.web_search_calls).toBe(1);
-
-    const r2 = await runDiscovery(sql, "manual");
-    expect(r2.ok).toBe(true);
-    expect(r2.created).toHaveLength(0);
-    expect(r2.duplicates).toHaveLength(1);
-    expect(r2.taskIds).toHaveLength(0);
-  });
-
-  it("調査チームでは、調査担当がWeb検索して参照ページをグループチャットに残す", async () => {
-    const sql = await getDb();
-    const r = await runDiscovery(sql, "manual");
-    const taskId = r.taskIds[0];
-    expect(taskId).toBeTruthy();
+    const r = await createTask(sql, {
+      title: `市場の調査 ${Date.now()}`,
+      description: "家計の節約アプリについて、いまの市場を調べてください。",
+      source: "user",
+      assigneeId: "research",
+      createdBy: { type: "user" },
+    });
+    if (!r.created) throw new Error("not created");
+    const taskId = r.task.id;
+    await initWorkflow(sql, taskId, true);
     await runWorkflows(sql, { taskIds: [taskId], maxSteps: 25, deadlineMs: 60_000 });
     const msgs = await listRoomMessages(sql, taskId, 100);
     const research = msgs.find((m) => m.employee_id === "research" && m.kind === "findings");
@@ -153,40 +128,6 @@ describe("仕事探し（事業の候補）", () => {
       select coalesce(sum(web_search_calls), 0)::int as n from api_usage
       where task_id = ${taskId} and (employee_id is distinct from 'research')`;
     expect(others.n).toBe(0);
-    expect((await getWorkflow(sql, taskId))?.phase).toBe("waiting_human");
-  });
-
-  it("自動調査がオフなら、候補を保存するだけ", async () => {
-    const sql = await getDb();
-    await sql`update company_settings set discovery_auto_start = false, web_research_enabled = false`;
-    const r = await runDiscovery(sql, "manual");
-    expect(r.created).toHaveLength(1);
-    expect(r.taskIds).toHaveLength(0);
-    expect(r.sources).toHaveLength(0);
-    expect((await getBusinessProject(sql, r.created[0].id))?.status).toBe("idea");
-  });
-
-  it("緊急停止中は動かない", async () => {
-    const sql = await getDb();
-    await sql`update company_settings set emergency_stop = true`;
-    const r = await runDiscovery(sql, "manual");
-    expect(r.ok).toBe(false);
-    expect(r.created).toHaveLength(0);
-  });
-
-  it("経営者が状態を変えると、操作履歴に残る", async () => {
-    const sql = await getDb();
-    await sql`update company_settings set discovery_auto_start = false`;
-    const r = await runDiscovery(sql, "manual");
-    const id = r.created[0].id;
-    await setBusinessStatus(sql, id, "promising", "値段を確認したい");
-    const b = await getBusinessProject(sql, id);
-    expect(b?.status).toBe("promising");
-    expect(b?.owner_note).toBe("値段を確認したい");
-    const [log] = await sql<{ detail: { to: string } }[]>`
-      select detail from audit_logs where action = 'business_status_changed' and target_id = ${id}`;
-    expect(log.detail.to).toBe("promising");
-    await expect(setBusinessStatus(sql, id, "bogus" as never, "")).rejects.toThrow();
   });
 });
 
@@ -230,18 +171,20 @@ describe("定期実行", () => {
     expect(jstDateParts(new Date("2030-01-06T15:30:00Z"))).toEqual({ date: "2030-01-07", weekday: 1 });
   });
 
-  it("「停止」なら何もしない", async () => {
+  it("自動で動かす設定が何もなければ、何もしない（事業の候補探し・事業の段階・運営レポートは、もうない）", async () => {
     const sql = await getDb();
-    const r = await runScheduledJobs(sql);
-    expect(r.ran).toEqual([]);
+    for (const d of ["2030-01-07T00:00:00Z", "2030-01-08T00:00:00Z", "2030-01-11T00:00:00Z"]) {
+      const r = await runScheduledJobs(sql, new Date(d)); // 月曜・火曜・金曜
+      expect(r.ran).toEqual([]);
+    }
   });
 
-  it("1日1回：仕事探し（日報は自動では作らない）。同じ日に2回動いても二重に実行しない", async () => {
+  it("SNSの投稿案（1日1回）：同じ日に2回動いても二重に実行しない", async () => {
     const sql = await getDb();
-    await sql`update company_settings set autorun_frequency = 'daily', discovery_auto_start = false`;
+    await sql`update company_settings set sns_plan_frequency = 'daily'`;
     const tuesday = new Date("2030-01-08T00:00:00Z");
     const r1 = await runScheduledJobs(sql, tuesday);
-    expect(r1.ran).toEqual(["discovery"]);
+    expect(r1.ran).toEqual(["sns_plan"]);
     expect(r1.reports).toEqual([]);
     const r2 = await runScheduledJobs(sql, tuesday);
     expect(r2.ran).toEqual([]);
@@ -250,16 +193,16 @@ describe("定期実行", () => {
 
   it("同時に2つ動いても、片方しか実行しない", async () => {
     const sql = await getDb();
-    await sql`update company_settings set autorun_frequency = 'weekly', discovery_auto_start = false`;
+    await sql`update company_settings set sns_plan_frequency = 'weekly'`;
     const monday = new Date("2030-01-07T00:00:00Z");
     const [a, b] = await Promise.all([runScheduledJobs(sql, monday), runScheduledJobs(sql, monday)]);
     const ran = [...a.ran, ...b.ran].sort();
-    expect(ran).toEqual(["discovery"]);
+    expect(ran).toEqual(["sns_plan"]);
   });
 
   it("週1回：月曜以外は何もしない", async () => {
     const sql = await getDb();
-    await sql`update company_settings set autorun_frequency = 'weekly'`;
+    await sql`update company_settings set sns_plan_frequency = 'weekly'`;
     const r = await runScheduledJobs(sql, new Date("2030-01-09T00:00:00Z"));
     expect(r.ran).toEqual([]);
   });

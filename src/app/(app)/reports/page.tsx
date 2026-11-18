@@ -5,7 +5,7 @@ import { REPORT_TYPE_LABEL } from "@/lib/constants";
 import { Empty, Page, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DocumentView } from "@/components/DocumentView";
-import { ReportNowButtons } from "../business/BusinessActions";
+import { ReportNowButtons } from "./ReportNowButtons";
 
 export const metadata = { title: "報告書" };
 export const maxDuration = 300;

@@ -1,21 +1,17 @@
 import { getDb } from "@/lib/db";
 import { dateTime, todayJst, yen } from "@/lib/format";
-import { listBusinessProjects } from "@/lib/repo/business";
 import { ledgerTotals, listLedgerEntries } from "@/lib/repo/ledger";
 import { Empty, Page, PageHeader, Section, Stat } from "@/components/ui";
 import { LedgerEntryForm, VoidLedgerForm } from "./LedgerForms";
 
 export const metadata = { title: "お金の記録" };
 
-export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ business?: string }> }) {
-  const sp = await searchParams;
+export default async function LedgerPage() {
   const sql = await getDb();
-  const [entries, totals, businesses] = await Promise.all([
+  const [entries, totals] = await Promise.all([
     listLedgerEntries(sql, { limit: 100 }),
     ledgerTotals(sql),
-    listBusinessProjects(sql, { limit: 100 }),
   ]);
-  const defaultBusiness = businesses.find((b) => b.id === sp.business)?.id;
   return (
     <>
       <PageHeader title="お金の記録" subtitle="入ったお金・出たお金" back="/finance" backLabel="財務" />
@@ -27,7 +23,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
 
         <Section title="新しく記録する">
           <div className="card p-4">
-            <LedgerEntryForm today={todayJst()} businesses={businesses.map((b) => ({ id: b.id, name: b.name }))} defaultBusinessId={defaultBusiness} />
+            <LedgerEntryForm today={todayJst()} />
           </div>
           <p className="mt-2 px-1 text-xs leading-relaxed text-muted">
             売上や、材料・広告などに使ったお金を、あなたが記録します（AIは銀行やお店のサイトを見られないため）。AIの利用料は自動で記録されるので、ここには入れなくて大丈夫です。
@@ -49,7 +45,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                       </span>
                       <span className="block text-[12px] text-muted">
                         {e.occurred_on}
-                        {e.business_name && `・${e.business_name}`}
                       </span>
                     </span>
                     <span className={`shrink-0 text-[16px] font-bold tabular ${e.voided_at ? "line-through" : e.kind === "income" ? "text-success" : "text-ink"}`}>
