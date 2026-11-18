@@ -143,6 +143,12 @@ export const SEED_EMPLOYEES: SeedEmployee[] = [
     judgment_criteria: "予算内か、採算が取れる見込みがあるか、法的・金銭的リスクはないか。",
     avatar_color: "#15803d",
     avatar_style: "elder",
+    // 状態ごとの動画アイコン（待機中・作業中・考え中）
+    avatar_videos: {
+      idle: "/avatars/employee2/idle.mp4",
+      working: "/avatars/employee2/working.mp4",
+      thinking: "/avatars/employee2/thinking.mp4",
+    },
     sort_order: 6,
   },
   {

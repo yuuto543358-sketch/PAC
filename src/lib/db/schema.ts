@@ -1427,4 +1427,14 @@ update employees set avatar_videos =
   where id = 'creative' and avatar_videos = '{}'::jsonb;
 `,
   },
+  {
+    version: 20,
+    name: "employee2_avatar_videos",
+    sql: /* sql */ `
+-- 2人目：監査・品質管理部の堅田 守に、3つの状態の動画を割り当てる（まだ何も設定していないときだけ。ほかの社員は変えない）
+update employees set avatar_videos =
+  '{"idle":"/avatars/employee2/idle.mp4","working":"/avatars/employee2/working.mp4","thinking":"/avatars/employee2/thinking.mp4"}'
+  where id = 'finance' and avatar_videos = '{}'::jsonb;
+`,
+  },
 ];
