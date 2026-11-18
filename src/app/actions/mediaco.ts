@@ -6,7 +6,7 @@ import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { audit } from "@/lib/repo/audit";
-import { runMediaEngine } from "@/lib/mediaco/engine";
+import { mediaReadiness, runMediaEngine } from "@/lib/mediaco/engine";
 import { dispatchNotifications } from "@/lib/notify";
 import { markArticlePublished, recordArticleMetrics, recordPost, updateBrandAccounts } from "@/lib/mediaco/repo";
 import type { ActionState } from "@/components/forms";
@@ -19,10 +19,15 @@ const idOf = (fd: FormData) => {
   return id;
 };
 
-/** 「今すぐ動かす」：次にやるべき仕事を、バックグラウンドで最大6つ進める（予算の上限は通常どおり守る） */
+/**
+ * 「今すぐ動かす」：次にやるべき仕事を、バックグラウンドで最大6つ進める（予算の上限は通常どおり守る）。
+ * 始められないとき（オフ・緊急停止・予算・別の作業中・今日の分は終わった など）は、黙らずにその理由を返す。
+ */
 export async function runMediaNowAction(): Promise<ActionState> {
   try {
     await assertAuth();
+    const ready = await mediaReadiness(await getDb());
+    if (!ready.ok) return { ok: false, error: ready.reason, ts: Date.now() };
     after(async () => {
       try {
         const sql = await getDb();
@@ -33,7 +38,7 @@ export async function runMediaNowAction(): Promise<ActionState> {
         createStepLogger("media").fail("manual run", err);
       }
     });
-    return ok("AI社員が仕事を始めました。1〜3分後に画面を開き直すと、結果が見られます");
+    return ok(`AI社員が「${ready.label}」から仕事を始めました。1〜3分後に画面を開き直すと、結果が見られます`);
   } catch (e) {
     return fail(e);
   }

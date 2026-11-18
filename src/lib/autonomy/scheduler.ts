@@ -77,6 +77,8 @@ export async function runScheduledJobs(sql: Sql, now: Date = new Date()): Promis
     try {
       result.media = await runMediaEngine(sql, { now, maxSteps: 4, deadlineMs: 150_000, trigger: "scheduled" });
       if (result.media.steps.length) result.ran.push("media");
+      // 何もしなかったときは、その理由を記録に残す（GitHub の定期実行の記録で見られる）
+      else if (result.media.idleReason) result.skipped.push(`メディア：${result.media.idleReason}`);
     } catch (err) {
       log.fail("media engine", err);
     }

@@ -14,21 +14,41 @@ import {
 
 export function RunNowButton({ label = "今すぐAI社員を動かす" }: { label?: string }) {
   const [pending, setPending] = useState(false);
+  // 結果（始めた／始められない理由）を、ボタンの下に残して読めるようにする（通知は数秒で消えるため）
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   return (
-    <button
-      type="button"
-      className="btn-tinted w-full"
-      disabled={pending}
-      onClick={async () => {
-        setPending(true);
-        const r: ActionState = await runMediaNowAction();
-        setPending(false);
-        if (r.ok) showToast(r.message ?? "始めました", "success");
-        else showToast(r.error ?? "始められませんでした", "error");
-      }}
-    >
-      {pending ? "準備中…" : label}
-    </button>
+    <div className="w-full">
+      <button
+        type="button"
+        className="btn-tinted w-full"
+        disabled={pending}
+        onClick={async () => {
+          setPending(true);
+          setNote(null);
+          let r: ActionState;
+          try {
+            r = await runMediaNowAction();
+          } catch {
+            r = { ok: false, error: "通信に失敗しました。電波のよい所で、もう一度押してください。", ts: Date.now() };
+          }
+          setPending(false);
+          const text = r.ok ? (r.message ?? "始めました") : (r.error ?? "始められませんでした");
+          setNote({ ok: Boolean(r.ok), text });
+          showToast(r.ok ? "AI社員が仕事を始めました" : "いまは動けません（理由はボタンの下）", r.ok ? "success" : "info");
+        }}
+      >
+        {pending ? "確認中…" : label}
+      </button>
+      {note && (
+        <p
+          role="status"
+          data-run-now-result={note.ok ? "started" : "blocked"}
+          className={`mt-2 rounded-xl px-3 py-2 text-[13px] leading-relaxed ${note.ok ? "bg-success-soft text-success" : "bg-accent-soft text-ink"}`}
+        >
+          {note.text}
+        </p>
+      )}
+    </div>
   );
 }
 

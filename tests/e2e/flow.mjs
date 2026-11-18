@@ -377,6 +377,14 @@ await page.goto(`${BASE}/employees/secretary/chat`);
 check("緊急停止中はチャット不可", (await page.getByText("緊急停止中のため会話できません").count()) > 0);
 await page.goto(`${BASE}/`);
 check("ホームに緊急停止のお知らせ", (await page.getByText("緊急停止中：").count()) > 0);
+// 動けないときに「今すぐAI社員を動かす」を押すと、黙らずに理由を出す
+await page.goto(`${BASE}/media/management`);
+await page.getByRole("button", { name: "今すぐAI社員を動かす" }).click();
+{
+  const box = page.locator('[data-run-now-result="blocked"]');
+  await box.waitFor({ timeout: 30_000 });
+  check("動けないとき「今すぐAI社員を動かす」を押すと、理由がボタンの下に残る（緊急停止中）", /緊急停止中のため、AI社員は動けません/.test(await box.innerText()));
+}
 await page.goto(`${BASE}/settings`);
 await page.getByRole("button", { name: "緊急停止を解除する" }).click();
 await page.getByText("緊急停止を解除しました").waitFor();
@@ -491,11 +499,14 @@ check("「文章をコピー」ボタンもある", (await page.getByRole("butto
 
 // ===== AI Media Company：市場調査 → ジャンル選定 → ブランド → 記事 → 公開・売上の記録 → Xの投稿 =====
 // AI社員を動かす（バックグラウンド）。短時間に呼び出しが集中すると安全装置で止まるので、そのときは1分待ってもう一度動かす
+const runNowTexts = [];
 async function runMediaUntil(path, text, tries = 5) {
   for (let i = 0; i < tries; i++) {
     await page.goto(`${BASE}/media/management`);
     await page.getByRole("button", { name: "今すぐAI社員を動かす" }).click();
-    await page.getByRole("status").filter({ hasText: /AI社員が仕事を始めました/ }).waitFor();
+    // 始めたとき（「〇〇」から仕事を始めました）も、前の仕事がまだ続いているとき（理由が出る）も、結果がボタンの下に残る
+    await page.locator("[data-run-now-result]").waitFor({ timeout: 30_000 });
+    runNowTexts.push(await page.locator("[data-run-now-result]").innerText());
     for (let w = 0; w < 6; w++) {
       await page.waitForTimeout(5000);
       await page.goto(`${BASE}${path}`);
@@ -517,6 +528,7 @@ check("タブに「記事」がある（ライフはメニューから外した�
   (await page.locator("nav[aria-label=メインメニュー] a[href='/media/articles']").count()) === 1 &&
   (await page.locator("nav[aria-label=メインメニュー] a[href='/life']").count()) === 0);
 const researched = await runMediaUntil("/media/research", "選定");
+check("「今すぐAI社員を動かす」を押すと、何から始めたかがボタンの下に出る", /AI社員が「複数ジャンルの市場調査」から仕事を始めました/.test(runNowTexts[0] ?? ""), runNowTexts[0]);
 check("市場調査部が複数ジャンルを調べ、上位3つを深掘りして1つを選ぶ", researched && (await page.getByText("深掘りした上位3ジャンル").count()) === 1 && (await page.getByText(/調べたジャンル（\d+）/).count()) === 1);
 check("ジャンルは100点満点で評価され、項目ごとの点数が出る", (await page.getByText("読者需要").count()) > 0 && (await page.getByText("運営コスト").count()) > 0);
 await shot("40-media-research");

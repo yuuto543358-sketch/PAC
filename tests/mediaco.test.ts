@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb, getDb } from "@/lib/db";
 import { mockHooks } from "@/lib/ai/client";
-import { decideNext, runMediaEngine, QUALITY_PASS, writeTask, type ArticleRow } from "@/lib/mediaco/engine";
+import { decideNext, mediaReadiness, runMediaEngine, QUALITY_PASS, writeTask, type ArticleRow } from "@/lib/mediaco/engine";
 import { ARTICLE_STYLE_RULES } from "@/lib/mediaco/style";
 import { modelForTier, tierFor, CHEAP_MODEL } from "@/lib/mediaco/budget";
 import { startJob, finishJob } from "@/lib/mediaco/jobs";
@@ -311,5 +311,58 @@ describe("予算のルールと、二重実行の防止", () => {
     expect(scores.reader_demand).toBe(20);
     expect(scores.paid_demand).toBe(0);
     expect(total).toBe(80);
+  });
+});
+
+describe("「今すぐAI社員を動かす」：動けないときは、黙らずに理由を伝える", () => {
+  it("今日の分が終わっていたら、そう伝える（定期実行の記録にも理由が残る）", async () => {
+    const sql = await getDb();
+    const day = at("2030-06-12");
+    // その日の仕事を全部終わらせる
+    for (let i = 0; i < 4; i++) {
+      const r = await runMediaEngine(sql, { now: day, maxSteps: 30 });
+      if (r.steps.length === 0) {
+        expect(r.idleReason).toMatch(/今日の記事/);
+        break;
+      }
+    }
+    const ready = await mediaReadiness(sql, day);
+    expect(ready.ok).toBe(false);
+    if (!ready.ok) expect(ready.reason).toMatch(/今日の記事は、予定の本数（1日1本）/);
+  });
+
+  it("緊急停止・オフ・別の作業中・予算の上限のときは、その理由を伝える", async () => {
+    const sql = await getDb();
+    await sql`update company_settings set emergency_stop = true`;
+    expect(await mediaReadiness(sql)).toEqual({ ok: false, reason: expect.stringMatching(/緊急停止中/) });
+    await sql`update company_settings set emergency_stop = false, media_enabled = false`;
+    expect(await mediaReadiness(sql)).toEqual({ ok: false, reason: expect.stringMatching(/自動運営がオフ/) });
+    await sql`update company_settings set media_enabled = true, media_lease_until = now() + interval '3 minutes', media_lease_owner = 'other'`;
+    expect(await mediaReadiness(sql)).toEqual({ ok: false, reason: expect.stringMatching(/すでに仕事をしています/) });
+    await sql`update company_settings set media_lease_until = null, media_lease_owner = ''`;
+    await sql`update budgets set daily_limit_jpy = 0.01`;
+    expect(await mediaReadiness(sql)).toEqual({ ok: false, reason: expect.stringMatching(/1日の上限/) });
+    await sql`update budgets set daily_limit_jpy = 100000, monthly_limit_jpy = 0.01, emergency_stop_jpy = 0.01`;
+    expect(await mediaReadiness(sql)).toEqual({ ok: false, reason: expect.stringMatching(/今月の予算の上限/) });
+  });
+
+  it("最初の市場調査が失敗で止まっても、ずっと止まったままにならない（ボタンならすぐ、定期実行なら12時間後にやり直す）", async () => {
+    await resetMedia();
+    const sql = await getDb();
+    await sql`insert into media_research_runs (kind, status, finished_at) values ('initial', 'failed', now())`;
+    // 定期実行：失敗したばかりなので、まだやり直さない（理由は記録に残る）
+    const r = await runMediaEngine(sql, { now: new Date(), maxSteps: 1, trigger: "scheduled" });
+    expect(r.steps).toEqual([]);
+    expect(r.idleReason).toMatch(/市場調査が続けて失敗/);
+    // ボタン：すぐにやり直す
+    const ready = await mediaReadiness(sql);
+    expect(ready).toEqual({ ok: true, label: "複数ジャンルの市場調査" });
+    const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from media_research_runs where status = 'screening'`;
+    expect(n).toBe(1);
+    // 定期実行でも、12時間たてばやり直す
+    await sql`update media_research_runs set status = 'failed', finished_at = now() where status = 'screening'`;
+    const later = new Date(Date.now() + 13 * 3600_000);
+    const next = await decideNext(sql, await getSettings(sql), "normal", later);
+    expect(next?.kind).toBe("research.screen");
   });
 });

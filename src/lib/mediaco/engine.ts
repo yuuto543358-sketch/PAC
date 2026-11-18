@@ -8,7 +8,7 @@ import { addDaysJst, jstDateParts } from "@/lib/format";
 import { similarity } from "@/lib/dedupe";
 import { createApproval } from "@/lib/repo/approvals";
 import { audit } from "@/lib/repo/audit";
-import { getSettings, type CompanySettings } from "@/lib/repo/settings";
+import { getBudget, getSettings, type CompanySettings } from "@/lib/repo/settings";
 import { checkPostLength } from "@/lib/sns/post";
 import { SNS_STYLE_RULES } from "@/lib/sns/style";
 import { ARTICLE_STYLE_RULES, POST_STYLE_RULES } from "./style";
@@ -72,7 +72,13 @@ export type EngineAction = {
 
 type StepCtx = { sql: Sql; settings: CompanySettings; tier: BudgetTier; model: string; date: string; now: Date };
 
-export type EngineResult = { status: "ran" | "busy" | "off"; steps: { kind: string; status: string; summary: string }[]; stoppedReason?: string };
+export type EngineResult = {
+  status: "ran" | "busy" | "off";
+  steps: { kind: string; status: string; summary: string }[];
+  stoppedReason?: string;
+  /** 何もしなかったときの理由（経営者に見せる・定期実行の記録に残す） */
+  idleReason?: string;
+};
 
 // ===== AIの呼び出し（担当の部署・社員として） =====
 
@@ -633,7 +639,16 @@ async function failedCount(sql: Sql, kind: string, refId: string) {
   return r.n;
 }
 
-export async function decideNext(sql: Sql, settings: CompanySettings, tier: BudgetTier, now: Date): Promise<EngineAction | null> {
+/** 市場調査が失敗で止まったとき、自動でやり直すまでの時間（費用をかけすぎないよう、すぐにはくり返さない。ボタンならすぐやり直す） */
+const RESEARCH_RETRY_HOURS = 12;
+
+export async function decideNext(
+  sql: Sql,
+  settings: CompanySettings,
+  tier: BudgetTier,
+  now: Date,
+  opts: { manual?: boolean } = {},
+): Promise<EngineAction | null> {
   const { date, weekday } = jstDateParts(now);
   const monday = addDaysJst(date, -((weekday + 6) % 7));
   const month = date.slice(0, 7);
@@ -648,7 +663,16 @@ export async function decideNext(sql: Sql, settings: CompanySettings, tier: Budg
     const [any] = await sql<{ n: number }[]>`select count(*)::int as n from media_research_runs where kind = 'initial'`;
     if (any.n === 0) {
       await sql`insert into media_research_runs (kind, status) values ('initial', 'screening')`;
-      return decideNext(sql, settings, tier, now);
+      return decideNext(sql, settings, tier, now, opts);
+    }
+    // 最初の市場調査が失敗で止まったまま（メディアがない）→ やり直す（以前は二度と動かなかった）。
+    // 「今すぐ動かす」ならすぐ、定期実行なら前の失敗から12時間たってから
+    const [last] = await sql<{ status: string; stale: boolean }[]>`
+      select status, (coalesce(finished_at, started_at) < ${now}::timestamptz - make_interval(hours => ${RESEARCH_RETRY_HOURS})) as stale
+      from media_research_runs where kind in ('initial','rerun') order by started_at desc limit 1`;
+    if (last?.status === "failed" && (opts.manual || last.stale)) {
+      await sql`insert into media_research_runs (kind, status) values ('initial', 'screening')`;
+      return decideNext(sql, settings, tier, now, opts);
     }
   }
   if (run) {
@@ -660,7 +684,7 @@ export async function decideNext(sql: Sql, settings: CompanySettings, tier: Budg
       return false;
     };
     if (run.status === "screening") {
-      if (await retries("research.screen")) return null;
+      if (await retries("research.screen")) return opts.manual ? decideNext(sql, settings, tier, now, opts) : null;
       return { kind: "research.screen", dept: "research", dedupeKey: `research.screen:${run.id}:${await failedCount(sql, "research.screen", run.id)}`, refType: "research_run", refId: run.id, label: "複数ジャンルの市場調査", run: (c) => screenGenres(c, run.id) };
     }
     if (run.status === "deep") {
@@ -670,7 +694,7 @@ export async function decideNext(sql: Sql, settings: CompanySettings, tier: Budg
       const next = top.findIndex((t) => !done.some((d) => d.name === t.name));
       if (next >= 0) {
         const name = top[next].name;
-        if (await retries("research.deep")) return null;
+        if (await retries("research.deep")) return opts.manual ? decideNext(sql, settings, tier, now, opts) : null;
         return { kind: "research.deep", dept: "research", dedupeKey: `research.deep:${run.id}:${name}:${await failedCount(sql, "research.deep", run.id)}`, refType: "research_run", refId: run.id, label: `「${name}」の深掘り調査`, run: (c) => deepGenre(c, run.id, name, next) };
       }
       return {
@@ -682,7 +706,7 @@ export async function decideNext(sql: Sql, settings: CompanySettings, tier: Budg
       };
     }
     if (run.status === "selected") {
-      if (await retries("brand.design")) return null;
+      if (await retries("brand.design")) return opts.manual ? decideNext(sql, settings, tier, now, opts) : null;
       return { kind: "brand.design", dept: "bizdev", dedupeKey: `brand.design:${run.id}:${await failedCount(sql, "brand.design", run.id)}`, refType: "research_run", refId: run.id, label: "メディアブランドの設計", run: (c) => designBrand(c, run.id) };
     }
   }
@@ -809,14 +833,15 @@ export async function recordArticleFailure(sql: Sql, articleId: string, message:
 export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: number; deadlineMs?: number; trigger?: string } = {}): Promise<EngineResult> {
   const log = createStepLogger("media");
   const settings = await getSettings(sql);
-  if (!settings.media_enabled || settings.emergency_stop || !isAiConfigured()) return { status: "off", steps: [] };
+  if (!settings.media_enabled || settings.emergency_stop || !isAiConfigured()) return { status: "off", steps: [], idleReason: offReason(settings) ?? undefined };
   const owner = `media-${Math.random().toString(36).slice(2, 10)}`;
   const [lease] = await sql<{ ok: number }[]>`
     update company_settings set media_lease_until = now() + interval '5 minutes', media_lease_owner = ${owner}
     where id = 1 and (media_lease_until is null or media_lease_until < now()) returning 1 as ok`;
-  if (!lease) return { status: "busy", steps: [] };
+  if (!lease) return { status: "busy", steps: [], idleReason: "別の場所でAI社員がすでに仕事をしています" };
   const steps: EngineResult["steps"] = [];
   let stoppedReason: string | undefined;
+  let idleReason: string | undefined;
   const maxSteps = opts.maxSteps ?? 6;
   const deadline = Date.now() + (opts.deadlineMs ?? 150_000);
   try {
@@ -830,8 +855,11 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
         stoppedReason = "予算の上限に達しました";
         break;
       }
-      const action = await decideNext(sql, s, tier, now);
-      if (!action) break;
+      const action = await decideNext(sql, s, tier, now, { manual: opts.trigger === "manual" });
+      if (!action) {
+        if (steps.length === 0) idleReason = await explainIdle(sql, s, tier, now);
+        break;
+      }
       // 残り時間が足りないときは、時間のかかる仕事を始めない（途中で切れないように。次の実行で行う）
       if (deadline - Date.now() < (HEAVY_KINDS.has(action.kind) ? HEAVY_STEP_MS : LIGHT_STEP_MS)) break;
       const job = await startJob(sql, { kind: action.kind, dept: action.dept, dedupeKey: action.dedupeKey, refType: action.refType, refId: action.refId });
@@ -857,6 +885,67 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
   } finally {
     await sql`update company_settings set media_lease_until = null, media_lease_owner = '' where id = 1 and media_lease_owner = ${owner}`;
   }
-  log.step("media engine", { trigger: opts.trigger, steps: steps.length, stoppedReason });
-  return { status: "ran", steps, stoppedReason };
+  log.step("media engine", { trigger: opts.trigger, steps: steps.length, stoppedReason, idleReason });
+  return { status: "ran", steps, stoppedReason, idleReason: idleReason ?? (steps.length === 0 ? stoppedReason : undefined) };
+}
+
+// ===== 「今すぐ動かす」の前の確認：動けないときは、その理由を経営者に伝える（黙って何もしないことをなくす） =====
+
+/** そもそも動けない設定になっているときの理由 */
+function offReason(settings: CompanySettings): string | null {
+  if (settings.emergency_stop) return "緊急停止中のため、AI社員は動けません。「設定」の緊急停止を解除すると動きます。";
+  if (!settings.media_enabled) return "AIメディアの自動運営がオフになっています。「メディアの設定」でオンにすると動きます。";
+  if (!isAiConfigured()) return "AIのキー（OPENAI_API_KEY）が設定されていないため、AI社員は動けません。";
+  return null;
+}
+
+/** やることが見つからなかったときの理由（今日の分は終わった・予算が95%を超えた など） */
+export async function explainIdle(sql: Sql, settings: CompanySettings, tier: BudgetTier, now: Date): Promise<string> {
+  const { date } = jstDateParts(now);
+  const [brand] = await sql<{ id: string }[]>`select id from media_brands where status = 'active' order by created_at desc limit 1`;
+  if (!brand) {
+    const [last] = await sql<{ status: string }[]>`
+      select status from media_research_runs where kind in ('initial','rerun') order by started_at desc limit 1`;
+    if (last?.status === "failed") {
+      return `市場調査が続けて失敗したため、いったん止まっています（${RESEARCH_RETRY_HOURS}時間後に自動でやり直します）。「今すぐAI社員を動かす」を押すと、すぐにやり直します。`;
+    }
+    return "メディアの準備（市場調査・ブランドづくり）を進めるところです。少し待ってから、もう一度押してください。";
+  }
+  const [{ today }] = await sql<{ today: number }[]>`
+    select count(*)::int as today from media_articles where brand_id = ${brand.id} and (created_at at time zone 'Asia/Tokyo')::date = ${date}::date`;
+  if (tier === "critical") {
+    return "AIの今月の予算が95%を超えたため、新しい記事の企画・Xの投稿案は止めています（作りかけの記事は進めます）。「設定」の予算を上げると再開します。";
+  }
+  if (today >= settings.media_articles_per_day) {
+    return `今日の記事は、予定の本数（1日${settings.media_articles_per_day}本）をもう作り始めています。Xの投稿案も今日の分はできています。次の記事は明日つくります（本数は「メディアの設定」で変えられます）。`;
+  }
+  return "いまは、やることがありません。次の自動実行（1日4回）で、また仕事を探します。";
+}
+
+export type MediaReadiness = { ok: true; label: string } | { ok: false; reason: string };
+
+/**
+ * 「今すぐAI社員を動かす」を押したとき、本当に仕事を始められるかを先に確かめる。
+ * 始められないときは、その理由（オフ・緊急停止・予算・別の作業中・今日の分は終わった など）を返す。
+ */
+export async function mediaReadiness(sql: Sql, now: Date = new Date()): Promise<MediaReadiness> {
+  const settings = await getSettings(sql);
+  const off = offReason(settings);
+  if (off) return { ok: false, reason: off };
+  const [busy] = await sql<{ mins: number }[]>`
+    select ceil(extract(epoch from (media_lease_until - now())) / 60)::int as mins from company_settings
+    where id = 1 and media_lease_until > now()`;
+  if (busy) return { ok: false, reason: `いま、AI社員がすでに仕事をしています（あと最大${Math.max(1, busy.mins)}分）。終わったら結果が画面に出ます。` };
+  const { tier, todayJpy } = await getBudgetTier(sql);
+  if (tier === "stopped") return { ok: false, reason: "AIの今月の予算の上限に達したため、AI社員は動けません。「設定」の予算を上げると再開します。" };
+  const budget = await getBudget(sql);
+  if (todayJpy >= Number(budget.daily_limit_jpy)) {
+    return {
+      ok: false,
+      reason: `今日のAIの利用料が1日の上限（${Math.round(Number(budget.daily_limit_jpy))}円）に達したため、AI社員は動けません。明日になると自動で再開します（上限は「設定」で変えられます）。`,
+    };
+  }
+  const action = await decideNext(sql, settings, tier, now, { manual: true });
+  if (!action) return { ok: false, reason: await explainIdle(sql, settings, tier, now) };
+  return { ok: true, label: action.label };
 }
