@@ -445,7 +445,7 @@ check("ジャンルは100点満点で評価され、項目ごとの点数が出�
 await shot("40-media-research");
 await page.goto(`${BASE}/media/brand`);
 const branded = (await page.getByText("販売商品").count()) > 0 || (await runMediaUntil("/media/brand", "販売商品"));
-check("事業開発部がメディアブランド（名前・読者・紹介文・商品）を設計する", branded && (await page.getByText("X の紹介文").count()) === 1);
+check("事業開発部がメディアブランド（名前・読者・紹介文・商品）を設計する", branded && (await page.getByText("X の紹介文", { exact: true }).count()) === 1);
 await page.fill("input[name=note_url]", "https://note.com/test_media");
 await page.fill("input[name=x_handle]", "@test_media");
 await page.getByRole("button", { name: "アカウントを記録する" }).click();
