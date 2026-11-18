@@ -62,6 +62,8 @@ export type StructuredCallInput<T extends z.ZodType> = {
   webSearch?: { maxCalls: number } | null;
   /** テスト用モックモードで返す内容 */
   mock: () => z.infer<T>;
+  /** 返事を待つ最長の時間（ミリ秒）。長い記事を書くときだけ長くする（ふだんは90秒） */
+  timeoutMs?: number;
 };
 
 /** Web検索で参照したページ */
@@ -247,7 +249,7 @@ export async function callStructured<T extends z.ZodType>(
             include: ["web_search_call.action.sources" as const],
           }
         : {}),
-    });
+    }, input.timeoutMs ? { timeout: input.timeoutMs } : undefined);
   } catch (err) {
     return handleApiError(sql, reservation, input.model, err);
   }

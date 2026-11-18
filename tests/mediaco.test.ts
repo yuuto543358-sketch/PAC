@@ -4,6 +4,7 @@ import { closeDb, getDb } from "@/lib/db";
 import { mockHooks } from "@/lib/ai/client";
 import { decideNext, mediaReadiness, runMediaEngine, QUALITY_PASS, writeTask, type ArticleRow } from "@/lib/mediaco/engine";
 import { ARTICLE_STYLE_RULES } from "@/lib/mediaco/style";
+import { kickMediaChain, MAX_CHAIN_HOPS, shouldContinue } from "@/lib/mediaco/chain";
 import { modelForTier, tierFor, CHEAP_MODEL } from "@/lib/mediaco/budget";
 import { startJob, finishJob } from "@/lib/mediaco/jobs";
 import { normalizeScores } from "@/lib/mediaco/schemas";
@@ -201,6 +202,23 @@ describe("修正待ちで止まらない", () => {
     await sql`update media_articles set status = 'rejected' where id = ${row.id}`;
   });
 
+  it("品質検査のあとの修正（記事全体を書き直す）は、時間に余裕があるときだけ始め、足りなければ「続きがある」として次の実行に回す", async () => {
+    const sql = await getDb();
+    const brand = (await getActiveBrand(sql))!;
+    const [row] = await sql<{ id: string }[]>`
+      insert into media_articles (brand_id, theme, status, body, quality) values (${brand.id}, '修正の時間のテスト', 'checked', '本文', ${sql.json({ issues: ["直す点"] })}) returning id`;
+    // 150秒しかない実行（定期実行と同じ）では、修正を始めない。続きがあるので、次の実行につなぐ
+    const short = await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 3, deadlineMs: 150_000 });
+    expect(short.steps.some((st) => st.kind === "article.revise")).toBe(false);
+    expect(short.more).toBe(true);
+    expect(await sql`select 1 from media_jobs where ref_id = ${row.id}`).toHaveLength(0);
+    // 次の実行（つないだ先・最初から時間がある）で修正して、完成にする
+    const next = await runMediaEngine(sql, { now: at(MONDAY), maxSteps: 3 });
+    expect(next.steps[0]?.kind).toBe("article.revise");
+    const [a] = await sql<{ status: string }[]>`select status from media_articles where id = ${row.id}`;
+    expect(a.status).toBe("ready");
+  });
+
   it("記事を書く指示に、AIっぽさのない自然な文章・初心者に分かる言葉のルールが入っている", () => {
     expect(ARTICLE_STYLE_RULES).toContain("AIの文章によくある書き方をしない");
     expect(ARTICLE_STYLE_RULES).toContain("初心者");
@@ -364,5 +382,60 @@ describe("「今すぐAI社員を動かす」：動けないときは、黙ら�
     const later = new Date(Date.now() + 13 * 3600_000);
     const next = await decideNext(sql, await getSettings(sql), "normal", later);
     expect(next?.kind).toBe("research.screen");
+  });
+});
+
+describe("1回で終わらない仕事は、次の実行につないで続ける（品質検査のあとで止まらない）", () => {
+  it("回数・時間で区切っただけなら「続きがある」、やることがなければ「続きはない」", async () => {
+    await resetMedia();
+    const sql = await getDb();
+    const day = at("2030-07-03");
+    const first = await runMediaEngine(sql, { now: day, maxSteps: 2 });
+    expect(first.steps).toHaveLength(2);
+    expect(first.more).toBe(true);
+    expect(shouldContinue(first)).toBe(true);
+    // 最後まで進めると、続きはない
+    let last = first;
+    for (let i = 0; i < 20 && last.more; i++) last = await runMediaEngine(sql, { now: day, maxSteps: 6 });
+    expect(last.more).toBe(false);
+    expect(shouldContinue(last)).toBe(false);
+    // 記事は品質検査のあと、止まらずに完成（公開待ち）まで進んでいる
+    const [a] = await sql<{ status: string }[]>`select status from media_articles order by created_at desc limit 1`;
+    expect(["ready", "published"]).toContain(a.status);
+  });
+
+  it("予算で止まった・失敗ばかり・やることがない、ときはつながない", () => {
+    expect(shouldContinue({ status: "ran", steps: [{ kind: "x", status: "done", summary: "" }], more: true, stoppedReason: "予算の上限" })).toBe(false);
+    expect(shouldContinue({ status: "ran", steps: [{ kind: "x", status: "failed", summary: "" }], more: true })).toBe(false);
+    expect(shouldContinue({ status: "ran", steps: [{ kind: "x", status: "done", summary: "" }], more: false })).toBe(false);
+    expect(shouldContinue({ status: "busy", steps: [] })).toBe(false);
+    expect(shouldContinue(null)).toBe(false);
+  });
+
+  it("次の実行を呼ぶときは合言葉をつけ、つなぐ回数には上限がある", async () => {
+    const http = await import("node:http");
+    const got: { url?: string; auth?: string; method?: string }[] = [];
+    const server = http.createServer((req, res) => {
+      got.push({ url: req.url, auth: req.headers.authorization, method: req.method });
+      res.statusCode = 202;
+      res.end("{}");
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    const port = (server.address() as { port: number }).port;
+    const prev = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "test-secret-for-chain";
+    try {
+      expect(await kickMediaChain(`http://127.0.0.1:${port}`, 2)).toBe(true);
+      expect(got[0]).toEqual({ url: "/api/cron/media?hop=2", auth: "Bearer test-secret-for-chain", method: "POST" });
+      expect(await kickMediaChain(`http://127.0.0.1:${port}`, MAX_CHAIN_HOPS + 1)).toBe(false);
+      expect(await kickMediaChain(null, 1)).toBe(false);
+      delete process.env.CRON_SECRET;
+      expect(await kickMediaChain(`http://127.0.0.1:${port}`, 1)).toBe(false);
+      expect(got).toHaveLength(1);
+    } finally {
+      if (prev === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = prev;
+      server.close();
+    }
   });
 });

@@ -617,6 +617,15 @@ check("設定に「最後に自動で動いた時刻」が出る", (await page.g
 // 定期実行の入口は、合言葉（CRON_SECRET）がないと動かない
 const cronRes = await page.request.get(`${BASE}/api/cron/workflow`);
 check("定期実行は合言葉なしでは動かない", cronRes.status() === 401);
+// メディアの仕事の「続き」を進める入口：合言葉がないと動かない・つなぐ回数に上限がある・合言葉つきなら受け付ける
+{
+  const auth = { Authorization: `Bearer ${process.env.CRON_SECRET ?? "cron-secret-for-local-test-0123456789"}` };
+  const noAuth = await page.request.post(`${BASE}/api/cron/media?hop=1`);
+  const tooMany = await page.request.post(`${BASE}/api/cron/media?hop=99`, { headers: auth });
+  const okRes = await page.request.post(`${BASE}/api/cron/media?hop=1`, { headers: auth });
+  check("続きを進める入口：合言葉なしは401、つなぎすぎは400、合言葉つきは受け付けて裏で進める（202）",
+    noAuth.status() === 401 && tooMany.status() === 400 && okRes.status() === 202, `${noAuth.status()} ${tooMany.status()} ${okRes.status()}`);
+}
 
 // PWA
 const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();

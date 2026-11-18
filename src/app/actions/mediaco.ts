@@ -2,12 +2,13 @@
 
 import { refresh } from "next/cache";
 import { after } from "next/server";
+import { headers } from "next/headers";
 import { assertAuth } from "@/lib/auth/dal";
 import { getDb } from "@/lib/db";
 import { createStepLogger } from "@/lib/log";
 import { audit } from "@/lib/repo/audit";
-import { mediaReadiness, runMediaEngine } from "@/lib/mediaco/engine";
-import { dispatchNotifications } from "@/lib/notify";
+import { mediaReadiness } from "@/lib/mediaco/engine";
+import { chainOrigin, runMediaChainStep } from "@/lib/mediaco/chain";
 import { markArticlePublished, recordArticleMetrics, recordPost, updateBrandAccounts } from "@/lib/mediaco/repo";
 import type { ActionState } from "@/components/forms";
 
@@ -28,12 +29,14 @@ export async function runMediaNowAction(): Promise<ActionState> {
     await assertAuth();
     const ready = await mediaReadiness(await getDb());
     if (!ready.ok) return { ok: false, error: ready.reason, ts: Date.now() };
+    // 1回（約3分）で終わらなければ、次の実行につないで続ける（品質検査のあとの修正まで、待たずに進む）
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const origin = chainOrigin(host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : null);
     after(async () => {
       try {
         const sql = await getDb();
-        await runMediaEngine(sql, { maxSteps: 6, deadlineMs: 190_000, trigger: "manual" });
-        // 記事ができた・承認のお願いなどの通知を送る
-        await dispatchNotifications(sql);
+        await runMediaChainStep(sql, { origin, hop: 0, trigger: "manual" });
       } catch (err) {
         createStepLogger("media").fail("manual run", err);
       }

@@ -3,6 +3,7 @@ import { createStepLogger } from "@/lib/log";
 import { runWorkflows } from "@/lib/workflow/engine";
 import { runScheduledJobs } from "@/lib/autonomy/scheduler";
 import { dispatchNotifications } from "@/lib/notify";
+import { chainOrigin, kickMediaChain, shouldContinue } from "@/lib/mediaco/chain";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -33,6 +34,8 @@ export async function GET(request: Request) {
     }
     // 1回の実行は5分（300秒）で打ち切られるため、AIの1回の呼び出し（最大90秒）がはみ出しても間に合うように残す
     const r = await runWorkflows(sql, { maxSteps: 30, deadlineMs: Math.max(20_000, 190_000 - (Date.now() - started)) });
+    // メディアの仕事が時間で区切られたなら、次の実行につないで続ける（次の自動実行まで待たない）
+    if (jobs?.media && shouldContinue(jobs.media)) await kickMediaChain(chainOrigin(new URL(request.url).origin), 1);
     let push = null;
     try {
       push = await dispatchNotifications(sql);

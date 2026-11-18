@@ -78,6 +78,8 @@ export type EngineResult = {
   stoppedReason?: string;
   /** 何もしなかったときの理由（経営者に見せる・定期実行の記録に残す） */
   idleReason?: string;
+  /** 時間（または1回の上限の数）で区切っただけで、まだ続きの仕事がある（すぐ次の実行につなげてよい） */
+  more?: boolean;
 };
 
 // ===== AIの呼び出し（担当の部署・社員として） =====
@@ -100,7 +102,7 @@ async function brandBrief(sql: Sql) {
 async function ai<T extends z.ZodType>(
   ctx: StepCtx,
   dept: Dept,
-  opts: { kind: string; task: string; schema: T; schemaName: string; maxTokens: number; webSearch?: number; mock: () => z.infer<T>; forOwner?: boolean },
+  opts: { kind: string; task: string; schema: T; schemaName: string; maxTokens: number; webSearch?: number; mock: () => z.infer<T>; forOwner?: boolean; timeoutMs?: number },
 ) {
   const me = await employeeBrief(ctx.sql, dept);
   const system = `あなたは「${ctx.settings.company_name}」（AI Media Company）の${me.department}の AI 社員「${me.name}」（${me.role_title}）です。
@@ -136,6 +138,7 @@ ${opts.forOwner ? `\n${PLAIN_LANGUAGE_RULES}\n\n${CONVERSATION_STYLE}` : ""}
     employeeId: me.employeeId,
     webSearch: opts.webSearch && ctx.settings.web_research_enabled && ctx.tier === "normal" ? { maxCalls: opts.webSearch } : null,
     mock: opts.mock,
+    timeoutMs: opts.timeoutMs,
   });
   if (!r.ok) throw new AiUnavailableError(r.message);
   return { data: r.data as z.infer<T>, costJpy: r.costJpy, sources: r.sources };
@@ -373,6 +376,7 @@ async function writeArticle(ctx: StepCtx, a: ArticleRow) {
     schema: WriteSchema,
     schemaName: "media_write",
     maxTokens: 9000,
+    timeoutMs: LONG_STEP_TIMEOUT_MS,
     mock: () => mockWrite(a.theme, a.price_jpy),
   });
   const w = data as WriteOutput;
@@ -435,6 +439,7 @@ async function reviseArticle(ctx: StepCtx, a: ArticleRow) {
     schema: WriteSchema,
     schemaName: "media_revise",
     maxTokens: 9000,
+    timeoutMs: LONG_STEP_TIMEOUT_MS,
     mock: () => mockWrite(a.theme, a.price_jpy, true),
   });
   const w = data as WriteOutput;
@@ -807,6 +812,14 @@ export async function decideNext(
 const HEAVY_KINDS = new Set(["article.write", "article.revise", "article.research", "research.screen", "research.deep", "brand.design", "article.plan"]);
 const HEAVY_STEP_MS = 100_000;
 const LIGHT_STEP_MS = 30_000;
+/**
+ * 記事を書く・直す仕事は、記事全体を書くので時間がかかる（ふつうの90秒では足りずに失敗することがあった）。
+ * 返事を最長150秒まで待ち、残り時間がそれ以上あるとき（実行の最初のほう）だけ始める。足りなければ次の実行につなぐ。
+ */
+const LONG_KINDS = new Set(["article.write", "article.revise"]);
+const LONG_STEP_TIMEOUT_MS = 150_000;
+const LONG_STEP_MS = 160_000;
+const stepTimeNeeded = (kind: string) => (LONG_KINDS.has(kind) ? LONG_STEP_MS : HEAVY_KINDS.has(kind) ? HEAVY_STEP_MS : LIGHT_STEP_MS);
 
 /**
  * 記事の仕事が失敗したときに数える。3回失敗したら：
@@ -842,8 +855,10 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
   const steps: EngineResult["steps"] = [];
   let stoppedReason: string | undefined;
   let idleReason: string | undefined;
+  // ループを抜けた理由。時間・回数で区切っただけなら、続きがある
+  let ended: "idle" | "budget" | "duplicate" | "time" | null = null;
   const maxSteps = opts.maxSteps ?? 6;
-  const deadline = Date.now() + (opts.deadlineMs ?? 150_000);
+  const deadline = Date.now() + (opts.deadlineMs ?? 190_000);
   try {
     // 途中で止まった仕事（サーバーの時間切れなど）は失敗として数え、次は別の回としてやり直す（同じ所で止まり続けないように）
     for (const articleId of await cleanupStaleJobs(sql)) await recordArticleFailure(sql, articleId, STALE_JOB_MESSAGE);
@@ -853,17 +868,25 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
       const { tier } = await getBudgetTier(sql);
       if (tier === "stopped") {
         stoppedReason = "予算の上限に達しました";
+        ended = "budget";
         break;
       }
       const action = await decideNext(sql, s, tier, now, { manual: opts.trigger === "manual" });
       if (!action) {
         if (steps.length === 0) idleReason = await explainIdle(sql, s, tier, now);
+        ended = "idle";
         break;
       }
       // 残り時間が足りないときは、時間のかかる仕事を始めない（途中で切れないように。次の実行で行う）
-      if (deadline - Date.now() < (HEAVY_KINDS.has(action.kind) ? HEAVY_STEP_MS : LIGHT_STEP_MS)) break;
+      if (deadline - Date.now() < stepTimeNeeded(action.kind)) {
+        ended = "time";
+        break;
+      }
       const job = await startJob(sql, { kind: action.kind, dept: action.dept, dedupeKey: action.dedupeKey, refType: action.refType, refId: action.refId });
-      if (!job) break; // 同じ仕事がすでに記録されている（ほかの場所で動いた）
+      if (!job) {
+        ended = "duplicate"; // 同じ仕事がすでに記録されている（ほかの場所で動いた）
+        break;
+      }
       await sql`update company_settings set media_lease_until = now() + interval '5 minutes' where id = 1 and media_lease_owner = ${owner}`;
       const ctx: StepCtx = { sql, settings: s, tier, model: modelForTier(tier, s.model_standard), date: jstDateParts(now).date, now };
       try {
@@ -877,6 +900,7 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
         if (action.refType === "article") await recordArticleFailure(sql, action.refId, message);
         if (err instanceof BudgetBlockedError) {
           stoppedReason = message;
+          ended = "budget";
           break;
         }
         if (!(err instanceof AiUnavailableError)) log.fail(action.kind, err);
@@ -885,8 +909,10 @@ export async function runMediaEngine(sql: Sql, opts: { now?: Date; maxSteps?: nu
   } finally {
     await sql`update company_settings set media_lease_until = null, media_lease_owner = '' where id = 1 and media_lease_owner = ${owner}`;
   }
-  log.step("media engine", { trigger: opts.trigger, steps: steps.length, stoppedReason, idleReason });
-  return { status: "ran", steps, stoppedReason, idleReason: idleReason ?? (steps.length === 0 ? stoppedReason : undefined) };
+  // 回数の上限・時間で抜けたとき（ended が null のまま）も、続きがある
+  const more = (ended === "time" || ended === null) && !stoppedReason;
+  log.step("media engine", { trigger: opts.trigger, steps: steps.length, stoppedReason, idleReason, more });
+  return { status: "ran", steps, stoppedReason, idleReason: idleReason ?? (steps.length === 0 ? stoppedReason : undefined), more };
 }
 
 // ===== 「今すぐ動かす」の前の確認：動けないときは、その理由を経営者に伝える（黙って何もしないことをなくす） =====
